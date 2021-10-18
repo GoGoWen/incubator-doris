@@ -159,6 +159,14 @@ OLAPStatus Reader::init(const ReaderParams& read_params) {
             break;
         }
     }
+
+    // as _direct_agg_key_next_row has issue when read for query, so always use _agg_key_next_row to accelate query
+    // and let compaction run more time,
+    // TODO - the better fix
+    if(_tablet->keys_type() == AGG_KEYS){
+        _next_row_func = &Reader::_agg_key_next_row;
+    }
+
     DCHECK(_next_row_func != nullptr) << "No next row function for type:" << _tablet->keys_type();
 
     return OLAP_SUCCESS;
