@@ -158,6 +158,9 @@ public:
     // Returns true if row_batch has reached capacity.
     bool is_full() { return _num_rows == _capacity; }
 
+    // Returns true if uncommited rows has reached capacity.
+    bool is_full_uncommited() { return _num_uncommitted_rows == _capacity; }
+
     // Returns true if the row batch has accumulated enough external memory (in MemPools
     // and io buffers).  This would be a trigger to compact the row batch or reclaim
     // the memory in some way.
@@ -237,6 +240,9 @@ public:
     ObjectPool* agg_object_pool() { return _agg_object_pool.get(); }
     int num_io_buffers() const { return _io_buffers.size(); }
     int num_tuple_streams() const { return _tuple_streams.size(); }
+
+    // increase # of uncommitted rows
+    void increase_uncommitted_rows();
 
     // Resets the row batch, returning all resources it has accumulated.
     void reset();
@@ -397,9 +403,10 @@ private:
 
     // All members need to be handled in RowBatch::swap()
 
-    bool _has_in_flight_row; // if true, last row hasn't been committed yet
-    int _num_rows;           // # of committed rows
-    int _capacity;           // maximum # of rows
+    bool _has_in_flight_row;       // if true, last row hasn't been committed yet
+    int _num_rows;                 // # of committed rows
+    int _num_uncommitted_rows;     // # of uncommited rows in row batch mem pool
+    int _capacity;                 // maximum # of rows
 
     /// If FLUSH_RESOURCES, the resources attached to this batch should be freed or
     /// acquired by a new owner as soon as possible. See MarkFlushResources(). If
