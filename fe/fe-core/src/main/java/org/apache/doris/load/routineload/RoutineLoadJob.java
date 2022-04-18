@@ -562,6 +562,12 @@ public abstract class RoutineLoadJob extends AbstractTxnStateChangeCallback impl
         return null;
     }
 
+    //implement method for compatibility
+    @Override
+    public String getHeaderType() {
+        return "";
+    }
+
     @Override
     public ImportColumnDescs getColumnExprDescs() {
         if (columnDescs == null) {

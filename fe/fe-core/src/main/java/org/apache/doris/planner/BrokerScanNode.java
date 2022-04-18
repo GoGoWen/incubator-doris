@@ -36,6 +36,7 @@ import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.BrokerUtil;
+import org.apache.doris.common.FeConstants;
 import org.apache.doris.load.BrokerFileGroup;
 import org.apache.doris.load.Load;
 import org.apache.doris.load.loadv2.LoadTask;
@@ -409,7 +410,10 @@ public class BrokerScanNode extends LoadScanNode {
                 return TFileFormatType.FORMAT_ORC;
             } else if (fileFormat.toLowerCase().equals("json")) {
                 return TFileFormatType.FORMAT_JSON;
-            } else if (fileFormat.toLowerCase().equals("csv")) {
+                // csv/csv_with_name/csv_with_names_and_types treat as csv format
+            } else if (fileFormat.toLowerCase().equals(FeConstants.csv)
+                    || fileFormat.toLowerCase().equals(FeConstants.csv_with_names)
+                    || fileFormat.toLowerCase().equals(FeConstants.csv_with_names_and_types)) {
                 return TFileFormatType.FORMAT_CSV_PLAIN;
             }
         }
@@ -432,6 +436,23 @@ public class BrokerScanNode extends LoadScanNode {
         }
     }
 
+<<<<<<< HEAD
+=======
+    public String getHostUri() throws UserException {
+        return "";
+    }
+
+    private String getHeaderType(String format_type) {
+        if (format_type != null) {
+            if (format_type.toLowerCase().equals(FeConstants.csv_with_names)
+                    || format_type.toLowerCase().equals(FeConstants.csv_with_names_and_types)) {
+                return format_type;
+            }
+        }
+        return "";
+    }
+
+>>>>>>> afce993ca ([feature](load)(csv) CSV import and export support header (#8765))
     // If fileFormat is not null, we use fileFormat instead of check file's suffix
     private void processFileGroup(
             ParamCreateContext context,
@@ -452,6 +473,8 @@ public class BrokerScanNode extends LoadScanNode {
             TBrokerFileStatus fileStatus = fileStatuses.get(i);
             long leftBytes = fileStatus.size - curFileOffset;
             long tmpBytes = curInstanceBytes + leftBytes;
+            //header_type 
+            String header_type = getHeaderType(context.fileGroup.getFileFormat());
             TFileFormatType formatType = formatType(context.fileGroup.getFileFormat(), fileStatus.path);
             List<String> columnsFromPath = BrokerUtil.parseColumnsFromPath(fileStatus.path,
                     context.fileGroup.getColumnsFromPath());
@@ -462,7 +485,7 @@ public class BrokerScanNode extends LoadScanNode {
                         || formatType == TFileFormatType.FORMAT_JSON) {
                     long rangeBytes = bytesPerInstance - curInstanceBytes;
                     TBrokerRangeDesc rangeDesc = createBrokerRangeDesc(curFileOffset, fileStatus, formatType,
-                            rangeBytes, columnsFromPath, numberOfColumnsFromFile, brokerDesc);
+                            rangeBytes, columnsFromPath, numberOfColumnsFromFile, brokerDesc, header_type);
                     if (formatType == TFileFormatType.FORMAT_JSON) {
                         rangeDesc.setStripOuterArray(context.fileGroup.isStripOuterArray());
                         rangeDesc.setJsonpaths(context.fileGroup.getJsonPaths());
@@ -476,11 +499,17 @@ public class BrokerScanNode extends LoadScanNode {
 
                 } else {
                     TBrokerRangeDesc rangeDesc = createBrokerRangeDesc(curFileOffset, fileStatus, formatType,
+<<<<<<< HEAD
                             leftBytes, columnsFromPath, numberOfColumnsFromFile, brokerDesc);
                     if (this instanceof HiveScanNode) {
                         rangeDesc.setHdfsParams(tHdfsParams);
                         rangeDesc.setReadByColumnDef(true);
                     }
+=======
+                            leftBytes, columnsFromPath, numberOfColumnsFromFile, brokerDesc, header_type);
+                    rangeDesc.setHdfsParams(tHdfsParams);
+                    rangeDesc.setReadByColumnDef(true);
+>>>>>>> afce993ca ([feature](load)(csv) CSV import and export support header (#8765))
                     brokerScanRange(curLocations).addToRanges(rangeDesc);
                     curFileOffset = 0;
                     i++;
@@ -493,7 +522,7 @@ public class BrokerScanNode extends LoadScanNode {
 
             } else {
                 TBrokerRangeDesc rangeDesc = createBrokerRangeDesc(curFileOffset, fileStatus, formatType,
-                        leftBytes, columnsFromPath, numberOfColumnsFromFile, brokerDesc);
+                        leftBytes, columnsFromPath, numberOfColumnsFromFile, brokerDesc, header_type);
                 if (formatType == TFileFormatType.FORMAT_JSON) {
                     rangeDesc.setStripOuterArray(context.fileGroup.isStripOuterArray());
                     rangeDesc.setJsonpaths(context.fileGroup.getJsonPaths());
@@ -522,7 +551,7 @@ public class BrokerScanNode extends LoadScanNode {
     private TBrokerRangeDesc createBrokerRangeDesc(long curFileOffset, TBrokerFileStatus fileStatus,
                                                    TFileFormatType formatType, long rangeBytes,
                                                    List<String> columnsFromPath, int numberOfColumnsFromFile,
-                                                   BrokerDesc brokerDesc) {
+                                                   BrokerDesc brokerDesc, String headerType) {
         TBrokerRangeDesc rangeDesc = new TBrokerRangeDesc();
         rangeDesc.setFileType(brokerDesc.getFileType());
         rangeDesc.setFormatType(formatType);
@@ -533,6 +562,7 @@ public class BrokerScanNode extends LoadScanNode {
         rangeDesc.setFileSize(fileStatus.size);
         rangeDesc.setNumOfColumnsFromFile(numberOfColumnsFromFile);
         rangeDesc.setColumnsFromPath(columnsFromPath);
+        rangeDesc.setHeaderType(headerType);
         // set hdfs params for hdfs file type.
         switch (brokerDesc.getFileType()) {
             case FILE_HDFS:
