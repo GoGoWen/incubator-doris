@@ -34,6 +34,7 @@ import org.apache.doris.catalog.Table;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
+import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.BrokerUtil;
 import org.apache.doris.load.BrokerFileGroup;
@@ -481,7 +482,7 @@ public class BrokerScanNode extends LoadScanNode {
 
                 } else {
                     TBrokerRangeDesc rangeDesc = createBrokerRangeDesc(curFileOffset, fileStatus, formatType,
-                            leftBytes, columnsFromPath, numberOfColumnsFromFile, brokerDesc, header_type);
+                            leftBytes, columnsFromPath, numberOfColumnsFromFile, brokerDesc);
                     if (rangeDesc.hdfs_params != null && rangeDesc.hdfs_params.getFsName() == null) {
                         rangeDesc.hdfs_params.setFsName(fsName);
                     } else if (rangeDesc.hdfs_params == null) {
