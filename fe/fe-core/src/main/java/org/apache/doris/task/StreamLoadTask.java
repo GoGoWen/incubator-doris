@@ -136,6 +136,11 @@ public class StreamLoadTask implements LoadTaskInfo {
         return sendBatchParallelism;
     }
 
+    @Override
+    public boolean isLoadToSingleTablet() {
+        return loadToSingleTablet;
+    }
+
     public PartitionNames getPartitions() {
         return partitions;
     }

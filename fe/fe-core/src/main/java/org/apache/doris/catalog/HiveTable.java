@@ -44,6 +44,11 @@ public class HiveTable extends Table {
     private static final String HIVE_TABLE = "table";
     public static final String HIVE_METASTORE_URIS = "hive.metastore.uris";
     public static final String HIVE_HDFS_PREFIX = "dfs";
+    private static String HDFS_FS_KEY = "fs.defaultFS";
+    private static String HDFS_USER_KEY = "hdfs_user";
+    private static String HDFS_KERB_PRINCIPAL = "kerb_principal";
+    private static String HDFS_KERB_TICKET_CACHE_PATH = "kerb_ticket_cache_path";
+    private static String HDFS_KERB_TOKEN = "kerb_token";
 
     private String hiveDb;
     private String hiveTable;
@@ -106,7 +111,12 @@ public class HiveTable extends Table {
             Iterator<Map.Entry<String, String>> iter = copiedProps.entrySet().iterator();
             while(iter.hasNext()) {
                 Map.Entry<String, String> entry = iter.next();
-                if (entry.getKey().startsWith(HIVE_HDFS_PREFIX)) {
+                if (entry.getKey().startsWith(HIVE_HDFS_PREFIX) ||
+                        entry.getKey().equals(HDFS_FS_KEY) ||
+                        entry.getKey().equals(HDFS_USER_KEY) ||
+                        entry.getKey().equals(HDFS_KERB_PRINCIPAL) ||
+                        entry.getKey().equals(HDFS_KERB_TICKET_CACHE_PATH) ||
+                        entry.getKey().equals(HDFS_KERB_TOKEN)) {
                     hiveProperties.put(entry.getKey(), entry.getValue());
                     iter.remove();
                 }

@@ -460,11 +460,11 @@ public class BrokerScanNode extends LoadScanNode {
         if (fileStatuses  == null || fileStatuses.isEmpty()) {
             return;
         }
+        // set hdfs params, used to Hive and Iceberg scan
         THdfsParams tHdfsParams = new THdfsParams();
-        if (this instanceof HiveScanNode) {
-            String fsName = ((HiveScanNode) this).getHdfsUri();
-            tHdfsParams.setFsName(fsName);
-        }
+        String fsName = getHostUri();
+        tHdfsParams.setFsName(fsName);
+        
         TScanRangeLocations curLocations = newLocations(context.params, brokerDesc);
         long curInstanceBytes = 0;
         long curFileOffset = 0;
