@@ -244,14 +244,14 @@ fi
 cd -
 echo "Finished patching $GTEST_SOURCE"
 
-# mysql patch
-cd $TP_SOURCE_DIR/$MYSQL_SOURCE
-if [ ! -f $PATCHED_MARK ]; then
-    patch -p1 < $TP_PATCH_DIR/mysql-server-mysql-5.7.18.patch
-    touch $PATCHED_MARK
-fi
-cd -
-echo "Finished patching $MYSQL_SOURCE"
+## mysql patch
+#cd $TP_SOURCE_DIR/$MYSQL_SOURCE
+#if [ ! -f $PATCHED_MARK ]; then
+#    patch -p1 < $TP_PATCH_DIR/mysql-server-mysql-5.7.18.patch
+#    touch $PATCHED_MARK
+#fi
+#cd -
+#echo "Finished patching $MYSQL_SOURCE"
 
 # libevent patch
 cd $TP_SOURCE_DIR/$LIBEVENT_SOURCE

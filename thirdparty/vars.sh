@@ -45,7 +45,8 @@ export TP_LIB_DIR=$TP_INSTALL_DIR/lib
 export TP_JAR_DIR=$TP_INSTALL_DIR/lib/jar
 
 # source of all dependencies
-export REPOSITORY_URL=https://doris-thirdparty-repo.bj.bcebos.com/thirdparty
+# export REPOSITORY_URL=https://doris-thirdparty-repo.bj.bcebos.com/thirdparty
+export REPOSITORY_URL=
 
 #####################################################
 # Download url, filename and unpaced filename
@@ -329,10 +330,10 @@ GSASL_SOURCE="libgsasl-1.10.0"
 GSASL_MD5SUM="9c8fc632da4ce108fb7581b33de2a5ce"
 
 # hdfs3
-HDFS3_DOWNLOAD="https://doris-thirdparty-repo.bj.bcebos.com/thirdparty/libhdfs3-master.zip"
+HDFS3_DOWNLOAD="https://github.com/GoGoWen/libhdfs3/archive/refs/heads/main.zip"
 HDFS3_NAME="libhdfs3-master.zip"
 HDFS3_SOURCE="libhdfs3-master"
-HDFS3_MD5SUM="8c071fd2e7b0b1ccc1ec9c0d073d4146"
+HDFS3_MD5SUM="fd23b071c57ab11249d0058a4b79c9a2"
 
 #libdivide
 LIBDIVIDE_DOWNLOAD="https://github.com/ridiculousfish/libdivide/archive/5.0.tar.gz"

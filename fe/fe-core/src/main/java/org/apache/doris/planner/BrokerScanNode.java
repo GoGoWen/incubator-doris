@@ -354,10 +354,10 @@ public class BrokerScanNode extends LoadScanNode {
 
         bytesPerInstance = totalBytes / numInstances + 1;
 
-        if (bytesPerInstance > Config.max_bytes_per_broker_scanner) {
-            throw new UserException(
-                    "Scan bytes per broker scanner exceed limit: " + Config.max_bytes_per_broker_scanner);
-        }
+        //if (bytesPerInstance > Config.max_bytes_per_broker_scanner) {
+        //    throw new UserException(
+        //            "Scan bytes per broker scanner exceed limit: " + Config.max_bytes_per_broker_scanner);
+        //}
         LOG.info("number instance of broker scan node is: {}, bytes per instance: {}", numInstances, bytesPerInstance);
     }
 
