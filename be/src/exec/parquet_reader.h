@@ -102,6 +102,11 @@ private:
     std::map<std::string, int> _map_column; // column-name <---> column-index
     std::vector<int> _parquet_column_ids;
     std::vector<arrow::Type::type> _parquet_column_type;
+    
+    // the src slot index which need to set to null as not the column not exist in parquet file
+    std::set<int> _skipped_read_idx;
+    // map from column id index to src slot index
+    std::map<int, int> _map_parquet_column_ids_idx;
     int _total_groups; // groups in a parquet file
     int _current_group;
 

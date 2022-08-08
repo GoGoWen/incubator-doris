@@ -155,12 +155,11 @@ Status ParquetReaderWrap::column_indices(const std::vector<SlotDescriptor*>& tup
         // Get the Column Reader for the boolean column
         auto iter = _map_column.find(slot_desc->col_name());
         if (iter != _map_column.end()) {
+            _map_parquet_column_ids_idx[_parquet_column_ids.size()] = i;
             _parquet_column_ids.emplace_back(iter->second);
         } else {
-            std::stringstream str_error;
-            str_error << "Invalid Column Name:" << slot_desc->col_name();
-            LOG(WARNING) << str_error.str();
-            return Status::InvalidArgument(str_error.str());
+            // will give null to the slot, as it not found in src file
+            _skipped_read_idx.emplace(i);
         }
     }
     return Status::OK();
@@ -265,9 +264,16 @@ Status ParquetReaderWrap::read(Tuple* tuple, const std::vector<SlotDescriptor*>&
     const uint8_t* value = nullptr;
     int column_index = 0;
     try {
+        // set null value
+        for (auto it = _skipped_read_idx.begin(); it != _skipped_read_idx.end(); ++it) {
+            auto slot_desc = tuple_slot_descs[*it];
+            RETURN_IF_ERROR(set_field_null(tuple, slot_desc));
+        }
+
+        // set values
         size_t slots = _parquet_column_ids.size();
         for (size_t i = 0; i < slots; ++i) {
-            auto slot_desc = tuple_slot_descs[i];
+            auto slot_desc = tuple_slot_descs[_map_parquet_column_ids_idx[i]];
             column_index = i; // column index in batch record
             switch (_parquet_column_type[i]) {
             case arrow::Type::type::STRING: {
