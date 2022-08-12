@@ -90,10 +90,15 @@ Status ParquetReader::_init_read_columns(const std::vector<SlotDescriptor*>& tup
         if (iter != _map_column.end()) {
             _include_column_ids.emplace_back(parquet_col_id);
         } else {
+<<<<<<< HEAD
             std::stringstream str_error;
             str_error << "Invalid Column Name:" << slot_desc->col_name();
             VLOG_DEBUG << str_error.str();
             return Status::InvalidArgument(str_error.str());
+=======
+            // just continue, as the invalid column will be set to null by default
+            continue;
+>>>>>>> 1579fbae1 (enhance load from parquet or orc file)
         }
         ParquetReadColumn column(slot_desc);
         _read_columns.emplace_back(column);
