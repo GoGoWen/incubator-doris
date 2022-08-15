@@ -758,10 +758,9 @@ RowBlockAllocator::~RowBlockAllocator() {
 OLAPStatus RowBlockAllocator::allocate(RowBlock** row_block, size_t num_rows, bool null_supported) {
     size_t row_block_size = _row_len * num_rows;
 
-    if (_memory_limitation > 0 &&
-        _mem_tracker->consumption() + row_block_size > _memory_limitation) {
+    if (_memory_limitation > 0 && _mem_tracker->consumption() + row_block_size > _memory_limitation) {
         *row_block = nullptr;
-        return OLAP_ERR_FETCH_MEMORY_EXCEEDED;
+        return Status::OLAPInternalError(OLAP_ERR_FETCH_MEMORY_EXCEEDED);
     }
 
     // TODO(lijiao) : Why abandon the original m_row_block_buffer
@@ -1171,14 +1170,14 @@ OLAPStatus SchemaChangeWithSorting::process(RowsetReaderSharedPtr rowset_reader,
     RowBlock* ref_row_block = nullptr;
     rowset_reader->next_block(&ref_row_block);
     while (ref_row_block != nullptr && ref_row_block->has_remaining()) {
-        OLAPStatus st = _row_block_allocator->allocate(
-                &new_row_block, ref_row_block->row_block_info().row_num, true);
+        auto st = _row_block_allocator->allocate(&new_row_block,
+                                                 ref_row_block->row_block_info().row_num, true);
         // if OLAP_ERR_FETCH_MEMORY_EXCEEDED == st.precise_code()
         // that mean RowBlockAllocator::alocate() memory exceeded.
         // But we can flush row_block_arr if row_block_arr is not empty.
         // Don't return directly.
-        if (OLAP_ERR_MALLOC_ERROR == st) {
-            return st;
+        if (OLAP_ERR_MALLOC_ERROR == st.precise_code()) {
+            return Status::OLAPInternalError(OLAP_ERR_MALLOC_ERROR);
         } else if (st) {
             // do memory check for sorting, in case schema change task fail at row block sorting because of
             // not doing internal sorting first
@@ -1198,7 +1197,7 @@ OLAPStatus SchemaChangeWithSorting::process(RowsetReaderSharedPtr rowset_reader,
                              << "You can increase the memory "
                              << "by changing the "
                                 "Config.memory_limitation_per_thread_for_schema_change_bytes";
-                return OLAP_ERR_FETCH_MEMORY_EXCEEDED;
+                return Status::OLAPInternalError(OLAP_ERR_FETCH_MEMORY_EXCEEDED);
             }
 
             // enter here while memory limitation is reached.
