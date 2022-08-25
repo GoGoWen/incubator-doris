@@ -294,28 +294,6 @@ int main(int argc, char** argv) {
     using doris::Status;
     using std::string;
 
-    // open pid file, obtain file lock and save pid
-    string pid_file = string(getenv("PID_DIR")) + "/be.pid";
-    int fd = open(pid_file.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-    if (fd < 0) {
-        fprintf(stderr, "fail to create pid file.");
-        exit(-1);
-    }
-
-    string pid = std::to_string((long)getpid());
-    pid += "\n";
-    size_t length = write(fd, pid.c_str(), pid.size());
-    if (length != pid.size()) {
-        fprintf(stderr, "fail to save pid into pid file.");
-        exit(-1);
-    }
-
-    // descriptor will be leaked when failing to close fd
-    if (::close(fd) < 0) {
-        fprintf(stderr, "failed to close fd of pidfile.");
-        exit(-1);
-    }
-
     // init config.
     // the config in be_custom.conf will overwrite the config in be.conf
     // Must init custom config after init config, separately.
@@ -465,6 +443,28 @@ int main(int argc, char** argv) {
         LOG(ERROR) << "Doris BE HeartBeat Service did not start correctly, exiting: " << status.get_error_msg();
         doris::shutdown_logging();
         exit(1);
+    }
+
+    // open pid file, obtain file lock and save pid
+    string pid_file = string(getenv("PID_DIR")) + "/be.pid";
+    int fd = open(pid_file.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+    if (fd < 0) {
+        fprintf(stderr, "fail to create pid file.");
+        exit(-1);
+    }
+
+    string pid = std::to_string((long)getpid());
+    pid += "\n";
+    size_t length = write(fd, pid.c_str(), pid.size());
+    if (length != pid.size()) {
+        fprintf(stderr, "fail to save pid into pid file.");
+        exit(-1);
+    }
+
+    // descriptor will be leaked when failing to close fd
+    if (::close(fd) < 0) {
+        fprintf(stderr, "failed to close fd of pidfile.");
+        exit(-1);
     }
 
     while (!doris::k_doris_exit) {
