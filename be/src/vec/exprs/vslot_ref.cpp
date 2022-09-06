@@ -60,7 +60,13 @@ Status VSlotRef::prepare(doris::RuntimeState* state, const doris::RowDescriptor&
 }
 
 Status VSlotRef::execute(VExprContext* context, Block* block, int* result_column_id) {
-    *result_column_id = _column_id;
+    // for slot ref, we alway return actual index in block if exist.
+    if (block->try_get_by_name(*_column_name) == nullptr) {
+        return Status::OK();
+    }
+
+    auto id = block->get_position_by_name(*_column_name);
+    *result_column_id = id;
     return Status::OK();
 }
 

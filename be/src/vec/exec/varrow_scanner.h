@@ -82,6 +82,7 @@ private:
     bool _cur_file_eof; // is read over?
     std::shared_ptr<arrow::RecordBatch> _batch;
     size_t _arrow_batch_cur_idx;
+    std::set<int> _skipped_idx;
 
     RuntimeProfile::Counter* _filtered_row_groups_counter;
     RuntimeProfile::Counter* _filtered_rows_counter;

@@ -306,6 +306,9 @@ Status BaseScanner::_materialize_dest_block(vectorized::Block* dest_block) {
     auto& filter_map = filter_column->get_data();
     auto origin_column_num = _src_block.columns();
 
+    // LOG block
+    LOG(WARNING) << "Bowen Log: " << _src_block.dump_data(0);
+
     for (auto slot_desc : _dest_tuple_desc->slots()) {
         if (!slot_desc->is_materialized()) {
             continue;
@@ -315,7 +318,12 @@ Status BaseScanner::_materialize_dest_block(vectorized::Block* dest_block) {
         auto* ctx = _dest_vexpr_ctx[dest_index];
         int result_column_id = -1;
         // PT1 => dest primitive type
+
+        // LOG block
+        LOG(WARNING) << "Bowen Log src block: " << _src_block.dump_data(0);
         RETURN_IF_ERROR(ctx->execute(&_src_block, &result_column_id));
+        LOG(WARNING) << "Bowen Log src block: " << _src_block.dump_data(0);
+        LOG(WARNING) << "Bowen Log result_column_id: " << result_column_id;
         bool is_origin_column = result_column_id < origin_column_num;
         auto column_ptr =
                 is_origin_column && _src_block_mem_reuse
@@ -385,6 +393,9 @@ Status BaseScanner::_materialize_dest_block(vectorized::Block* dest_block) {
         _src_block.clear();
     }
 
+    // LOG block
+    LOG(WARNING) << "Bowen Log dest block: " << dest_block->dump_data(0);
+
     size_t dest_size = dest_block->columns();
     // do filter
     dest_block->insert(vectorized::ColumnWithTypeAndName(
@@ -393,6 +404,8 @@ Status BaseScanner::_materialize_dest_block(vectorized::Block* dest_block) {
     RETURN_IF_ERROR(vectorized::Block::filter_block(dest_block, dest_size, dest_size));
     _counter->num_rows_filtered += rows - dest_block->rows();
 
+    // LOG block
+    LOG(WARNING) << "Bowen Log dest block: " << dest_block->dump_data(0);
     return Status::OK();
 }
 
@@ -418,9 +431,15 @@ Status BaseScanner::_init_src_block() {
 
 Status BaseScanner::_fill_dest_block(vectorized::Block* dest_block, bool* eof) {
     *eof = _scanner_eof;
+    // LOG block
+    LOG(WARNING) << "Bowen Log: " << _src_block.dump_data(0);
     _fill_columns_from_path();
     if (LIKELY(_src_block.rows() > 0)) {
+        // LOG block
+        LOG(WARNING) << "Bowen Log: " << _src_block.dump_data(0);
         RETURN_IF_ERROR(BaseScanner::_filter_src_block());
+        // LOG block
+        LOG(WARNING) << "Bowen Log: " << _src_block.dump_data(0);
         RETURN_IF_ERROR(BaseScanner::_materialize_dest_block(dest_block));
     }
 

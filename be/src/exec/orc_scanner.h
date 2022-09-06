@@ -62,10 +62,6 @@ private:
     std::shared_ptr<orc::ColumnVectorBatch> _batch;
     std::unique_ptr<orc::Reader> _reader;
     std::unique_ptr<orc::RowReader> _row_reader;
-    std::map<std::string, int> _map_column_to_id;
-    // The batch after reading from orc data is arranged in the original order,
-    // so we need to record the index in the original order to correspond the column names to the order
-    std::vector<int> _position_in_orc_original;
     int _num_of_columns_from_file;
 
     int _total_groups; // groups in a orc file

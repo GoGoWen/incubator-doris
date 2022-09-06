@@ -149,6 +149,12 @@ protected:
     TupleId _tupleId;
     std::vector<ExprContext*> _conjunct_ctxs;
 
+    // map from column name to column id
+    std::map<std::string, int> _map_column_to_id;
+    // The batch after reading from orc data is arranged in the original order,
+    // so we need to record the index in the original order to correspond the column names to the order
+    std::vector<int> _position_in_orc_original;
+
 private:
     Status _filter_src_block();
     void _fill_columns_from_path();

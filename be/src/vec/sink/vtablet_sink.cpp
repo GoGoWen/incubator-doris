@@ -445,7 +445,9 @@ Status VOlapTableSink::send(RuntimeState* state, vectorized::Block* input_block)
     DorisMetrics::instance()->load_rows->increment(rows);
     DorisMetrics::instance()->load_bytes->increment(bytes);
 
+    LOG(WARNING) << "Bowen Log: " << input_block->dump_data(0);
     vectorized::Block block(input_block->get_columns_with_type_and_name());
+    LOG(WARNING) << "Bowen Log: " << block.dump_data(0);
     if (!_output_vexpr_ctxs.empty()) {
         // Do vectorized expr here to speed up load
         block = vectorized::VExprContext::get_output_block_after_execute_exprs(
@@ -453,6 +455,7 @@ Status VOlapTableSink::send(RuntimeState* state, vectorized::Block* input_block)
         if (UNLIKELY(block.rows() == 0)) {
             return status;
         }
+        LOG(WARNING) << "Bowen Log: " << block.dump_data(0);
     }
 
     auto num_rows = block.rows();
@@ -469,7 +472,9 @@ Status VOlapTableSink::send(RuntimeState* state, vectorized::Block* input_block)
             // because of "data unqualified"
             return Status::EndOfFile("Encountered unqualified data, stop processing");
         }
+        LOG(WARNING) << "Bowen Log before _convert_to_dest_desc_block: " << block.dump_data(0);
         _convert_to_dest_desc_block(&block);
+        LOG(WARNING) << "Bowen Log after _convert_to_dest_desc_block: " << block.dump_data(0);
     }
 
     BlockRow block_row;

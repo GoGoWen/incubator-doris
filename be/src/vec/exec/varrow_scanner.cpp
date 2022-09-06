@@ -158,6 +158,23 @@ Status VArrowScanner::_init_src_block() {
         if (slot_desc == nullptr) {
             continue;
         }
+
+        if (-1 == _cur_file_reader->get_cloumn_index(slot_desc->col_name())) {
+            _skipped_idx.emplace(i);
+            // if not find in source file, set the default value
+            auto is_nullable = slot_desc->is_nullable();
+            auto data_type = vectorized::DataTypeFactory::instance().create_data_type(slot_desc->type(),
+                                                                                      is_nullable);
+            if (data_type == nullptr) {
+                return Status::NotSupported(
+                        fmt::format("Not support type for column:{}", slot_desc->col_name()));
+            }
+            MutableColumnPtr data_column = data_type->create_column();
+            _src_block.insert(
+                ColumnWithTypeAndName(std::move(data_column), data_type, slot_desc->col_name()));
+            continue;
+        }
+
         auto* array = _batch->column(batch_pos++).get();
         // let src column be nullable for simplify converting
         // TODO, support not nullable for exec efficiently
@@ -203,6 +220,7 @@ Status VArrowScanner::get_next(vectorized::Block* block, bool* eof) {
     }
 
     RETURN_IF_ERROR(_init_src_block());
+    LOG(WARNING) << "Bowen Log: " << _src_block.dump_data(0);
     // convert arrow batch to block until reach the batch_size
     while (!_scanner_eof) {
         // cast arrow type to PT0 and append it to src block
@@ -226,9 +244,13 @@ Status VArrowScanner::get_next(vectorized::Block* block, bool* eof) {
     }
     COUNTER_UPDATE(_rows_read_counter, _src_block.rows());
     SCOPED_TIMER(_materialize_timer);
+    // LOG block
+    LOG(WARNING) << "Bowen Log: " << _src_block.dump_data(0);
     // cast PT0 => PT1
     // for example: TYPE_SMALLINT => TYPE_VARCHAR
     RETURN_IF_ERROR(_cast_src_block(&_src_block));
+    // LOG block
+    LOG(WARNING) << "Bowen Log: " << _src_block.dump_data(0);
 
     // materialize, src block => dest columns
     return _fill_dest_block(block, eof);
@@ -238,11 +260,17 @@ Status VArrowScanner::get_next(vectorized::Block* block, bool* eof) {
 // primitive type(PT1) ==materialize_block==> dest primitive type
 Status VArrowScanner::_cast_src_block(Block* block) {
     // cast primitive type(PT0) to primitive type(PT1)
+    size_t column_pos = 0;
     for (size_t i = 0; i < _num_of_columns_from_file; ++i) {
         SlotDescriptor* slot_desc = _src_slot_descs[i];
         if (slot_desc == nullptr) {
             continue;
         }
+
+        if (_skipped_idx.find(i) != _skipped_idx.end) {
+            continue;
+        }
+
         auto& arg = block->get_by_name(slot_desc->col_name());
         // remove nullable here, let the get_function decide whether nullable
         auto return_type = slot_desc->get_data_type_ptr();
@@ -253,8 +281,9 @@ Status VArrowScanner::_cast_src_block(Block* block) {
                  std::make_shared<DataTypeString>(), ""}};
         auto func_cast =
                 SimpleFunctionFactory::instance().get_function("CAST", arguments, return_type);
-        RETURN_IF_ERROR(func_cast->execute(nullptr, *block, {i}, i, arg.column->size()));
-        block->get_by_position(i).type = std::move(return_type);
+        RETURN_IF_ERROR(func_cast->execute(nullptr, *block, {column_pos}, column_pos, arg.column->size()));
+        block->get_by_position(column_pos).type = std::move(return_type);
+        column_pos++;
     }
     return Status::OK();
 }
@@ -268,6 +297,11 @@ Status VArrowScanner::_append_batch_to_src_block(Block* block) {
         if (slot_desc == nullptr) {
             continue;
         }
+
+        if (_skipped_idx.find(i) != _skipped_idx.end()) {
+            continue;
+        }
+
         auto* array = _batch->column(column_pos++).get();
         auto& column_with_type_and_name = block->get_by_name(slot_desc->col_name());
         RETURN_IF_ERROR(arrow_column_to_doris_column(
