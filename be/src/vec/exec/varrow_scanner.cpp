@@ -260,16 +260,15 @@ Status VArrowScanner::get_next(vectorized::Block* block, bool* eof) {
 // primitive type(PT1) ==materialize_block==> dest primitive type
 Status VArrowScanner::_cast_src_block(Block* block) {
     // cast primitive type(PT0) to primitive type(PT1)
-    size_t column_pos = 0;
     for (size_t i = 0; i < _num_of_columns_from_file; ++i) {
         SlotDescriptor* slot_desc = _src_slot_descs[i];
         if (slot_desc == nullptr) {
             continue;
         }
 
-        if (_skipped_idx.find(i) != _skipped_idx.end) {
-            continue;
-        }
+        //if (_skipped_idx.find(i) != _skipped_idx.end) {
+        //    continue;
+        //}
 
         auto& arg = block->get_by_name(slot_desc->col_name());
         // remove nullable here, let the get_function decide whether nullable
@@ -281,9 +280,8 @@ Status VArrowScanner::_cast_src_block(Block* block) {
                  std::make_shared<DataTypeString>(), ""}};
         auto func_cast =
                 SimpleFunctionFactory::instance().get_function("CAST", arguments, return_type);
-        RETURN_IF_ERROR(func_cast->execute(nullptr, *block, {column_pos}, column_pos, arg.column->size()));
-        block->get_by_position(column_pos).type = std::move(return_type);
-        column_pos++;
+        RETURN_IF_ERROR(func_cast->execute(nullptr, *block, {i}, i, arg.column->size()));
+        block->get_by_position(i).type = std::move(return_type);
     }
     return Status::OK();
 }
@@ -299,14 +297,28 @@ Status VArrowScanner::_append_batch_to_src_block(Block* block) {
         }
 
         if (_skipped_idx.find(i) != _skipped_idx.end()) {
-            continue;
-        }
+            arrow::Int64Builder builder;
+            for (int row_id = 0; row_id < _batch->num_rows(); ++row_id) {
+                builder.AppendNull();
+            }
 
-        auto* array = _batch->column(column_pos++).get();
-        auto& column_with_type_and_name = block->get_by_name(slot_desc->col_name());
-        RETURN_IF_ERROR(arrow_column_to_doris_column(
-                array, _arrow_batch_cur_idx, column_with_type_and_name.column,
+            auto res = builder.Finish();
+            if (!res.ok()) {
+                return Status::InternalError(
+                    fmt::format("Building arrow array faillure, reason: {}", res.status().ToString()));
+            }
+            auto array = res.ValueOrDie();
+            auto& column_with_type_and_name = block->get_by_name(slot_desc->col_name());
+            RETURN_IF_ERROR(arrow_column_to_doris_column(
+                array.get(), _arrow_batch_cur_idx, column_with_type_and_name.column,
                 column_with_type_and_name.type, num_elements, _state->timezone_obj()));
+        } else {
+            auto* array = _batch->column(column_pos++).get();
+            auto& column_with_type_and_name = block->get_by_name(slot_desc->col_name());
+            RETURN_IF_ERROR(arrow_column_to_doris_column(
+                    array, _arrow_batch_cur_idx, column_with_type_and_name.column,
+                    column_with_type_and_name.type, num_elements, _state->timezone_obj()));
+        }
     }
 
     _arrow_batch_cur_idx += num_elements;
