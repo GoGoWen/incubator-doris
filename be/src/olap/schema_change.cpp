@@ -760,7 +760,7 @@ OLAPStatus RowBlockAllocator::allocate(RowBlock** row_block, size_t num_rows, bo
 
     if (_memory_limitation > 0 && _mem_tracker->consumption() + row_block_size > _memory_limitation) {
         *row_block = nullptr;
-        return Status::OLAPInternalError(OLAP_ERR_FETCH_MEMORY_EXCEEDED);
+        return OLAP_ERR_FETCH_MEMORY_EXCEEDED;
     }
 
     // TODO(lijiao) : Why abandon the original m_row_block_buffer
@@ -1176,8 +1176,8 @@ OLAPStatus SchemaChangeWithSorting::process(RowsetReaderSharedPtr rowset_reader,
         // that mean RowBlockAllocator::alocate() memory exceeded.
         // But we can flush row_block_arr if row_block_arr is not empty.
         // Don't return directly.
-        if (OLAP_ERR_MALLOC_ERROR == st.precise_code()) {
-            return Status::OLAPInternalError(OLAP_ERR_MALLOC_ERROR);
+        if (OLAP_ERR_MALLOC_ERROR == st) {
+            return OLAP_ERR_MALLOC_ERROR;
         } else if (st) {
             // do memory check for sorting, in case schema change task fail at row block sorting because of
             // not doing internal sorting first
@@ -1197,7 +1197,7 @@ OLAPStatus SchemaChangeWithSorting::process(RowsetReaderSharedPtr rowset_reader,
                              << "You can increase the memory "
                              << "by changing the "
                                 "Config.memory_limitation_per_thread_for_schema_change_bytes";
-                return Status::OLAPInternalError(OLAP_ERR_FETCH_MEMORY_EXCEEDED);
+                return OLAP_ERR_FETCH_MEMORY_EXCEEDED;
             }
 
             // enter here while memory limitation is reached.
