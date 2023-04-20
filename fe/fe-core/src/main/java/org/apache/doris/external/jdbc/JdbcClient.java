@@ -510,6 +510,12 @@ public class JdbcClient {
             case "VARBINARY":
             case "ENUM":
                 return ScalarType.createStringType();
+            case "HLL":
+                return ScalarType.createHllType();
+            //case "HLL":
+            //    return ScalarType.createStringType();
+            case "BITMAP":
+                return Type.UNSUPPORTED;
             default:
                 return Type.UNSUPPORTED;
         }
