@@ -120,7 +120,7 @@ void DataTypeHLL::to_string(const IColumn& column, size_t row_num,
     ostr.write(result.c_str(), result.size());
 }
 
-std::string to_string(const IColumn& column, size_t row_num) const {
+std::string DataTypeHLL::to_string(const IColumn& column, size_t row_num) const {
     auto col_row = check_column_const_set_readability(column, row_num);
     ColumnPtr ptr = col_row.first;
     row_num = col_row.second;
@@ -128,18 +128,46 @@ std::string to_string(const IColumn& column, size_t row_num) const {
     auto& data = const_cast<HyperLogLog&>(assert_cast<const ColumnHLL&>(*ptr).get_element(row_num));
 
     std::string result(data.max_serialized_size(), '0');
-    size_t actual_size = data.serialize((uint8_t*)result.data());
+    data.serialize((uint8_t*)result.data());
     return result;
 }
 
 Status DataTypeHLL::from_string(ReadBuffer& rb, IColumn* column) const {
-    auto* column_data = static_cast<ColumnVector<HyperLogLog>*>(column);
-    std::string str;
-    str = rb.to_string()
+    auto& data_column = assert_cast<ColumnHLL&>(*column);
+    auto& data = data_column.get_data();
 
+    LOG(INFO) << "size of input hll string:" << rb.count();
+
+    std::string str;
+    str = rb.to_string();
+
+    // Create byte array of same size as string length
+    std::byte byteArr[str.length()];
+    // Iterate over characters in string,
+    // convert them to byte and copy to byte array
+    std::transform(
+        str.begin(),
+        str.end(),
+        byteArr,
+        [](const char& ch) {
+            return std::byte(ch);
+        });
+    // Iterate over byte array and print
+    LOG(INFO) << "string going to deserialize:";
+    for (const std::byte& byt: byteArr) 
+    {
+        LOG(INFO) << std::to_integer<int>(byt) << ", ";
+    }
+
+    LOG(INFO) << "HLL string from:" << str;
     HyperLogLog hll;
-    hll.deserialize(Slice(str));
-    column_data->insert_value(hll);
+    if (hll.deserialize(Slice(str))) {
+        LOG(INFO) << "deserialize hll from string succeed!";
+    } else {
+        LOG(INFO) << "deserialize hll from string failed!";
+    }
+    data.push_back(std::move(hll));
+    return Status::OK();
 }
 
 } // namespace doris::vectorized

@@ -1439,7 +1439,7 @@ private:
     }
 
     WrapperType create_hll_wrapper(FunctionContext* context, const DataTypePtr& from_type_untyped,
-                                   const DataTypeArray& to_type) const {
+                                   const DataTypeHLL& to_type) const {
         /// Conversion from String through parsing.
         if (check_and_get_data_type<DataTypeString>(from_type_untyped.get())) {
             return &ConvertImplGenericFromString<ColumnString>::execute;
@@ -1454,7 +1454,7 @@ private:
                     "types");
         }
 
-        return Status::RuntimeError("Illegal column for function CAST AS HLL");
+        return nullptr;
     }
 
     WrapperType create_array_wrapper(FunctionContext* context, const DataTypePtr& from_type_untyped,

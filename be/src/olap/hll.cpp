@@ -170,6 +170,7 @@ size_t HyperLogLog::serialize(uint8_t* dst) const {
         *ptr++ = _type;
         *ptr++ = (uint8_t)_hash_set.size();
         for (auto hash_value : _hash_set) {
+            LOG(INFO) << "hash value:" << hash_value;
             encode_fixed64_le(ptr, hash_value);
             ptr += 8;
         }
@@ -251,7 +252,7 @@ bool HyperLogLog::is_valid(const Slice& slice) {
 // TODO(zc): check input string's length
 bool HyperLogLog::deserialize(const Slice& slice) {
     // can be called only when type is empty
-    DCHECK(_type == HLL_DATA_EMPTY);
+    // DCHECK(_type == HLL_DATA_EMPTY);
 
     // NOTE(zc): Don't remove this check unless you known what
     // you are doing. Because of history bug, we ingest some

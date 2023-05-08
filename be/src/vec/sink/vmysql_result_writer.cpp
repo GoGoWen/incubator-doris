@@ -121,6 +121,28 @@ Status VMysqlResultWriter<is_binary_format>::_add_one_column(
                     size_t size = hyperLogLog.max_serialized_size();
                     std::unique_ptr<char[]> buf = std::make_unique<char[]>(size);
                     hyperLogLog.serialize((uint8*)buf.get());
+
+
+                    //TO DELETE
+                    std::string str(buf.get(), size);
+                    // Create byte array of same size as string length
+                    std::byte byteArr[str.length()];
+                    // Iterate over characters in string,
+                    // convert them to byte and copy to byte array
+                    std::transform(
+                        str.begin(),
+                        str.end(),
+                        byteArr,
+                        [](const char& ch) {
+                            return std::byte(ch);
+                        });
+                    // Iterate over byte array and print
+                    LOG(INFO) << "select hll to mysql:";
+                    for (const std::byte& byt: byteArr) 
+                    {
+                        LOG(INFO) << std::to_integer<int>(byt) << ", ";
+                    }
+
                     buf_ret = rows_buffer[i].push_string(buf.get(), size);
 
                 } else if (column->is_quantile_state() && output_object_data()) {

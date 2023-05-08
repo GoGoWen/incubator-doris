@@ -105,6 +105,7 @@ private:
     jmethodID _executor_has_next_id;
     jmethodID _executor_block_rows_id;
     jmethodID _executor_get_blocks_id;
+    jmethodID _executor_get_blocks_new_id;
     jmethodID _executor_get_boolean_result;
     jmethodID _executor_get_tinyint_result;
     jmethodID _executor_get_smallint_result;
@@ -124,6 +125,7 @@ private:
     jmethodID _executor_get_decimal64_result;
     jmethodID _executor_get_decimal128_result;
     jmethodID _executor_get_array_result;
+    jmethodID _executor_get_hll_result;
     jmethodID _executor_get_types_id;
     jmethodID _executor_close_id;
     jmethodID _executor_get_list_id;
@@ -137,6 +139,10 @@ private:
     std::vector<MutableColumnPtr>
             str_array_cols; // for array type to save data like big string [1,2,3]
 
+    std::map<int, int> _map_column_idx_to_cast_idx_hll;
+    std::vector<DataTypePtr> _input_hll_string_types;
+    std::vector<MutableColumnPtr> str_hll_cols; // for hll type to save data like string
+    
     JdbcStatistic _jdbc_statistic;
 };
 

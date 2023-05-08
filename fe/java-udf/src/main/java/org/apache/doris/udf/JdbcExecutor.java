@@ -174,6 +174,31 @@ public class JdbcExecutor {
         return block;
     }
 
+    public List<Object[]> getBlockNew(int batchSize, Object colsArray) throws UdfRuntimeException {
+        try {
+            ArrayList<Integer> colsTypes = (ArrayList<Integer>) colsArray;
+            Integer[] colArray = new Integer[colsTypes.size()];
+            colArray = colsTypes.toArray(colArray);
+            int columnCount = resultSetMetaData.getColumnCount();
+            curBlockRows = 0;
+            do {
+                for (int i = 0; i < columnCount; ++i) {
+                    if (colArray[i] > 0) {
+                        LOG.info("getBytes:" + i);
+                        block.get(i)[curBlockRows] = resultSet.getBytes(i + 1);
+                    } else {
+                        LOG.info("getObject:" + i);
+                        block.get(i)[curBlockRows] = resultSet.getObject(i + 1);
+                    }
+                }
+                curBlockRows++;
+            } while (curBlockRows < batchSize && resultSet.next());
+        } catch (SQLException e) {
+            throw new UdfRuntimeException("get next block failed: ", e);
+        }
+        return block;
+    }
+
     public int getCurBlockRows() {
         return curBlockRows;
     }
@@ -1078,6 +1103,44 @@ public class JdbcExecutor {
         }
     }
 
+
+    private void hllPutToString(Object[] column, boolean isNullable, int numRows, long nullMapAddr,
+            long offsetsAddr, long charsAddr) {
+        int[] offsets = new int[numRows];
+        byte[][] byteRes = new byte[numRows][];
+        int offset = 0;
+        if (isNullable == true) {
+            // Here can not loop from startRowForNullable,
+            // because byteRes will be used later
+            for (int i = 0; i < numRows; i++) {
+                if (column[i] == null) {
+                    byteRes[i] = emptyBytes;
+                    UdfUtils.UNSAFE.putByte(nullMapAddr + i, (byte) 1);
+                } else {
+                    byteRes[i] = (byte[]) column[i];
+                }
+                offset += byteRes[i].length;
+                offsets[i] = offset;
+            }
+        } else {
+            for (int i = 0; i < numRows; i++) {
+                byteRes[i] = (byte[]) column[i];
+                offset += byteRes[i].length;
+                offsets[i] = offset;
+            }
+        }
+        byte[] bytes = new byte[offsets[numRows - 1]];
+        long bytesAddr = JNINativeMethod.resizeStringColumn(charsAddr, offsets[numRows - 1]);
+        int dst = 0;
+        for (int i = 0; i < numRows; i++) {
+            for (int j = 0; j < byteRes[i].length; j++) {
+                bytes[dst++] = byteRes[i][j];
+            }
+        }
+        UdfUtils.copyMemory(offsets, UdfUtils.INT_ARRAY_OFFSET, null, offsetsAddr, numRows * 4L);
+        UdfUtils.copyMemory(bytes, UdfUtils.BYTE_ARRAY_OFFSET, null, bytesAddr, offsets[numRows - 1]);
+    }
+
     private void objectPutToString(Object[] column, boolean isNullable, int numRows, long nullMapAddr,
             long offsetsAddr, long charsAddr) {
         int[] offsets = new int[numRows];
@@ -1168,6 +1231,19 @@ public class JdbcExecutor {
             // here object put to string, so the object must have impl toString() function
             objectPutToString(column, isNullable, numRows, nullMapAddr, offsetsAddr, charsAddr);
         }
+    }
+
+    public void copyBatchHllResult(Object columnObj, boolean isNullable, int numRows, long nullMapAddr,
+            long offsetsAddr, long charsAddr) {
+        Object[] column = (Object[]) columnObj;
+        int firstNotNullIndex = 0;
+        if (isNullable) {
+            firstNotNullIndex = getFirstNotNullObject(column, numRows, nullMapAddr);
+        }
+        if (firstNotNullIndex == numRows) {
+            return;
+        }
+        hllPutToString(column, isNullable, numRows, nullMapAddr, offsetsAddr, charsAddr);
     }
 
     public void copyBatchDecimalV2Result(Object columnObj, boolean isNullable, int numRows, long nullMapAddr,

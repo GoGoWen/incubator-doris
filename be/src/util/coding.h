@@ -44,8 +44,10 @@ inline void encode_fixed32_le(uint8_t* buf, uint32_t val) {
 
 inline void encode_fixed64_le(uint8_t* buf, uint64_t val) {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
+    LOG(INFO)<<"little endian";
     memcpy(buf, &val, sizeof(val));
 #else
+    LOG(INFO)<<"big endian";
     uint64_t res = gbswap_64(val);
     memcpy(buf, &res, sizeof(res));
 #endif
