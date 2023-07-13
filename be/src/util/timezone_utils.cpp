@@ -18,6 +18,12 @@
 
 #include "util/timezone_utils.h"
 
+#include <cctz/time_zone.h>
+
+#include <boost/algorithm/string.hpp>
+#include <filesystem>
+#include <string>
+
 namespace doris {
 
 RE2 TimezoneUtils::time_zone_offset_format_reg("^[+-]{1}\\d{2}\\:\\d{2}$");
