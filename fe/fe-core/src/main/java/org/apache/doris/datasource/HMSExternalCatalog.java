@@ -102,7 +102,7 @@ public class HMSExternalCatalog extends ExternalCatalog {
         }
 
         String[] nameservices = dfsNameservices.split(",");
-        for(String dfsservice: nameservices) {
+        for (String dfsservice : nameservices) {
             String namenodes = catalogProperty.getOrDefault("dfs.ha.namenodes." + dfsservice, "");
             if (Strings.isNullOrEmpty(namenodes)) {
                 throw new DdlException("Missing dfs.ha.namenodes." + dfsservice + " property");
