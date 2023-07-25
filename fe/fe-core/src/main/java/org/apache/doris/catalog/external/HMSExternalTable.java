@@ -34,18 +34,24 @@ import org.apache.doris.thrift.TTableType;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.MetaStoreUtil;
+import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
+import org.apache.hadoop.hive.serde2.Deserializer;
+import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
+import org.apache.hadoop.hive.serde2.objectinspector.*;
+import org.apache.hive.common.util.ReflectionUtil;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -61,6 +67,7 @@ public class HMSExternalTable extends ExternalTable {
         SUPPORTED_HIVE_FILE_FORMATS.add("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat");
         SUPPORTED_HIVE_FILE_FORMATS.add("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat");
         SUPPORTED_HIVE_FILE_FORMATS.add("org.apache.hadoop.mapred.TextInputFormat");
+        SUPPORTED_HIVE_FILE_FORMATS.add("org.apache.iceberg.mr.hive.HiveIcebergInputFormat");
     }
 
     private volatile org.apache.hadoop.hive.metastore.api.Table remoteTable = null;
@@ -305,20 +312,109 @@ public class HMSExternalTable extends ExternalTable {
     public List<Column> initSchema() {
         makeSureInitialized();
         List<Column> columns;
-        List<FieldSchema> schema = ((HMSExternalCatalog) catalog).getClient().getSchema(dbName, name);
-        if (dlaType.equals(DLAType.ICEBERG)) {
-            columns = getIcebergSchema(schema);
-        } else {
-            List<Column> tmpSchema = Lists.newArrayListWithCapacity(schema.size());
-            for (FieldSchema field : schema) {
-                tmpSchema.add(new Column(field.getName(),
+        org.apache.hadoop.hive.metastore.api.Table table = ((HMSExternalCatalog) catalog).getClient().getTable(dbName, name);
+        try {
+            List<FieldSchema> schema = getFieldsFromDeserializer(name, getDeserializer(((HMSExternalCatalog) catalog).getClient().getHiveConf(), table, false));
+            if (dlaType.equals(DLAType.ICEBERG)) {
+                columns = getIcebergSchema(schema);
+            } else {
+                List<Column> tmpSchema = Lists.newArrayListWithCapacity(schema.size());
+                for (FieldSchema field : schema) {
+                    tmpSchema.add(new Column(field.getName(),
                         HiveMetaStoreClientHelper.hiveTypeToDorisType(field.getType()), true, null,
                         true, field.getComment(), true, -1));
+                }
+                columns = tmpSchema;
             }
-            columns = tmpSchema;
+        } catch (MetaException | SerDeException e) {
+            LOG.error("get schema failed, reason:{}", e.getMessage());
         }
         initPartitionColumns(columns);
         return columns;
+    }
+
+    public List<FieldSchema> getFieldsFromDeserializer(String tableName,
+                                                Deserializer deserializer) throws SerDeException, MetaException {
+        ObjectInspector oi = deserializer.getObjectInspector();
+        String[] names = tableName.split("\\.");
+        String last_name = names[names.length - 1];
+        for (int i = 1; i < names.length; i++) {
+
+            if (oi instanceof StructObjectInspector) {
+                StructObjectInspector soi = (StructObjectInspector) oi;
+                StructField sf = soi.getStructFieldRef(names[i]);
+                if (sf == null) {
+                    throw new MetaException("Invalid Field " + names[i]);
+                } else {
+                    oi = sf.getFieldObjectInspector();
+                }
+            } else if (oi instanceof ListObjectInspector
+                && names[i].equalsIgnoreCase("$elem$")) {
+                ListObjectInspector loi = (ListObjectInspector) oi;
+                oi = loi.getListElementObjectInspector();
+            } else if (oi instanceof MapObjectInspector
+                && names[i].equalsIgnoreCase("$key$")) {
+                MapObjectInspector moi = (MapObjectInspector) oi;
+                oi = moi.getMapKeyObjectInspector();
+            } else if (oi instanceof MapObjectInspector
+                && names[i].equalsIgnoreCase("$value$")) {
+                MapObjectInspector moi = (MapObjectInspector) oi;
+                oi = moi.getMapValueObjectInspector();
+            } else {
+                throw new MetaException("Unknown type for " + names[i]);
+            }
+        }
+
+        ArrayList<FieldSchema> str_fields = new ArrayList<FieldSchema>();
+        // rules on how to recurse the ObjectInspector based on its type
+        if (oi.getCategory() != ObjectInspector.Category.STRUCT) {
+            str_fields.add(new FieldSchema(last_name, oi.getTypeName(),
+                "from deserializer"));
+        } else {
+            List<? extends StructField> fields = ((StructObjectInspector) oi)
+                .getAllStructFieldRefs();
+            for (int i = 0; i < fields.size(); i++) {
+                StructField structField = fields.get(i);
+                String fieldName = structField.getFieldName();
+                String fieldTypeName = structField.getFieldObjectInspector().getTypeName();
+                String fieldComment = "from deserializer";
+
+                str_fields.add(new FieldSchema(fieldName, fieldTypeName, fieldComment));
+            }
+        }
+        return str_fields;
+    }
+
+    private Deserializer getDeserializer(Configuration conf,
+                                                org.apache.hadoop.hive.metastore.api.Table table, boolean skipConfError) throws
+        MetaException {
+        String lib = table.getSd().getSerdeInfo().getSerializationLib();
+        if (lib == null) {
+            return null;
+        }
+        return getDeserializer(conf, table, skipConfError, lib);
+    }
+
+    private Deserializer getDeserializer(Configuration conf,
+                                         org.apache.hadoop.hive.metastore.api.Table table, boolean skipConfError,
+                                         String lib) throws MetaException {
+        try {
+            Deserializer deserializer = ReflectionUtil.newInstance(conf.getClassByName(lib).
+                asSubclass(Deserializer.class), conf);
+            if (skipConfError) {
+                SerDeUtils.initializeSerDeWithoutErrorCheck(deserializer, conf,
+                    MetaStoreUtils.getTableMetadata(table), null);
+            } else {
+                SerDeUtils.initializeSerDe(deserializer, conf, MetaStoreUtils.getTableMetadata(table), null);
+            }
+            return deserializer;
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            LOG.error("error in initSerDe: " + e.getClass().getName() + " "
+                + e.getMessage(), e);
+            throw new MetaException(e.getClass().getName() + " " + e.getMessage());
+        }
     }
 
     private List<Column> getIcebergSchema(List<FieldSchema> hmsSchema) {

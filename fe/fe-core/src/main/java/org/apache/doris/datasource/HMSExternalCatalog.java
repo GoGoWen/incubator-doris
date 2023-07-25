@@ -36,11 +36,13 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -168,6 +170,20 @@ public class HMSExternalCatalog extends ExternalCatalog {
             }
         }
 
+        //SessionState sessionState = new SessionState(hiveConf, "");
+        //SessionState.start(sessionState);
+        //try {
+        //    sessionState.loadAuxJars();
+        //    sessionState.loadReloadableAuxJars();
+        //} catch (IOException e) {
+        //    throw new HMSClientException("Failed to load reloadable jar file path: ", e);
+        //}
+
+        //String[] tokens = new String[] {"/export/admin/narwal_1.2.0/fe/lib/iceberg-mr-1.1.0.jar"};
+        //sessionState.add_resources(SessionState.ResourceType.JAR,
+        //    Arrays.asList(Arrays.copyOfRange(tokens, 0, tokens.length)));
+        //Class<?> cls = sessionState.getConf().getClassByName("org.apache.iceberg.mr.hive.HiveIcebergSerDe");
+        hiveConf.set("hive.added.jars.path","hdfs://ns1017/user/jd_ad/ads_report/yangbowen/iceberg-mr-1.1.0.jar");
         client = new PooledHiveMetaStoreClient(hiveConf, MAX_CLIENT_POOL_SIZE);
     }
 

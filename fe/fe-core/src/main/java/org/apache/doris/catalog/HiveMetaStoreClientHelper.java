@@ -145,6 +145,7 @@ public class HiveMetaStoreClientHelper {
     public static IMetaStoreClient getClient(String metaStoreUris) throws DdlException {
         HiveConf hiveConf = new HiveConf();
         hiveConf.setVar(HiveConf.ConfVars.METASTOREURIS, metaStoreUris);
+        hiveConf.setVar(HiveConf.ConfVars.HIVEAUXJARS, "file:///export/admin/narwal_1.2.0/fe/lib/iceberg-mr-1.1.0.jar");
         hiveConf.set(ConfVars.METASTORE_CLIENT_SOCKET_TIMEOUT.name(),
                 String.valueOf(Config.hive_metastore_client_timeout_second));
         IMetaStoreClient metaStoreClient = null;

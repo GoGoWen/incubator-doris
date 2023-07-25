@@ -68,6 +68,10 @@ public class PooledHiveMetaStoreClient {
         this.poolSize = pooSize;
     }
 
+    public HiveConf getHiveConf() {
+        return hiveConf;
+    }
+
     public List<String> getAllDatabases() {
         try (CachedClient client = getClient()) {
             return client.client.getAllDatabases();
