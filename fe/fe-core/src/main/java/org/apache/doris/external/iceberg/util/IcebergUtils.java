@@ -332,16 +332,12 @@ public class IcebergUtils {
         } else if (expr instanceof DateLiteral) {
             DateLiteral dateLiteral = (DateLiteral) expr;
             SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-            StringBuilder sb = new StringBuilder();
-            sb.append(dateLiteral.getYear())
-                    .append(dateLiteral.getMonth())
-                    .append(dateLiteral.getDay())
-                    .append(dateLiteral.getHour())
-                    .append(dateLiteral.getMinute())
-                    .append(dateLiteral.getSecond());
+            String dateStr = String.format("%04d%02d%02d%02d%02d%02d", dateLiteral.getYear(),
+                    dateLiteral.getMonth(), dateLiteral.getDay(), dateLiteral.getHour(), dateLiteral.getMinute(),
+                    dateLiteral.getMinute());
             Date date;
             try {
-                date = formatter.parse(sb.toString());
+                date = formatter.parse(dateStr);
             } catch (ParseException e) {
                 return null;
             }
