@@ -341,9 +341,7 @@ public class IcebergUtils {
             } catch (ParseException e) {
                 return null;
             }
-            return String.format("%04d-%02d-%02d %02d:%02d:%02d", dateLiteral.getYear(),
-                dateLiteral.getMonth(), dateLiteral.getDay(), dateLiteral.getHour(), dateLiteral.getMinute(),
-                dateLiteral.getMinute());
+            return String.format("%04d-%02d-%02d", dateLiteral.getYear(), dateLiteral.getMonth(), dateLiteral.getDay());
         } else if (expr instanceof DecimalLiteral) {
             DecimalLiteral decimalLiteral = (DecimalLiteral) expr;
             return decimalLiteral.getValue();
