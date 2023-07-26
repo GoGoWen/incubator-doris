@@ -22,6 +22,7 @@ import org.apache.doris.catalog.HiveMetaStoreClientHelper;
 import org.apache.doris.catalog.Type;
 import org.apache.doris.datasource.HMSExternalCatalog;
 import org.apache.doris.datasource.hive.PooledHiveMetaStoreClient;
+import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
 import org.apache.doris.statistics.AnalysisTaskInfo;
 import org.apache.doris.statistics.AnalysisTaskScheduler;
 import org.apache.doris.statistics.BaseAnalysisTask;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.types.Types;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -304,11 +306,20 @@ public class HMSExternalTable extends ExternalTable {
     @Override
     public List<Column> initSchema() {
         makeSureInitialized();
-        List<Column> columns;
-        List<FieldSchema> schema = ((HMSExternalCatalog) catalog).getClient().getSchema(dbName, name);
+        List<Column> columns = null;
         if (dlaType.equals(DLAType.ICEBERG)) {
-            columns = getIcebergSchema(schema);
+            Schema schema = HiveMetaStoreClientHelper.getIcebergTable(this).schema();
+            List<Types.NestedField> iceberg_columns = schema.columns();
+            List<Column> tmpSchema = Lists.newArrayListWithCapacity(iceberg_columns.size());
+            for (Types.NestedField field : iceberg_columns) {
+                tmpSchema.add(new Column(field.name(),
+                        HiveMetaStoreClientHelper.icebergTypeToDorisType(field.type()), true, null,
+                        true, field.doc(), true,
+                        schema.caseInsensitiveFindField(field.name()).fieldId()));
+            }
+            columns = tmpSchema;
         } else {
+            List<FieldSchema> schema = ((HMSExternalCatalog) catalog).getClient().getSchema(dbName, name);
             List<Column> tmpSchema = Lists.newArrayListWithCapacity(schema.size());
             for (FieldSchema field : schema) {
                 tmpSchema.add(new Column(field.getName(),
