@@ -334,14 +334,25 @@ public class IcebergUtils {
             SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
             String dateStr = String.format("%04d%02d%02d%02d%02d%02d", dateLiteral.getYear(),
                     dateLiteral.getMonth(), dateLiteral.getDay(), dateLiteral.getHour(), dateLiteral.getMinute(),
-                    dateLiteral.getMinute());
+                    dateLiteral.getSecond());
             Date date;
             try {
                 date = formatter.parse(dateStr);
             } catch (ParseException e) {
                 return null;
             }
-            return String.format("%04d-%02d-%02d", dateLiteral.getYear(), dateLiteral.getMonth(), dateLiteral.getDay());
+
+            String dataStr = "";
+            if (dateLiteral.getType() == Type.DATE || dateLiteral.getType() == Type.DATEV2) {
+                dataStr = String.format("%04d-%02d-%02d", dateLiteral.getYear(),
+                    dateLiteral.getMonth(), dateLiteral.getDay());
+                return dataStr;
+            } else {
+                dataStr = String.format("%04d-%02d-%02dT%02d:%02d:%02d.%06d", dateLiteral.getYear(),
+                    dateLiteral.getMonth(), dateLiteral.getDay(), dateLiteral.getHour(), dateLiteral.getMinute(),
+                    dateLiteral.getSecond(), dateLiteral.getMicrosecond());
+            }
+            return dataStr;
         } else if (expr instanceof DecimalLiteral) {
             DecimalLiteral decimalLiteral = (DecimalLiteral) expr;
             return decimalLiteral.getValue();
