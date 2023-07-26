@@ -68,7 +68,7 @@ public class PaloFe {
 
     public static void main(String[] args) {
         StartupOptions options = new StartupOptions();
-        options.enableHttpServer = true;
+        options.enableHttpServer = false;
         options.enableQeService = true;
         start(DORIS_HOME_DIR, PID_DIR, args, options);
     }

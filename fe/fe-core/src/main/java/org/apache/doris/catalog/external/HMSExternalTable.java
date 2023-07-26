@@ -310,7 +310,7 @@ public class HMSExternalTable extends ExternalTable {
     @Override
     public List<Column> initSchema() {
         makeSureInitialized();
-        List<Column> columns;
+        List<Column> columns = null;
         org.apache.hadoop.hive.metastore.api.Table table = ((HMSExternalCatalog) catalog).getClient().getTable(dbName, name);
         try {
             List<FieldSchema> schema = getFieldsFromDeserializer(name, getDeserializer(((HMSExternalCatalog) catalog).getClient().getHiveConf(), table, false));
