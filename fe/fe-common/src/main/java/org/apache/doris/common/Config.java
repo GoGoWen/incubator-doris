@@ -2045,5 +2045,11 @@ public class Config extends ConfigBase {
      */
     @ConfField(mutable = true)
     public static boolean infodb_support_ext_catalog = false;
+
+    /**
+     *  Expiration for bdp account auth
+     */
+    @ConfField(mutable = true)
+    public static long bdp_token_expiration_ms = 30000;
 }
 

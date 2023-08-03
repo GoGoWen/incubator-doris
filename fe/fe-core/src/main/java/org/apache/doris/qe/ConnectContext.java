@@ -154,6 +154,14 @@ public class ConnectContext {
 
     private long userQueryTimeout;
 
+    private String erp = null;
+
+    private String source = null;
+
+    private String teamUser = null;
+
+    private String userKey = null;
+
     public void setUserQueryTimeout(long queryTimeout) {
         this.userQueryTimeout = queryTimeout;
     }
@@ -672,5 +680,31 @@ public class ConnectContext {
         return "stmt[" + stmtId + ", " + DebugUtil.printId(queryId) + "]";
     }
 
+    public void setErp(String erp) {
+        this.erp = erp;
+    }
+    public void setTeamUser(String teamUser) {
+        this.teamUser = teamUser;
+    }
+    public void setSource(String source) {
+        this.source = source;
+    }
+    public String getErp() {
+        return erp;
+    }
+    public String getSource() {
+        return source;
+    }
+    public String getTeamUser() {
+        return teamUser;
+    }
+
+    public void setUserKey(String userKey) {
+        this.userKey = userKey;
+    }
+
+    public String getUserKey() {
+        return userKey;
+    }
 }
 
