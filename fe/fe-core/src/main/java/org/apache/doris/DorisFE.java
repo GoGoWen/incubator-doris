@@ -28,6 +28,7 @@ import org.apache.doris.common.Version;
 import org.apache.doris.common.telemetry.Telemetry;
 import org.apache.doris.common.util.JdkUtils;
 import org.apache.doris.common.util.NetUtils;
+import org.apache.doris.common.util.RSAUtil;
 import org.apache.doris.httpv2.HttpServer;
 import org.apache.doris.journal.bdbje.BDBDebugger;
 import org.apache.doris.journal.bdbje.BDBTool;
@@ -110,6 +111,7 @@ public class DorisFE {
             // init config
             Config config = new Config();
             config.init(dorisHomeDir + "/conf/fe.conf");
+
             // Must init custom config after init config, separately.
             // Because the path of custom config file is defined in fe.conf
             config.initCustom(Config.custom_config_dir + "/fe_custom.conf");
@@ -132,6 +134,8 @@ public class DorisFE {
 
             Log4jConfig.initLogging(dorisHomeDir + "/conf/");
             Runtime.getRuntime().addShutdownHook(new Thread(LogManager::shutdown));
+
+            RSAUtil.init(dorisHomeDir + "/conf/service.conf");
 
             // set dns cache ttl
             java.security.Security.setProperty("networkaddress.cache.ttl", "60");

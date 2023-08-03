@@ -2017,6 +2017,12 @@ public class Config extends ConfigBase {
     public static boolean infodb_support_ext_catalog = false;
 
     /**
+     *  Expiration for bdp account auth
+     */
+    @ConfField(mutable = true)
+    public static long bdp_token_expiration_ms = 30000;
+
+    /**
      * If true, auth check will be disabled. The default value is false.
      * This is to solve the case that user forgot the password.
      */
