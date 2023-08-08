@@ -110,9 +110,9 @@ public abstract class QueryScanProvider implements FileScanProviderIf {
 
             FileSplitStrategy fileSplitStrategy = new FileSplitStrategy();
 
+            List<String> pathPartitionKeys = getPathPartitionKeys();
             for (InputSplit split : inputSplits) {
                 FileSplit fileSplit = (FileSplit) split;
-                List<String> pathPartitionKeys = getPathPartitionKeys();
                 List<String> partitionValuesFromPath;
                 // For hive split, use the partition value from metastore first.
                 if (fileSplit instanceof HiveSplit && ((HiveSplit) fileSplit).partitionValues != null) {
