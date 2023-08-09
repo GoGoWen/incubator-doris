@@ -25,6 +25,7 @@
 #include "runtime/runtime_state.h"
 #include "vec/core/block.h"
 #include "vec/exec/scan/vscanner.h"
+#include "vec/exprs/vexpr.h"
 namespace doris::vectorized {
 using namespace ErrorCode;
 
