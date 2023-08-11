@@ -2051,5 +2051,8 @@ public class Config extends ConfigBase {
      */
     @ConfField(mutable = true)
     public static long bdp_token_expiration_ms = 30000;
+    
+    @ConfField(mutable = true)
+    public static boolean use_mysql_bigint_for_largeint = false;
 }
 
