@@ -23,11 +23,11 @@ defaultDb = "regression_test"
 // add useLocalSessionState so that the jdbc will not send
 // init cmd like: select @@session.tx_read_only
 // at each time we connect.
-jdbcUrl = "jdbc:mysql://127.0.0.1:9235/?useLocalSessionState=true&allowLoadLocalInfile=true"
+jdbcUrl = "jdbc:mysql://127.0.0.1:9030/?useLocalSessionState=true&allowLoadLocalInfile=true"
 jdbcUser = "root"
 jdbcPassword = ""
 
-feHttpAddress = "127.0.0.1:8335"
+feHttpAddress = "127.0.0.1:8030"
 feHttpUser = "root"
 feHttpPassword = ""
 
@@ -123,5 +123,5 @@ s3Endpoint = "cos.ap-hongkong.myqcloud.com"
 s3BucketName = "doris-build-hk-1308700295"
 s3Region = "ap-hongkong"
 
-sf1DataPath = "/mnt/disk2/yunyou/git/doris1.2/test-data-cache"
-cacheDataPath = "/mnt/disk2/yunyou/git/doris1.2/test-data-cache"
+// sf1DataPath = "/mnt/disk2/yunyou/git/doris1.2/test-data-cache"
+// cacheDataPath = "/mnt/disk2/yunyou/git/doris1.2/test-data-cache"
