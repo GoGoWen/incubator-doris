@@ -632,8 +632,8 @@ suite("test_date_function") {
         contains "`birth1` < '2022-01-01'"
     }
     
-    def result = sql "explain select date_trunc('2021-01-01 00:00:12', 'month')"
-    assertFalse(result[0][0].contains("date_trunc"))
+    def r = sql "explain select date_trunc('2021-01-01 00:00:12', 'month')"
+    assertFalse(r[0][0].contains("date_trunc"))
 
     sql """
         insert into ${tableName} values 
