@@ -469,7 +469,8 @@ public class ExportJob implements Writable {
                         new PlanFragmentId(nextId.getAndIncrement()), scanNode, DataPartition.UNPARTITIONED);
                 break;
             default:
-                break;
+                LOG.info("Table Type unsupport export, ExportTable type : {}", exportTable.getType());
+                throw new UserException("Table Type unsupport export :" + exportTable.getType());
         }
         fragment.setOutputExprs(createOutputExprs());
 
