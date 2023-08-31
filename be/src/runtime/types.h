@@ -199,6 +199,8 @@ struct TypeDescriptor {
 
     bool is_array_type() const { return type == TYPE_ARRAY; }
 
+    bool is_hll_type() const { return type == TYPE_HLL; }
+    
     bool is_bitmap_type() const { return type == TYPE_OBJECT; }
 
     /// Returns the byte size of this type.  Returns 0 for variable length types.

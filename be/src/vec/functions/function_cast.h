@@ -33,6 +33,7 @@
 #include "vec/common/string_buffer.hpp"
 #include "vec/data_types/data_type_decimal.h"
 #include "vec/data_types/data_type_factory.hpp"
+#include "vec/data_types/data_type_hll.h"
 #include "vec/data_types/data_type_jsonb.h"
 #include "vec/data_types/data_type_nullable.h"
 #include "vec/data_types/data_type_number.h"
@@ -1423,6 +1424,25 @@ private:
         return create_unsupport_wrapper(error_msg);
     }
 
+    WrapperType create_hll_wrapper(FunctionContext* context, const DataTypePtr& from_type_untyped,
+                                   const DataTypeHLL& to_type) const {
+        /// Conversion from String through parsing.
+        if (check_and_get_data_type<DataTypeString>(from_type_untyped.get())) {
+            return &ConvertImplGenericFromString<ColumnString>::execute;
+        }
+
+        //TODO if from is not string, it must be HLL?
+        const auto* from_type = check_and_get_data_type<DataTypeHLL>(from_type_untyped.get());
+
+        if (!from_type) {
+            return create_unsupport_wrapper(
+                    "CAST AS HLL can only be performed between HLL, String "
+                    "types");
+        }
+
+        return nullptr;
+    }
+
     WrapperType create_array_wrapper(FunctionContext* context, const DataTypePtr& from_type_untyped,
                                      const DataTypeArray& to_type) const {
         /// Conversion from String through parsing.
@@ -1714,6 +1734,9 @@ private:
         case TypeIndex::Array:
             return create_array_wrapper(context, from_type,
                                         static_cast<const DataTypeArray&>(*to_type));
+        case TypeIndex::HLL:
+            return create_hll_wrapper(context, from_type,
+                                      static_cast<const DataTypeHLL&>(*to_type));
         default:
             break;
         }

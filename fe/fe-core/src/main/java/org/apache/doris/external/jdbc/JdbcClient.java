@@ -43,8 +43,10 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Getter
 public class JdbcClient {
@@ -60,16 +62,40 @@ public class JdbcClient {
     private DruidDataSource dataSource = null;
     private boolean isOnlySpecifiedDatabase = false;
 
-    private boolean isLowerCaseTableNames = false;
+    protected boolean isLowerCaseTableNames = false;
 
     private static boolean convertDateToNull = false;
 
     // only used when isLowerCaseTableNames = true.
-    private Map<String, String> lowerTableToRealTable = Maps.newHashMap();
+    protected Map<String, String> lowerTableToRealTable = Maps.newHashMap();
 
     // only used when isLowerCaseTableNames = true.
-    private Map<String, String> lowerDBToRealDB = Maps.newHashMap();
+    protected Map<String, String> lowerDBToRealDB = Maps.newHashMap();
 
+    public static org.apache.doris.external.jdbc.JdbcClient createJdbcClient(String user, String password, String jdbcUrl, String driverUrl, String driverClass,
+                                                                             String onlySpecifiedDatabase, String isLowerCaseTableNames) {
+        try {
+            String dbType = JdbcResource.parseDbType(jdbcUrl);
+            switch (dbType) {
+                case JdbcResource.MYSQL:
+                    return new JdbcMySQLClient(user, password, jdbcUrl, driverUrl, driverClass,
+                        onlySpecifiedDatabase, isLowerCaseTableNames);
+                case JdbcResource.POSTGRESQL:
+                case JdbcResource.ORACLE:
+                case JdbcResource.SQLSERVER:
+                case JdbcResource.CLICKHOUSE:
+                case JdbcResource.SAP_HANA:
+                case JdbcResource.TRINO:
+                case JdbcResource.PRESTO:
+                    return new JdbcClient(user, password, jdbcUrl, driverUrl, driverClass,
+                        onlySpecifiedDatabase, isLowerCaseTableNames);
+                default:
+                    throw new IllegalArgumentException("Unsupported DB type: " + dbType);
+            }
+        } catch (DdlException e) {
+            throw new JdbcClientException("Failed to parse db type from jdbcUrl: " + jdbcUrl, e);
+        }
+    }
     public JdbcClient(String user, String password, String jdbcUrl, String driverUrl, String driverClass,
             String onlySpecifiedDatabase, String isLowerCaseTableNames) {
         this.jdbcUser = user;
@@ -357,7 +383,7 @@ public class JdbcClient {
     }
 
     @Data
-    private class JdbcFieldSchema {
+    protected class JdbcFieldSchema {
         private String columnName;
         // The SQL type of the corresponding java.sql.types (Type ID)
         private int dataType;
@@ -582,6 +608,8 @@ public class JdbcClient {
             case "VARBINARY":
             case "ENUM":
                 return ScalarType.createStringType();
+            case "HLL":
+                return ScalarType.createHllType();
             default:
                 return Type.UNSUPPORTED;
         }
@@ -940,7 +968,6 @@ public class JdbcClient {
         }
         return ScalarType.createStringType();
     }
-
 
     public List<Column> getColumnsFromJdbc(String dbName, String tableName) {
         List<JdbcFieldSchema> jdbcTableSchema = getJdbcColumnsInfo(dbName, tableName);

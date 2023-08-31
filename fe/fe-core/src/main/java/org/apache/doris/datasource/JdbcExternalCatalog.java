@@ -129,8 +129,8 @@ public class JdbcExternalCatalog extends ExternalCatalog {
 
     @Override
     protected void initLocalObjectsImpl() {
-        jdbcClient = new JdbcClient(getJdbcUser(), getJdbcPasswd(), getJdbcUrl(), getDriverUrl(), getDriverClass(),
-                getOnlySpecifiedDatabase(), getLowerCaseTableNames());
+        jdbcClient = JdbcClient.createJdbcClient(getJdbcUser(), getJdbcPasswd(), getJdbcUrl(), getDriverUrl(),
+            getDriverClass(), getOnlySpecifiedDatabase(), getLowerCaseTableNames());
     }
 
     @Override
