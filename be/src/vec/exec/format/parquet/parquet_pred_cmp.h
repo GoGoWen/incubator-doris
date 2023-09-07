@@ -68,6 +68,7 @@ struct ColumnMinMaxParams {
     std::vector<void*> in_pred_values;
     const char* min_bytes;
     const char* max_bytes;
+    PrimitiveType doris_type_from_parquet;
 };
 
 template <typename T>
@@ -101,7 +102,7 @@ static void _decode_decimal_v2_to_primary(const ColumnMinMaxParams& params,
 //}
 
 static bool _eval_in_val(const ColumnMinMaxParams& params) {
-    switch (params.conjunct_type) {
+    switch (params.doris_type_from_parquet) {
     case TYPE_TINYINT: {
         _FILTER_GROUP_BY_IN(int8_t, params.in_pred_values, params.min_bytes, params.max_bytes)
         break;
@@ -149,7 +150,7 @@ static bool _eval_in_val(const ColumnMinMaxParams& params) {
 }
 
 static bool _eval_eq(const ColumnMinMaxParams& params) {
-    switch (params.conjunct_type) {
+    switch (params.doris_type_from_parquet) {
     case TYPE_TINYINT: {
         _PLAIN_DECODE(int16_t, params.value, params.min_bytes, params.max_bytes, conjunct_value,
                       min, max)
@@ -244,7 +245,7 @@ static bool _filter_group_by_gt_or_ge(T conjunct_value, T max, bool is_ge) {
 }
 
 static bool _eval_gt(const ColumnMinMaxParams& params, bool is_eq) {
-    switch (params.conjunct_type) {
+    switch (params.doris_type_from_parquet) {
     case TYPE_TINYINT: {
         _PLAIN_DECODE_SINGLE(int8_t, params.value, params.max_bytes, conjunct_value, max)
         return _filter_group_by_gt_or_ge(conjunct_value, max, is_eq);
@@ -321,7 +322,7 @@ static bool _filter_group_by_lt_or_le(T conjunct_value, T min, bool is_le) {
 }
 
 static bool _eval_lt(const ColumnMinMaxParams& params, bool is_eq) {
-    switch (params.conjunct_type) {
+    switch (params.doris_type_from_parquet) {
     case TYPE_TINYINT: {
         _PLAIN_DECODE_SINGLE(int8_t, params.value, params.min_bytes, conjunct_value, min)
         return _filter_group_by_lt_or_le(conjunct_value, min, is_eq);
@@ -549,6 +550,7 @@ static bool determine_filter_min_max(const ColumnValueRangeType& col_val_range,
     params.parquet_type_length = col_schema->parquet_schema.type_length;
     params.min_bytes = min_bytes;
     params.max_bytes = max_bytes;
+    params.doris_type_from_parquet = col_schema->type.type;
     for (int i = 0; i < filters.size(); i++) {
         _eval_predicate(filters[i], &params, &need_filter);
         if (need_filter) {
