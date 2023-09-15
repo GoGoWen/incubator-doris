@@ -859,9 +859,9 @@ public class HiveMetaStoreClientHelper {
                 Types.DecimalType decimal = (Types.DecimalType) primitive;
                 return ScalarType.createDecimalType(decimal.precision(), decimal.scale());
             case DATE:
-                return ScalarType.createDateV2Type();
+                return ScalarType.getDefaultDateType(Type.DATE);
             case TIMESTAMP:
-                return ScalarType.createDatetimeV2Type(0);
+                return ScalarType.getDefaultDateType(Type.DATETIME);
             case TIME:
                 return Type.UNSUPPORTED;
             default:

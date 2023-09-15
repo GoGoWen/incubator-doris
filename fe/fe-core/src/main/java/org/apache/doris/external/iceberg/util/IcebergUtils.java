@@ -292,7 +292,7 @@ public class IcebergUtils {
                 String colName = slotRef.getColumnName();
                 Types.NestedField nestedField = schema.caseInsensitiveFindField(colName);
                 colName = nestedField.name();
-                Object value = extractDorisLiteral(literalExpr);
+                Object value = extractDorisLiteral(literalExpr, slotRef.getType());
                 if (value == null) {
                     if (opCode == TExprOpcode.EQ_FOR_NULL && literalExpr instanceof NullLiteral) {
                         return Expressions.isNull(colName);
@@ -322,7 +322,7 @@ public class IcebergUtils {
         }
     }
 
-    private static Object extractDorisLiteral(Expr expr) {
+    private static Object extractDorisLiteral(Expr expr, Type type) {
         if (!expr.isLiteral()) {
             return null;
         }
@@ -333,8 +333,8 @@ public class IcebergUtils {
             DateLiteral dateLiteral = (DateLiteral) expr;
             SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
             String dateStr = String.format("%04d%02d%02d%02d%02d%02d", dateLiteral.getYear(),
-                    dateLiteral.getMonth(), dateLiteral.getDay(), dateLiteral.getHour(), dateLiteral.getMinute(),
-                    dateLiteral.getSecond());
+                dateLiteral.getMonth(), dateLiteral.getDay(), dateLiteral.getHour(), dateLiteral.getMinute(),
+                dateLiteral.getSecond());
             Date date;
             try {
                 date = formatter.parse(dateStr);
@@ -343,14 +343,14 @@ public class IcebergUtils {
             }
 
             String dataStr = "";
-            if (dateLiteral.getType() == Type.DATE || dateLiteral.getType() == Type.DATEV2) {
+            if (type == Type.DATE || type == Type.DATEV2) {
                 dataStr = String.format("%04d-%02d-%02d", dateLiteral.getYear(),
                     dateLiteral.getMonth(), dateLiteral.getDay());
                 return dataStr;
             } else {
-                dataStr = String.format("%04d-%02d-%02dT%02d:%02d:%02d.%06d", dateLiteral.getYear(),
+                dataStr = String.format("%04d-%02d-%02d %02d:%02d:%02d", dateLiteral.getYear(),
                     dateLiteral.getMonth(), dateLiteral.getDay(), dateLiteral.getHour(), dateLiteral.getMinute(),
-                    dateLiteral.getSecond(), dateLiteral.getMicrosecond());
+                    dateLiteral.getSecond());
             }
             return dataStr;
         } else if (expr instanceof DecimalLiteral) {
