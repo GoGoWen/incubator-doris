@@ -35,6 +35,8 @@ public class IcebergExternalCatalogFactory {
                 return new IcebergRestExternalCatalog(catalogId, name, resource, props);
             case IcebergExternalCatalog.ICEBERG_HMS:
                 return new IcebergHMSExternalCatalog(catalogId, name, resource, props);
+            case IcebergExternalCatalog.ICEBERG_HADOOP:
+                return new IcebergHadoopExternalCatalog(catalogId, name, resource, props);
             default:
                 throw new DdlException("Unknown " + IcebergExternalCatalog.ICEBERG_CATALOG_TYPE
                     + " value: " + catalogType);

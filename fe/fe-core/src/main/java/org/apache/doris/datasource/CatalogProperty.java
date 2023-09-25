@@ -108,6 +108,10 @@ public class CatalogProperty implements Writable {
         return hadoopProperties;
     }
 
+    public void addProperty(String key, String val) {
+        this.properties.put(key, val);
+    }
+
     @Override
     public void write(DataOutput out) throws IOException {
         Text.writeString(out, GsonUtils.GSON.toJson(this));
