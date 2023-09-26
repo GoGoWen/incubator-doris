@@ -252,7 +252,7 @@ under the License.
         <!-- ATTN: avro version must be consistent with Iceberg version -->
         <!-- Please modify iceberg.version and avro.version together,
          you can find avro version info in iceberg mvn repository -->
-        <iceberg.version>1.4.1</iceberg.version>
+        <iceberg.version>JD-1.4.0-SNAPSHOT</iceberg.version>
         <avro.version>1.11.1</avro.version>
         <!-- hudi -->
         <hudi.version>0.10.0</hudi.version>
@@ -320,7 +320,7 @@ under the License.
                 <repository>
                     <id>snapshots</id>
                     <name>apache snapshots maven repo https</name>
-                    <url>https://repository.apache.org/content/repositories/snapshots/</url>
+                    <url>http://artifactory.jd.com/libs-snapshots/</url>
                 </repository>
                 <!-- for java-cup -->
                 <repository>
@@ -973,6 +973,12 @@ under the License.
                 <groupId>org.apache.doris</groupId>
                 <artifactId>hive-shade-3</artifactId>
                 <version>${doris.shade.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.apache.avro</groupId>
+                        <artifactId>avro</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>
@@ -1063,14 +1069,26 @@ under the License.
             <!-- https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-core -->
             <dependency>
                 <groupId>org.apache.iceberg</groupId>
-                <artifactId>iceberg-core-bowen</artifactId>
+                <artifactId>iceberg-core</artifactId>
                 <version>${iceberg.version}</version>
             </dependency>
 
             <!-- https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-hive-metastore -->
             <dependency>
                 <groupId>org.apache.iceberg</groupId>
-                <artifactId>iceberg-hive-metastore-bowen</artifactId>
+                <artifactId>iceberg-hive-metastore</artifactId>
+                <version>${iceberg.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.iceberg</groupId>
+                <artifactId>iceberg-api</artifactId>
+                <version>${iceberg.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.iceberg</groupId>
+                <artifactId>iceberg-common</artifactId>
                 <version>${iceberg.version}</version>
             </dependency>
 
@@ -1286,7 +1304,7 @@ under the License.
         <repository>
             <id>snapshots</id>
             <name>apache snapshots maven repo https</name>
-            <url>https://repository.apache.org/content/repositories/snapshots/</url>
+            <url>http://artifactory.jd.com/libs-snapshots/</url>
             <snapshots>
                 <updatePolicy>always</updatePolicy>
             </snapshots>

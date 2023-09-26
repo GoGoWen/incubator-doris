@@ -690,14 +690,26 @@ under the License.
 
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-core-bowen</artifactId>
+            <artifactId>iceberg-core</artifactId>
+            <version>${iceberg.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-api</artifactId>
+            <version>${iceberg.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-common</artifactId>
             <version>${iceberg.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-aws</artifactId>
-            <version>1.1.0</version>
+            <version>${iceberg.version}</version>
         </dependency>
 
         <dependency>
@@ -727,7 +739,7 @@ under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-hive-metastore-bowen</artifactId>
+            <artifactId>iceberg-hive-metastore</artifactId>
             <version>${iceberg.version}</version>
         </dependency>
 

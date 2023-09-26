@@ -57,8 +57,9 @@ public class IcebergExternalTable extends ExternalTable {
         List<Types.NestedField> columns = schema.columns();
         List<Column> tmpSchema = Lists.newArrayListWithCapacity(columns.size());
         for (Types.NestedField field : columns) {
+            String defaultValue = field.getDefaultValue() == null ? null : field.getDefaultValue().toString();
             tmpSchema.add(new Column(field.name(),
-                    icebergTypeToDorisType(field.type()), true, null, true, field.getDefaultValue().toString(), field.doc(), true,
+                    icebergTypeToDorisType(field.type()), true, null, true, defaultValue, field.doc(), true,
                     schema.caseInsensitiveFindField(field.name()).fieldId()));
         }
         return tmpSchema;
