@@ -696,18 +696,6 @@ under the License.
 
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-api</artifactId>
-            <version>${iceberg.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-common</artifactId>
-            <version>${iceberg.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-aws</artifactId>
             <version>${iceberg.version}</version>
         </dependency>
