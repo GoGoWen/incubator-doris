@@ -63,6 +63,15 @@ public:
         data.push_back(*reinterpret_cast<const T*>(pos));
     }
 
+    void insert_many_strings(const StringRef* strings, size_t num) override {
+        for (size_t i = 0; i < num; i++) {
+            uint32_t len = strings[i].size;
+            if (len) {
+                insert_binary_data(strings[i].data, len);
+            }
+        }
+    }
+
     void insert_binary_data(const char* pos, size_t length) {
         insert_default();
         T* pvalue = &get_element(size() - 1);

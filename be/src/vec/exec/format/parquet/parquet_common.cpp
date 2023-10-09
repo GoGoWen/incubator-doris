@@ -565,7 +565,9 @@ Status ByteArrayDecoder::decode_values(MutableColumnPtr& doris_column, DataTypeP
     TypeIndex logical_type = remove_nullable(data_type)->get_type_id();
     switch (logical_type) {
     case TypeIndex::String:
-    case TypeIndex::FixedString: {
+    case TypeIndex::FixedString:
+    case TypeIndex::HLL:
+    case TypeIndex::BitMap: {
         size_t dict_index = 0;
 
         ColumnSelectVector::DataReadType read_type;
