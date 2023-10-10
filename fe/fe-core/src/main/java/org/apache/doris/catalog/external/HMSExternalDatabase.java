@@ -33,6 +33,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,10 +95,14 @@ public class HMSExternalDatabase extends ExternalDatabase<HMSExternalTable> impl
         initDatabaseLog.setDbId(id);
         List<String> tableNames = extCatalog.listTableNames(null, name);
         // if set table white list, let's add it
+        HashSet<String> tableNamesHashSet
+            = (HashSet<String>)tableNames.stream().collect(Collectors.toSet());
         for(String tableStr : (((HMSExternalCatalog)extCatalog).getTableWhitelist())) {
-            String[] tables  = tableStr.split(",");
+            String[] tables  = tableStr.split("\\.");
             if(tables.length == 2 && name.equalsIgnoreCase(tables[0])) {
-                tableNames.add(tables[1]);
+                if (!tableNamesHashSet.contains(tables[1])) {
+                    tableNames.add(tables[1]);
+                }
             }
         }
 
