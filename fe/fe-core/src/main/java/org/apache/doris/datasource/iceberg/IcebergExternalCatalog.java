@@ -50,6 +50,7 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     public static final String ICEBERG_CATALOG_TYPE = "iceberg.catalog.type";
     public static final String ICEBERG_HLL_COLUMNS = "iceberg.hll.columns";
     public static final String ICEBERG_BITMAP_COLUMNS = "iceberg.bitmap.columns";
+    public static final String ICEBERG_TABLE_WHITELIST = "iceberg.table.whitelist";
     public static final String ICEBERG_REST = "rest";
     public static final String ICEBERG_HMS = "hms";
     public static final String ICEBERG_HADOOP = "hadoop";
@@ -58,6 +59,7 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     protected SupportsNamespaces nsCatalog;
     private HashSet<String> hllColumns = new HashSet<>();
     private HashSet<String> bitmapColumns = new HashSet<>();
+    private HashSet<String> tableList = new HashSet<>();
 
     public IcebergExternalCatalog(long catalogId, String name) {
         super(catalogId, name);
@@ -92,6 +94,7 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
         dbNameToId = tmpDbNameToId;
         idToDb = tmpIdToDb;
         initColumnMapping();
+        initTableWhiteList();
         Env.getCurrentEnv().getEditLog().logInitCatalog(initCatalogLog);
     }
 
@@ -101,6 +104,10 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
 
     public HashSet<String> getBitmapColumns() {
         return bitmapColumns;
+    }
+
+    public HashSet<String> getWhiteTableList() {
+        return tableList;
     }
 
     private void initColumnMapping() {
@@ -115,6 +122,17 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
         if (bitmapColumnsStr != null) {
             String[] columnsBitmap = bitmapColumnsStr.split(",");
             bitmapColumns.addAll(Arrays.asList(columnsBitmap));
+        }
+    }
+
+    private void initTableWhiteList() {
+        // init white list table
+        // in jd, the hive catalog invoke getTableName() will return all tables
+        // which cause some table we can not read
+        String tablesWhitelist = catalogProperty.getProperties().get(ICEBERG_TABLE_WHITELIST);
+        if (tablesWhitelist != null) {
+            String[] tableNames = tablesWhitelist.split(",");
+            tableList.addAll(Arrays.asList(tableNames));
         }
     }
 
@@ -173,6 +191,13 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     public List<String> listTableNames(SessionContext ctx, String dbName) {
         makeSureInitialized();
         List<TableIdentifier> tableIdentifiers = catalog.listTables(Namespace.of(dbName));
+        // attach whitelist table
+        for(String tableStr : tableList) {
+            String[] tableInfo = tableStr.split(".");
+            if (tableInfo.length == 2) {
+                tableIdentifiers.add(TableIdentifier.of(tableInfo[0], tableInfo[1]));
+            }
+        }
         return tableIdentifiers.stream().map(TableIdentifier::name).collect(Collectors.toList());
     }
 

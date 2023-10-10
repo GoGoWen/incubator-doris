@@ -93,6 +93,14 @@ public class HMSExternalDatabase extends ExternalDatabase<HMSExternalTable> impl
         initDatabaseLog.setCatalogId(extCatalog.getId());
         initDatabaseLog.setDbId(id);
         List<String> tableNames = extCatalog.listTableNames(null, name);
+        // if set table white list, let's add it
+        for(String tableStr : (((HMSExternalCatalog)extCatalog).getTableWhitelist())) {
+            String[] tables  = tableStr.split(",");
+            if(tables.length == 2 && name.equalsIgnoreCase(tables[0])) {
+                tableNames.add(tables[1]);
+            }
+        }
+
         if (tableNames != null) {
             Map<String, Long> tmpTableNameToId = Maps.newConcurrentMap();
             Map<Long, HMSExternalTable> tmpIdToTbl = Maps.newHashMap();

@@ -41,6 +41,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -56,6 +58,10 @@ public class HMSExternalCatalog extends ExternalCatalog {
     // Must set to -1 otherwise client.getNextNotification will throw exception
     // Reference to https://github.com/apache/doris/issues/18251
     private long lastSyncedEventId = -1L;
+
+    public static final String TABLE_WHITELIST = "table.whitelist";
+    private HashSet<String> tableList = new HashSet<>();
+
 
     /**
      * Default constructor for HMSExternalCatalog.
@@ -134,7 +140,23 @@ public class HMSExternalCatalog extends ExternalCatalog {
         }
         dbNameToId = tmpDbNameToId;
         idToDb = tmpIdToDb;
+        initHiveTableList();
         Env.getCurrentEnv().getEditLog().logInitCatalog(initCatalogLog);
+    }
+
+    public HashSet<String> getTableWhitelist() {
+        return tableList;
+    }
+
+    private void initHiveTableList() {
+        // init white list table
+        // in jd, the hive catalog invoke getTableName() will return all tables
+        // which cause some table we can not read
+        String tablesWhitelist = catalogProperty.getProperties().get(TABLE_WHITELIST);
+        if (tablesWhitelist != null) {
+            String[] tableNames = tablesWhitelist.split(",");
+            tableList.addAll(Arrays.asList(tableNames));
+        }
     }
 
     @Override
