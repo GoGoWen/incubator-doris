@@ -63,7 +63,7 @@ public class IcebergExternalTable extends ExternalTable {
             if (((IcebergExternalCatalog) catalog).getHllColumns().contains(fullFieldName)) {
                 columnType = ScalarType.createHllType();
             } else if(((IcebergExternalCatalog) catalog).getBitmapColumns().contains(fullFieldName)) {
-                columnType = BITMAP;
+                columnType = Type.BITMAP;
             } else {
                 columnType = icebergTypeToDorisType(field.type());
             }
