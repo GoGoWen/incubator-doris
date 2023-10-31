@@ -343,7 +343,7 @@ public class IcebergUtils {
             }
 
             String dataStr = "";
-            if (type == Type.DATE || type == Type.DATEV2) {
+            if (type.isDate() || type.isDateV2()) {
                 dataStr = String.format("%04d-%02d-%02d", dateLiteral.getYear(),
                     dateLiteral.getMonth(), dateLiteral.getDay());
                 return dataStr;
