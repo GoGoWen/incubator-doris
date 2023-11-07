@@ -307,4 +307,16 @@ public class HMSExternalCatalog extends ExternalCatalog {
         HMSExternalDatabase db = new HMSExternalDatabase(this, dbId, dbName);
         idToDb.put(dbId, db);
     }
+
+    @Override
+    public void replayInitCatalog(InitCatalogLog log) {
+        super.replayInitCatalog(log);
+
+        //init table white list
+        if(log.getTableList() != null) {
+            String tablesList = log.getTableList();
+            String[] tableNames = tablesList.split(",");
+            tableList.addAll(Arrays.asList(tableNames));
+        }
+    }
 }

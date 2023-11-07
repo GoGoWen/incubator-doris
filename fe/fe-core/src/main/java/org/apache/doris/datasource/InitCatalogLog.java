@@ -67,6 +67,9 @@ public class InitCatalogLog implements Writable {
     @SerializedName(value = "bitmapColumns")
     private String bitmapColumns;
 
+    @SerializedName(value = "tableList")
+    private String tableList;
+
     public InitCatalogLog() {
         refreshCount = 0;
         createCount = 0;
