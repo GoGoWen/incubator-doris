@@ -58,7 +58,6 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     protected SupportsNamespaces nsCatalog;
     private HashSet<String> hllColumns = new HashSet<>();
     private HashSet<String> bitmapColumns = new HashSet<>();
-    private HashSet<String> tableList = new HashSet<>();
 
     public IcebergExternalCatalog(long catalogId, String name) {
         super(catalogId, name);
@@ -92,7 +91,7 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
         }
         dbNameToId = tmpDbNameToId;
         idToDb = tmpIdToDb;
-        initColumnMapping();
+        initColumnMapping(initCatalogLog);
         Env.getCurrentEnv().getEditLog().logInitCatalog(initCatalogLog);
     }
 
@@ -104,18 +103,20 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
         return bitmapColumns;
     }
 
-    private void initColumnMapping() {
+    private void initColumnMapping(InitCatalogLog initLog) {
         // init hllColumns
         String hllColumnsStr = catalogProperty.getProperties().get(ICEBERG_HLL_COLUMNS);
         if (hllColumnsStr != null) {
             String[] columnsHll = hllColumnsStr.split(",");
             hllColumns.addAll(Arrays.asList(columnsHll));
+            initLog.setHllColumns(hllColumnsStr);
         }
         // init bitmapColumns
         String bitmapColumnsStr = catalogProperty.getProperties().get(ICEBERG_BITMAP_COLUMNS);
         if (bitmapColumnsStr != null) {
             String[] columnsBitmap = bitmapColumnsStr.split(",");
             bitmapColumns.addAll(Arrays.asList(columnsBitmap));
+            initLog.setBitmapColumns(bitmapColumnsStr);
         }
     }
 
@@ -180,5 +181,23 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     public org.apache.iceberg.Table getIcebergTable(String dbName, String tblName) {
         makeSureInitialized();
         return catalog.loadTable(TableIdentifier.of(dbName, tblName));
+    }
+
+    @Override
+    public void replayInitCatalog(InitCatalogLog log) {
+        super.replayInitCatalog(log);
+
+        // init hllColumns and bitmap columns
+        String hllCols = log.getHllColumns();
+        if (hllCols != null) {
+            String[] columnsHll = hllCols.split(",");
+            hllColumns.addAll(Arrays.asList(columnsHll));
+        }
+        // init bitmapColumns
+        String bitmapColumnsStr = log.getHllColumns();
+        if (bitmapColumnsStr != null) {
+            String[] columnsBitmap = bitmapColumnsStr.split(",");
+            bitmapColumns.addAll(Arrays.asList(columnsBitmap));
+        }
     }
 }

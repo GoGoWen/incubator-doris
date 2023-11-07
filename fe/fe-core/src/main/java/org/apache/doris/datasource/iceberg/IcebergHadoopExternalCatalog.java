@@ -22,6 +22,7 @@ import org.apache.doris.datasource.CatalogProperty;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.doris.datasource.InitCatalogLog;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 
@@ -56,5 +57,10 @@ public class IcebergHadoopExternalCatalog extends IcebergExternalCatalog {
         catalogProperties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse);
         hadoopCatalog.initialize(icebergCatalogType, catalogProperties);
         catalog = hadoopCatalog;
+    }
+
+    @Override
+    public void replayInitCatalog(InitCatalogLog log) {
+        super.replayInitCatalog(log);
     }
 }
