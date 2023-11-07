@@ -72,10 +72,9 @@ public:
     }
     void to_string(const IColumn& column, size_t row_num, BufferWritable& ostr) const override;
 
-    [[noreturn]] virtual Field get_default() const override {
-        LOG(FATAL) << "Method get_default() is not implemented for data type " << get_name();
-        __builtin_unreachable();
-    }
+    Status from_string(ReadBuffer& rb, IColumn* column) const;
+
+    Field get_default() const override { return BitmapValue::empty_bitmap(); }
 
     static void serialize_as_stream(const BitmapValue& value, BufferWritable& buf);
 

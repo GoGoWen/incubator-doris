@@ -431,6 +431,7 @@ The transaction mechanism ensures the atomicity of data writing to JDBC External
 | STRING | STRING | |
 | TEXT | STRING | |
 | HLL | HLL | `return_object_data_as_binary=true` is required when query HLL column |
+| BITMAP     | BITMAP                 | Query BITMAP needs to set `return_object_data_as_binary=true`                        |
 |Other| UNSUPPORTED |
 
 ### SAP HANA

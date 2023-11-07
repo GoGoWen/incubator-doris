@@ -610,6 +610,8 @@ public class JdbcClient {
                 return ScalarType.createStringType();
             case "HLL":
                 return ScalarType.createHllType();
+            case "BITMAP":
+                return Type.BITMAP;
             default:
                 return Type.UNSUPPORTED;
         }

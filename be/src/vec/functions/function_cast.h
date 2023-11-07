@@ -34,6 +34,7 @@
 #include "vec/data_types/data_type_decimal.h"
 #include "vec/data_types/data_type_factory.hpp"
 #include "vec/data_types/data_type_hll.h"
+#include "vec/data_types/data_type_bitmap.h"
 #include "vec/data_types/data_type_jsonb.h"
 #include "vec/data_types/data_type_nullable.h"
 #include "vec/data_types/data_type_number.h"
@@ -1443,6 +1444,26 @@ private:
         return nullptr;
     }
 
+    WrapperType create_bitmap_wrapper(FunctionContext* context,
+                                      const DataTypePtr& from_type_untyped,
+                                      const DataTypeBitMap& to_type) const {
+        /// Conversion from String through parsing.
+        if (check_and_get_data_type<DataTypeString>(from_type_untyped.get())) {
+            return &ConvertImplGenericFromString::execute;
+        }
+
+        //TODO if from is not string, it must be BITMAP?
+        const auto* from_type = check_and_get_data_type<DataTypeBitMap>(from_type_untyped.get());
+
+        if (!from_type) {
+            return create_unsupport_wrapper(
+                    "CAST AS BITMAP can only be performed between BITMAP, String "
+                    "types");
+        }
+
+        return nullptr;
+    }
+
     WrapperType create_array_wrapper(FunctionContext* context, const DataTypePtr& from_type_untyped,
                                      const DataTypeArray& to_type) const {
         /// Conversion from String through parsing.
@@ -1737,6 +1758,9 @@ private:
         case TypeIndex::HLL:
             return create_hll_wrapper(context, from_type,
                                       static_cast<const DataTypeHLL&>(*to_type));
+        case TypeIndex::BitMap:
+            return create_bitmap_wrapper(context, from_type,
+                                         static_cast<const DataTypeBitMap&>(*to_type));
         default:
             break;
         }

@@ -104,6 +104,8 @@ public class JdbcMySQLClient extends JdbcClient {
 
                 // in mysql-jdbc-connector-8.0.*, TYPE_NAME of the HLL column in doris will be "UNKNOWN"
                 // in mysql-jdbc-connector-5.1.*, TYPE_NAME of the HLL column in doris will be "HLL"
+                // in mysql-jdbc-connector-8.0.*, TYPE_NAME of BITMAP column in doris will be "BIT"
+                // in mysql-jdbc-connector-5.1.*, TYPE_NAME of BITMAP column in doris will be "BITMAP"
                 field.setDataTypeName(rs.getString("TYPE_NAME"));
                 if (rs.getString("TYPE_NAME").equalsIgnoreCase("UNKNOWN")) {
                     if (needGetDorisColumns) {

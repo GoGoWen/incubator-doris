@@ -337,6 +337,15 @@ public:
         return false;
     }
 
+    bool has_bitmap_slot() const {
+        for (auto slot : _slots) {
+            if (slot->type().is_bitmap_type()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     TupleId id() const { return _id; }
 
     /// Return true if the physical layout of this descriptor matches that of other_desc,
