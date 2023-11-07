@@ -60,9 +60,11 @@ public class IcebergExternalTable extends ExternalTable {
             String defaultValue = field.getDefaultValue() == null ? null : field.getDefaultValue().toString();
             String fullFieldName = dbName+"."+name+"."+field.name();
             Type columnType = Type.UNSUPPORTED;
-            if (((IcebergExternalCatalog) catalog).getHllColumns().contains(fullFieldName)) {
+            if (((IcebergExternalCatalog) catalog).getHllColumns() != null &&
+                ((IcebergExternalCatalog) catalog).getHllColumns().contains(fullFieldName)) {
                 columnType = ScalarType.createHllType();
-            } else if(((IcebergExternalCatalog) catalog).getBitmapColumns().contains(fullFieldName)) {
+            } else if(((IcebergExternalCatalog) catalog).getBitmapColumns() != null &&
+                ((IcebergExternalCatalog) catalog).getBitmapColumns().contains(fullFieldName)) {
                 columnType = Type.BITMAP;
             } else {
                 columnType = icebergTypeToDorisType(field.type());
