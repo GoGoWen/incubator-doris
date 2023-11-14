@@ -66,13 +66,19 @@ public class TabletStatMgr extends MasterDaemon {
                             result.getTabletsStatsSize());
                     updateTabletStat(backend.getId(), result);
                     ok = true;
-                } catch (Exception e) {
+                } catch (Throwable e) {
+                    e.printStackTrace();
                     LOG.warn("task exec error. backend[{}]", backend.getId(), e);
                 } finally {
-                    if (ok) {
-                        ClientPool.backendPool.returnObject(address, client);
-                    } else {
-                        ClientPool.backendPool.invalidateObject(address, client);
+                    try {
+                        if (ok) {
+                            ClientPool.backendPool.returnObject(address, client);
+                        } else {
+                            ClientPool.backendPool.invalidateObject(address, client);
+                        }
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                        LOG.warn("task exec error. backend[{}]", backend.getId(), e);
                     }
                 }
             });
