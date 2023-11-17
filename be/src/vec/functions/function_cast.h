@@ -1449,7 +1449,7 @@ private:
                                       const DataTypeBitMap& to_type) const {
         /// Conversion from String through parsing.
         if (check_and_get_data_type<DataTypeString>(from_type_untyped.get())) {
-            return &ConvertImplGenericFromString::execute;
+            return &ConvertImplGenericFromString<ColumnString>::execute;
         }
 
         //TODO if from is not string, it must be BITMAP?
