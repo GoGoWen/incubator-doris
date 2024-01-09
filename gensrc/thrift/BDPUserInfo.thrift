@@ -24,5 +24,5 @@ struct TBDPUserInfo {
   4: required i64 loginTime
   5: optional string martName
   6: optional string cluster
-  7: optional string encryptedUserKey
+  7: optional string userToken
 }

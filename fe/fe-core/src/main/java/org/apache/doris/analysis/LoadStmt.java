@@ -92,6 +92,14 @@ public class LoadStmt extends DdlStmt {
     public static final String BOS_ACCESSKEY = "bos_accesskey";
     public static final String BOS_SECRET_ACCESSKEY = "bos_secret_accesskey";
 
+    public static final String BDP_TEAM_USER = "bdp_team_user";
+
+    public static final String BDP_USER_TOKEN = "bdp_user_token";
+
+    public static final String BDP_SOURCE = "bdp_source";
+
+    public static final String BDP_ERP = "bdp_erp";
+
     // mini load params
     public static final String KEY_IN_PARAM_COLUMNS = "columns";
     public static final String KEY_IN_PARAM_SET = "set";

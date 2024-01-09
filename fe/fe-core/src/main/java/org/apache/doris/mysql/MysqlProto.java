@@ -31,8 +31,8 @@ import org.apache.doris.datasource.CatalogIf;
 import org.apache.doris.ldap.LdapAuthenticate;
 import org.apache.doris.mysql.privilege.Auth;
 import org.apache.doris.qe.ConnectContext;
-import org.apache.doris.thrift.TBDPUserInfo;
 import org.apache.doris.system.SystemInfoService;
+import org.apache.doris.thrift.TBDPUserInfo;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -75,18 +75,19 @@ public class MysqlProto {
                     return false;
                 }
                 if (!serviceName.equals(userInfo.getSource())) {
-                    context.getState().setError("the service name " + serviceName +
-                            " not be equal with decrypted one {} " + userInfo.getSource());
+                    context.getState().setError(("the service name "
+                            + serviceName
+                            + " not be equal with decrypted one  " + userInfo.getSource()));
                     return false;
                 }
                 context.setErp(userInfo.getErp());
                 context.setSource(userInfo.getSource());
                 context.setTeamUser(userInfo.getTeamUser());
-                context.setUserKey(RSAUtil.decryptUserKey(userInfo.getEncryptedUserKey()));
+                context.setUserToken(userInfo.getUserToken());
                 if (LOG.isDebugEnabled()) {
-                    LOG.warn("doris username {}, service {}, erp {}, source {}, teamUser {}, userKey {}",
+                    LOG.debug("doris username {}, service {}, erp {}, source {}, teamUser {}, userKey {}",
                             qualifiedUser, serviceName, context.getErp(), context.getSource(), context.getTeamUser(),
-                            context.getUserKey());
+                            context.getUserToken());
                 }
             } catch (Exception e) {
                 context.getState().setError("decrypt bdp user info failed");

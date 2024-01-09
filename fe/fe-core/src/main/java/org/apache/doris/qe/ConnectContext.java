@@ -204,7 +204,7 @@ public class ConnectContext {
 
     private String teamUser = null;
 
-    private String userKey = null;
+    private String userToken = null;
 
 
     private StatementContext statementContext;
@@ -911,28 +911,33 @@ public class ConnectContext {
     public void setErp(String erp) {
         this.erp = erp;
     }
+
     public void setTeamUser(String teamUser) {
         this.teamUser = teamUser;
     }
+
     public void setSource(String source) {
         this.source = source;
     }
+
     public String getErp() {
         return erp;
     }
+
     public String getSource() {
         return source;
     }
+
     public String getTeamUser() {
         return teamUser;
     }
 
-    public void setUserKey(String userKey) {
-        this.userKey = userKey;
+    public void setUserToken(String userToken) {
+        this.userToken = userToken;
     }
 
-    public String getUserKey() {
-        return userKey;
+    public String getUserToken() {
+        return userToken;
     }
 }
 

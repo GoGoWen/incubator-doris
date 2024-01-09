@@ -53,6 +53,17 @@ public class AbstractBackupStmt extends DdlStmt {
         this.repoName = repoName;
         this.abstractBackupTableRefClause = abstractBackupTableRefClause;
         this.properties = properties == null ? Maps.newHashMap() : properties;
+        this.properties.remove(LoadStmt.BDP_TEAM_USER);
+        this.properties.remove(LoadStmt.BDP_ERP);
+        this.properties.remove(LoadStmt.BDP_SOURCE);
+        this.properties.remove(LoadStmt.BDP_USER_TOKEN);
+
+        if (ConnectContext.get() != null && ConnectContext.get().getErp() != null) {
+            this.properties.put(LoadStmt.BDP_TEAM_USER, ConnectContext.get().getTeamUser());
+            this.properties.put(LoadStmt.BDP_SOURCE, ConnectContext.get().getSource());
+            this.properties.put(LoadStmt.BDP_ERP, ConnectContext.get().getErp());
+            this.properties.put(LoadStmt.BDP_USER_TOKEN, ConnectContext.get().getUserToken());
+        }
     }
 
     @Override

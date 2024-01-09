@@ -29,7 +29,15 @@ ROOT=`dirname "$0"`
 ROOT=`cd "$ROOT"; pwd`
 export DORIS_HOME=${ROOT}
 build_version=`grep build_version_rc_version ./gensrc/script/gen_build_version.sh | head -n 1 | cut -d = -f 2 | awk -F "[\"\"]" '{print $2}'`
+build_version_major=`grep build_version_major ./gensrc/script/gen_build_version.sh | head -n 1 | cut -d = -f 2`
+build_version_minor=`grep build_version_minor ./gensrc/script/gen_build_version.sh | head -n 1 | cut -d = -f 2`
+build_version_patch=`grep build_version_patch ./gensrc/script/gen_build_version.sh | head -n 1 | cut -d = -f 2`
+build_version="${build_version_major}.${build_version_minor}.${build_version_patch}-$build_version"
 DORIS_OUTPUT=${DORIS_HOME}/output
+echo "***************************************"
+echo "Begin to build Doris for $build_version"
+echo "***************************************"
+
 rm -rf ${DORIS_OUTPUT}
 rm -rf ${DORIS_HOME}/output-${build_version}
 WITH_MYSQL=1 WITH_LZO=1 sh build.sh

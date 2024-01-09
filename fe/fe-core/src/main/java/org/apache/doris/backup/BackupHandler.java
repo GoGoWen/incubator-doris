@@ -24,6 +24,7 @@ import org.apache.doris.analysis.BackupStmt.BackupType;
 import org.apache.doris.analysis.CancelBackupStmt;
 import org.apache.doris.analysis.CreateRepositoryStmt;
 import org.apache.doris.analysis.DropRepositoryStmt;
+import org.apache.doris.analysis.LoadStmt;
 import org.apache.doris.analysis.PartitionNames;
 import org.apache.doris.analysis.RestoreStmt;
 import org.apache.doris.analysis.StorageBackend;
@@ -49,6 +50,7 @@ import org.apache.doris.common.util.MasterDaemon;
 import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.fs.FileSystemFactory;
 import org.apache.doris.fs.remote.RemoteFileSystem;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.task.DirMoveTask;
 import org.apache.doris.task.DownloadTask;
 import org.apache.doris.task.SnapshotTask;
@@ -59,6 +61,7 @@ import org.apache.doris.thrift.TTaskType;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.logging.log4j.LogManager;
@@ -208,6 +211,19 @@ public class BackupHandler extends MasterDaemon implements Writable {
                 && stmt.getStorageType() == StorageBackend.StorageType.BROKER) {
             ErrorReport.reportDdlException(ErrorCode.ERR_COMMON_ERROR,
                     "broker does not exist: " + stmt.getBrokerName());
+        }
+
+        Map<String, String> properties = Maps.newHashMap();
+        properties.putAll(stmt.getProperties());
+        properties.remove(LoadStmt.BDP_USER_TOKEN);
+        properties.remove(LoadStmt.BDP_ERP);
+        properties.remove(LoadStmt.BDP_SOURCE);
+        properties.remove(LoadStmt.BDP_TEAM_USER);
+        if (ConnectContext.get() != null && ConnectContext.get().getErp() != null) {
+            properties.put(LoadStmt.BDP_ERP, ConnectContext.get().getErp());
+            properties.put(LoadStmt.BDP_TEAM_USER, ConnectContext.get().getTeamUser());
+            properties.put(LoadStmt.BDP_SOURCE, ConnectContext.get().getSource());
+            properties.put(LoadStmt.BDP_USER_TOKEN, ConnectContext.get().getUserToken());
         }
 
         RemoteFileSystem fileSystem = FileSystemFactory.get(stmt.getBrokerName(), stmt.getStorageType(),

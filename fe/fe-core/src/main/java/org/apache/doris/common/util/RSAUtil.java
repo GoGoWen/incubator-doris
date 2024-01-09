@@ -19,7 +19,6 @@ package org.apache.doris.common.util;
 
 import org.apache.doris.thrift.TBDPUserInfo;
 
-import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -32,10 +31,8 @@ import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Map;
@@ -48,12 +45,10 @@ import javax.crypto.NoSuchPaddingException;
 public class RSAUtil {
     private static final Logger LOG = LogManager.getLogger(RSAUtil.class);
     public static final String KEY_ALGORIHTM = "RSA";
-    private static final int MAX_ENCRYPT_BLOCK = 117;
     private static final int MAX_DECRYPT_BLOCK = 128;
-    private static PrivateKey DORIS_RSA_PRIVATE_KEY = null;
     private static ThreadLocal<Map<String, Cipher>> decryptCipherMap = new ThreadLocal<>();
-    private static ThreadLocal<Cipher> decryptUserKeyCipher = new ThreadLocal<>();
     private static Map<String, PublicKey> serviceToPublicKeyMap = Maps.newHashMap();
+
     public static byte[] decryptBase64(String key) {
         return Base64.getDecoder().decode(key);
     }
@@ -72,23 +67,6 @@ public class RSAUtil {
             }
         }
         initServicePublicKeyCertificate(props);
-        initServicePrivateKeyCertificate();
-    }
-
-    public static void initServicePrivateKeyCertificate() {
-        try {
-            String privateKeyStr = System.getenv("DORIS_RSA_PRIVATE_KEY");
-            if (!Strings.isNullOrEmpty(privateKeyStr)) {
-                byte[] privateKeyByte = decryptBase64(privateKeyStr);
-                PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKeyByte);
-                KeyFactory keyFactory = KeyFactory.getInstance(KEY_ALGORIHTM);
-                DORIS_RSA_PRIVATE_KEY = keyFactory.generatePrivate(keySpec);
-            } else {
-                LOG.warn("DORIS_RSA_PRIVATE_KEY is not set in system env");
-            }
-        } catch (Exception e) {
-            LOG.warn("init private key certificate for doris service failed", e);
-        }
     }
 
     public static void initServicePublicKeyCertificate(Properties properties) {
@@ -130,8 +108,8 @@ public class RSAUtil {
         byte[] textBytes = decryptBase64(text);
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         for (int i = 0, offset = 0; textBytes.length - offset > 0; i++, offset = MAX_DECRYPT_BLOCK * i) {
-            byte[] tempBytes = textBytes.length - offset > MAX_DECRYPT_BLOCK ?
-                    decryptCipher.doFinal(textBytes, offset, MAX_DECRYPT_BLOCK) :
+            byte[] tempBytes = (textBytes.length - offset) > MAX_DECRYPT_BLOCK
+                    ? decryptCipher.doFinal(textBytes, offset, MAX_DECRYPT_BLOCK) :
                     decryptCipher.doFinal(textBytes, offset, textBytes.length - offset);
             byteArrayOutputStream.write(tempBytes);
         }
@@ -140,26 +118,5 @@ public class RSAUtil {
         TDeserializer deserializer = new TDeserializer();
         deserializer.deserialize(userInfo, byteArrayOutputStream.toByteArray());
         return userInfo;
-    }
-
-    public static String decryptUserKey(String text)
-            throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException,
-            BadPaddingException, IOException {
-        Cipher localDecryptCipher = decryptUserKeyCipher.get();
-        if (localDecryptCipher == null) {
-            localDecryptCipher = Cipher.getInstance(KEY_ALGORIHTM);
-            localDecryptCipher.init(Cipher.DECRYPT_MODE, DORIS_RSA_PRIVATE_KEY);
-            decryptUserKeyCipher.set(localDecryptCipher);
-        }
-        byte[] textBytes = decryptBase64(text);
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        for (int i = 0, offset = 0; textBytes.length - offset > 0; i++, offset = MAX_DECRYPT_BLOCK * i) {
-            byte[] tempBytes = textBytes.length - offset > MAX_DECRYPT_BLOCK ?
-                    localDecryptCipher.doFinal(textBytes, offset, MAX_DECRYPT_BLOCK) :
-                    localDecryptCipher.doFinal(textBytes, offset, textBytes.length - offset);
-            byteArrayOutputStream.write(tempBytes);
-        }
-        byteArrayOutputStream.close();
-        return byteArrayOutputStream.toString();
     }
 }

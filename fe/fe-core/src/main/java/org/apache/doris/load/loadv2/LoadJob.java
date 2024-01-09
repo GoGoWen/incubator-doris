@@ -361,13 +361,18 @@ public abstract class LoadJob extends AbstractTxnStateChangeCallback implements 
 
     public void setJobProperties(Map<String, String> properties) throws DdlException {
         initDefaultJobProperties();
-
         // set property from session variables
         if (ConnectContext.get() != null) {
             jobProperties.put(LoadStmt.EXEC_MEM_LIMIT, ConnectContext.get().getSessionVariable().getMaxExecMemByte());
             jobProperties.put(LoadStmt.TIMEZONE, ConnectContext.get().getSessionVariable().getTimeZone());
             jobProperties.put(LoadStmt.SEND_BATCH_PARALLELISM,
                     ConnectContext.get().getSessionVariable().getSendBatchParallelism());
+            if (ConnectContext.get().getErp() != null) {
+                jobProperties.put(LoadStmt.BDP_USER_TOKEN, ConnectContext.get().getUserToken());
+                jobProperties.put(LoadStmt.BDP_TEAM_USER, ConnectContext.get().getTeamUser());
+                jobProperties.put(LoadStmt.BDP_ERP, ConnectContext.get().getErp());
+                jobProperties.put(LoadStmt.BDP_SOURCE, ConnectContext.get().getSource());
+            }
         }
 
         if (properties == null || properties.isEmpty()) {
