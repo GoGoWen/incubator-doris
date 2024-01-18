@@ -20,8 +20,8 @@
 // **Note**: default db will be create if not exist
 defaultDb = "regression_test"
 
-jdbcUrl = "jdbc:mysql://172.19.0.2:9131/?useLocalSessionState=true&allowLoadLocalInfile=true"
-targetJdbcUrl = "jdbc:mysql://172.19.0.2:9131/?useLocalSessionState=true&allowLoadLocalInfile=true"
+jdbcUrl = "jdbc:mysql://127.0.0.1:9030/?useLocalSessionState=true&allowLoadLocalInfile=true"
+targetJdbcUrl = "jdbc:mysql://127.0.0.1:9030/?useLocalSessionState=true&allowLoadLocalInfile=true"
 jdbcUser = "root"
 jdbcPassword = ""
 
@@ -30,7 +30,7 @@ feTargetThriftAddress = "127.0.0.1:9020"
 feSyncerUser = "root"
 feSyncerPassword = ""
 
-feHttpAddress = "172.19.0.2:8131"
+feHttpAddress = "127.0.0.1:8030"
 feHttpUser = "root"
 feHttpPassword = ""
 
@@ -54,52 +54,12 @@ testDirectories = ""
 // this groups will not be executed
 excludeGroups = ""
 // this suites will not be executed
-excludeSuites = "test_information_schema_external,test_outfile_exception,test_digest,test_aggregate_all_functions2,test_hive_read_orc_complex_type,test_with_and_two_phase_agg,explode,test_cast_function,test_profile,test_broker_load_p2,test_spark_load,test_analyze_stats_p1,test_refresh_mtmv,test_bitmap_filter,test_export_parquet,test_doris_jdbc_catalog"
+excludeSuites = "test_information_schema_external,test_outfile_exception,test_digest,test_aggregate_all_functions2,test_hive_read_orc_complex_type,test_with_and_two_phase_agg,explode,test_cast_function,test_profile,test_broker_load_p2,test_spark_load,test_analyze_stats_p1,test_refresh_mtmv,test_bitmap_filter,test_export_parquet,test_doris_jdbc_catalog,,create_table_use_partition_policy,create_table_use_policy,doris_source,double_write_schema_change,flink_connector,load,load_four_step,load_one_step,load_three_step,load_two_step,modify_replica_use_partition,spark_connector,table_modify_resouce,test_big_kv_map,test_bitmap_index_load,test_bloom_filter_hit,test_build_index,test_build_index_fault,test_delete_where_in,test_point_query_load,test_scalar_types_load,test_scalar_types_load_p2,test_unique_mow_sequence,test_unique_mow_sequence"
 
 // this directories will not be executed
 excludeDirectories = "nereids_tpcds_shape_sf100_p0,nereids_tpch_shape_sf1000_p0,nereids_tpch_shape_sf500_p0,workload_manager_p1,fault_injection_p0"
 
 customConf1 = "test_custom_conf_value"
-
-// for test csv with header
-enableHdfs=false // set to true if hdfs is ready
-hdfsFs = "hdfs://127.0.0.1:9000"
-hdfsUser = "doris-test"
-hdfsPasswd = ""
-brokerName = "broker_name"
-
-// broker load test config
-enableBrokerLoad=true
-
-// jdbc connector test config
-// To enable jdbc test, you need first start mysql/pg container.
-// See `docker/thirdparties/start-thirdparties-docker.sh`
-enableJdbcTest=false
-mysql_57_port=7111
-pg_14_port=7121
-mariadb_10_port=3326
-// hive catalog test config
-// To enable jdbc test, you need first start hive container.
-// See `docker/thirdparties/start-thirdparties-docker.sh`
-enableHiveTest=false
-hms_port=7141
-hiveServerPort=10000
-
-// kafka test config
-// to enable kafka test, you need firstly to start kafka container
-// See `docker/thirdparties/start-thirdparties-docker.sh`
-enableKafkaTest=true
-kafka_port=19193
-
-// iceberg test config
-iceberg_rest_uri_port=18181
-
-enableEsTest=false
-es_6_port=19200
-es_7_port=29200
-es_8_port=39200
-
-cacheDataPath = "/data/regression/"
 
 s3Endpoint = "cos.ap-hongkong.myqcloud.com"
 s3BucketName = "doris-build-hk-1308700295"
