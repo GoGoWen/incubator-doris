@@ -324,7 +324,7 @@ under the License.
         <aws-java-sdk.version>1.12.519</aws-java-sdk.version>
         <mariadb-java-client.version>3.0.4</mariadb-java-client.version>
         <dlf-metastore-client-hive.version>0.2.14</dlf-metastore-client-hive.version>
-        <hadoop.version>3.3.6</hadoop.version>
+        <hadoop.version>JD-REPORT-3.3.5-SNAPSHOT</hadoop.version>
         <joda.version>2.8.1</joda.version>
         <project.scm.id>github</project.scm.id>
         <spring.version>2.7.13</spring.version>
