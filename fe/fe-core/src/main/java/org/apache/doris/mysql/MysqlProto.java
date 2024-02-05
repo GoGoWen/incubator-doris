@@ -55,47 +55,6 @@ public class MysqlProto {
             byte[] randomString, String qualifiedUser) {
         String remoteIp = context.getMysqlChannel().getRemoteIp();
         List<UserIdentity> currentUserIdentity = Lists.newArrayList();
-
-        if (qualifiedUser.contains("@")) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("the connected bdp full username is {}", qualifiedUser);
-            }
-            String[] bdpAuthInfo = qualifiedUser.split("@");
-            if (bdpAuthInfo.length != 3) {
-                context.getState().setError("invalid bdp auth info array size " + bdpAuthInfo.length);
-                return false;
-            }
-            qualifiedUser = bdpAuthInfo[0];
-            String serviceName = bdpAuthInfo[1];
-            String token = bdpAuthInfo[2];
-            try {
-                TBDPUserInfo userInfo = RSAUtil.decrypt(serviceName, token);
-                if (System.currentTimeMillis() - userInfo.getLoginTime() > Config.bdp_token_expiration_ms) {
-                    context.getState().setError("the bdp token has been expired for user " + userInfo.getErp());
-                    return false;
-                }
-                if (!serviceName.equals(userInfo.getSource())) {
-                    context.getState().setError(("the service name "
-                            + serviceName
-                            + " not be equal with decrypted one  " + userInfo.getSource()));
-                    return false;
-                }
-                context.setErp(userInfo.getErp());
-                context.setSource(userInfo.getSource());
-                context.setTeamUser(userInfo.getTeamUser());
-                context.setUserToken(userInfo.getUserToken());
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("doris username {}, service {}, erp {}, source {}, teamUser {}, userKey {}",
-                            qualifiedUser, serviceName, context.getErp(), context.getSource(), context.getTeamUser(),
-                            context.getUserToken());
-                }
-            } catch (Exception e) {
-                context.getState().setError("decrypt bdp user info failed");
-                LOG.warn("decrypt bdp user info failed", e);
-                return false;
-            }
-        }
-
         try {
             Env.getCurrentEnv().getAuth().checkPassword(qualifiedUser, remoteIp,
                     scramble, randomString, currentUserIdentity);
@@ -116,6 +75,46 @@ public class MysqlProto {
         if (tmpUser == null || tmpUser.isEmpty()) {
             ErrorReport.report(ErrorCode.ERR_ACCESS_DENIED_ERROR, "anonym@" + context.getRemoteIP(), usePasswd);
             return null;
+        }
+
+        if (tmpUser.contains("@")) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("the connected bdp full username is {}", tmpUser);
+            }
+            String[] bdpAuthInfo = tmpUser.split("@");
+            if (bdpAuthInfo.length != 3) {
+                context.getState().setError("invalid bdp auth info array size " + bdpAuthInfo.length);
+                return null;
+            }
+            tmpUser = bdpAuthInfo[0];
+            String serviceName = bdpAuthInfo[1];
+            String token = bdpAuthInfo[2];
+            try {
+                TBDPUserInfo userInfo = RSAUtil.decrypt(serviceName, token);
+                if (System.currentTimeMillis() - userInfo.getLoginTime() > Config.bdp_token_expiration_ms) {
+                    context.getState().setError("the bdp token has been expired for user " + userInfo.getErp());
+                    return null;
+                }
+                if (!serviceName.equals(userInfo.getSource())) {
+                    context.getState().setError(("the service name "
+                            + serviceName
+                            + " not be equal with decrypted one  " + userInfo.getSource()));
+                    return null;
+                }
+                context.setErp(userInfo.getErp());
+                context.setSource(userInfo.getSource());
+                context.setTeamUser(userInfo.getTeamUser());
+                context.setUserToken(userInfo.getUserToken());
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("doris username {}, service {}, erp {}, source {}, teamUser {}, userKey {}",
+                            tmpUser, serviceName, context.getErp(), context.getSource(), context.getTeamUser(),
+                            context.getUserToken());
+                }
+            } catch (Exception e) {
+                context.getState().setError("decrypt bdp user info failed");
+                LOG.warn("decrypt bdp user info failed", e);
+                return null;
+            }
         }
 
         context.setCluster(SystemInfoService.DEFAULT_CLUSTER);
