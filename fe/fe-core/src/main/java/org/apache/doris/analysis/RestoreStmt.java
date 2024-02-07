@@ -213,6 +213,10 @@ public class RestoreStmt extends AbstractBackupStmt {
             }
             copiedProperties.remove(PROP_IS_BEING_SYNCED);
         }
+        copiedProperties.remove(LoadStmt.BDP_SOURCE);
+        copiedProperties.remove(LoadStmt.BDP_ERP);
+        copiedProperties.remove(LoadStmt.BDP_TEAM_USER);
+        copiedProperties.remove(LoadStmt.BDP_USER_TOKEN);
 
         if (!copiedProperties.isEmpty()) {
             ErrorReport.reportAnalysisException(ErrorCode.ERR_COMMON_ERROR,
