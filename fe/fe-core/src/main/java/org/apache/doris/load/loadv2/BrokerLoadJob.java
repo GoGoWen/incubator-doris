@@ -18,6 +18,7 @@
 package org.apache.doris.load.loadv2;
 
 import org.apache.doris.analysis.BrokerDesc;
+import org.apache.doris.analysis.LoadStmt;
 import org.apache.doris.analysis.StorageBackend;
 import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.catalog.Database;
@@ -110,6 +111,12 @@ public class BrokerLoadJob extends BulkLoadJob {
 
     @Override
     protected void unprotectedExecuteJob() {
+        Map<String, String> properties = brokerDesc.getProperties();
+        properties.put(LoadStmt.BDP_TEAM_USER, getBdpTeamUser());
+        properties.put(LoadStmt.BDP_ERP, getBdpErp());
+        properties.put(LoadStmt.BDP_USER_TOKEN, getBdpUserToken());
+        properties.put(LoadStmt.BDP_SOURCE, getBdpSource());
+
         LoadTask task = new BrokerLoadPendingTask(this, fileGroupAggInfo.getAggKeyToFileGroups(),
                 brokerDesc, getPriority());
         idToTasks.put(task.getSignature(), task);

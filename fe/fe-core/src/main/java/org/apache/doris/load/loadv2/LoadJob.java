@@ -1255,6 +1255,22 @@ public abstract class LoadJob extends AbstractTxnStateChangeCallback implements 
         return (boolean) jobProperties.getOrDefault(LoadStmt.USE_NEW_LOAD_SCAN_NODE, false);
     }
 
+    public String getBdpSource() {
+        return (String) jobProperties.get(LoadStmt.BDP_SOURCE);
+    }
+
+    public String getBdpUserToken() {
+        return (String) jobProperties.get(LoadStmt.BDP_USER_TOKEN);
+    }
+
+    public String getBdpErp() {
+        return (String) jobProperties.get(LoadStmt.BDP_ERP);
+    }
+
+    public String getBdpTeamUser() {
+        return (String) jobProperties.get(LoadStmt.BDP_TEAM_USER);
+    }
+
     // Return true if this job is finished for a long time
     public boolean isExpired(long currentTimeMs) {
         if (!isCompleted()) {
