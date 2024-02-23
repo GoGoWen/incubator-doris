@@ -50,7 +50,6 @@ import org.apache.doris.persist.CleanLabelOperationLog;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.OriginStatement;
 import org.apache.doris.thrift.TUniqueId;
-import org.apache.doris.transaction.DatabaseTransactionMgr;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -798,22 +797,15 @@ public class LoadManager implements Writable {
         } finally {
             writeUnlock();
         }
-        LOG.info("clean {} labels on db {} with label '{}' in load mgr.", counter, dbId, label);
-
         // 2. Remove from DatabaseTransactionMgr
         try {
-            DatabaseTransactionMgr dbTxnMgr = Env.getCurrentGlobalTransactionMgr().getDatabaseTransactionMgr(dbId);
-            dbTxnMgr.cleanLabel(label);
+            Env.getCurrentGlobalTransactionMgr().getDatabaseTransactionMgr(dbId).cleanLabel(label, isReplay);
         } catch (AnalysisException e) {
             // just ignore, because we don't want to throw any exception here.
         }
 
-        // 3. Log
-        if (!isReplay) {
-            CleanLabelOperationLog log = new CleanLabelOperationLog(dbId, label);
-            Env.getCurrentEnv().getEditLog().logCleanLabel(log);
-        }
-        LOG.info("finished to clean label on db {} with label {}. is replay: {}", dbId, label, isReplay);
+        LOG.info("finished to clean {} labels on db {} with label '{}' in load mgr. is replay: {}",
+                counter, dbId, label, isReplay);
     }
 
     private void readLock() {

@@ -33,7 +33,6 @@ build_version_minor=0
 build_version_patch=5
 build_version_rc_version="jd-rc01"
 
->>>>>>> 2918ef3492 ([release](version) change branch-2.0 version to 2.0.5-rc01 (#30777))
 build_version="${build_version_prefix}-${build_version_major}.${build_version_minor}.${build_version_patch}-${build_version_rc_version}"
 
 unset LANG

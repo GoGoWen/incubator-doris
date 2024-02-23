@@ -111,8 +111,8 @@ public class BrokerLoadJob extends BulkLoadJob {
 
     @Override
     protected void unprotectedExecuteJob() {
-        Map<String, String> properties = brokerDesc.getProperties();
-        if (getBdpTeamUser() != null) {
+        if (getBdpTeamUser() != null && brokerDesc != null) {
+            Map<String, String> properties = brokerDesc.getProperties();
             properties.put(LoadStmt.BDP_TEAM_USER, getBdpTeamUser());
             properties.put(LoadStmt.BDP_ERP, getBdpErp());
             properties.put(LoadStmt.BDP_USER_TOKEN, getBdpUserToken());
