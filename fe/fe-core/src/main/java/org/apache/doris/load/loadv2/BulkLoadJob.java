@@ -23,6 +23,7 @@ import org.apache.doris.analysis.InsertStmt;
 import org.apache.doris.analysis.LoadStmt;
 import org.apache.doris.analysis.SqlParser;
 import org.apache.doris.analysis.SqlScanner;
+import org.apache.doris.analysis.UnifiedLoadStmt;
 import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.catalog.AuthorizationInfo;
 import org.apache.doris.catalog.Database;
@@ -263,10 +264,10 @@ public abstract class BulkLoadJob extends LoadJob {
         fileGroupAggInfo = new BrokerFileGroupAggInfo();
         SqlParser parser = new SqlParser(new SqlScanner(new StringReader(originStmt.originStmt),
                 Long.valueOf(sessionVariables.get(SessionVariable.SQL_MODE))));
-        LoadStmt stmt;
         try {
             Database db = Env.getCurrentInternalCatalog().getDbOrDdlException(dbId);
-            stmt = (LoadStmt) SqlParserUtils.getStmt(parser, originStmt.idx);
+            LoadStmt stmt = (LoadStmt) ((UnifiedLoadStmt) SqlParserUtils.getStmt(parser, originStmt.idx))
+                    .getProxyStmt();
             for (DataDescription dataDescription : stmt.getDataDescriptions()) {
                 dataDescription.analyzeWithoutCheckPriv(db.getFullName());
             }
