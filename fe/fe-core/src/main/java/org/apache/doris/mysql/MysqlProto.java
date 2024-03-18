@@ -484,5 +484,4 @@ public class MysqlProto {
         buffer.get();
         return buf;
     }
-
 }
