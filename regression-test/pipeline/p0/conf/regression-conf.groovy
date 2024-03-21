@@ -25,6 +25,11 @@ targetJdbcUrl = "jdbc:mysql://127.0.0.1:9030/?useLocalSessionState=true&allowLoa
 jdbcUser = "root"
 jdbcPassword = ""
 
+ccrDownstreamUrl = "jdbc:mysql://172.19.0.2:9131/?useLocalSessionState=true&allowLoadLocalInfile=true"
+ccrDownstreamUser = "root"
+ccrDownstreamPassword = ""
+ccrDownstreamFeThriftAddress = "127.0.0.1:9020"
+
 feSourceThriftAddress = "127.0.0.1:9020"
 feTargetThriftAddress = "127.0.0.1:9020"
 feSyncerUser = "root"
