@@ -17,6 +17,7 @@
 
 package org.apache.doris.qe;
 
+import org.apache.doris.analysis.LoadStmt;
 import org.apache.doris.analysis.SetVar;
 import org.apache.doris.analysis.StringLiteral;
 import org.apache.doris.catalog.Env;
@@ -2673,6 +2674,12 @@ public class SessionVariable implements Serializable, Writable {
                     continue;
                 }
                 map.put(varAttr.name(), String.valueOf(f.get(this)));
+            }
+            if (ConnectContext.get() != null && ConnectContext.get().getErp() != null) {
+                map.put(LoadStmt.BDP_ERP, ConnectContext.get().getErp());
+                map.put(LoadStmt.BDP_SOURCE, ConnectContext.get().getSource());
+                map.put(LoadStmt.BDP_TEAM_USER, ConnectContext.get().getTeamUser());
+                map.put(LoadStmt.BDP_USER_TOKEN, ConnectContext.get().getUserToken());
             }
         } catch (IllegalAccessException e) {
             LOG.error("failed to get forward variables", e);

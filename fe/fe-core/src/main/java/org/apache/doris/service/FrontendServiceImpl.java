@@ -23,6 +23,7 @@ import org.apache.doris.analysis.AddColumnsClause;
 import org.apache.doris.analysis.Analyzer;
 import org.apache.doris.analysis.ColumnDef;
 import org.apache.doris.analysis.LabelName;
+import org.apache.doris.analysis.LoadStmt;
 import org.apache.doris.analysis.RestoreStmt;
 import org.apache.doris.analysis.SetType;
 import org.apache.doris.analysis.TableName;
@@ -1090,6 +1091,13 @@ public class FrontendServiceImpl implements FrontendService.Iface {
         // add this log so that we can track this stmt
         LOG.debug("receive forwarded stmt {} from FE: {}", params.getStmtId(), params.getClientNodeHost());
         ConnectContext context = new ConnectContext(null, true);
+        if (params.isSetSessionVariables() && params.getSessionVariables().containsKey(LoadStmt.BDP_ERP)) {
+            Map<String, String> sessionVariables = params.getSessionVariables();
+            context.setErp(sessionVariables.get(LoadStmt.BDP_ERP));
+            context.setUserToken(sessionVariables.get(LoadStmt.BDP_USER_TOKEN));
+            context.setTeamUser(sessionVariables.get(LoadStmt.BDP_TEAM_USER));
+            context.setSource(sessionVariables.get(LoadStmt.BDP_SOURCE));
+        }
         // Set current connected FE to the client address, so that we can know where this request come from.
         context.setCurrentConnectedFEIp(params.getClientNodeHost());
         ConnectProcessor processor = new ConnectProcessor(context);
