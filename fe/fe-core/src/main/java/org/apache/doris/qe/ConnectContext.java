@@ -947,6 +947,7 @@ public class ConnectContext {
     public String getUserToken() {
         return userToken;
     }
+
     public Map<String, LiteralExpr> getUserVars() {
         return userVars;
     }
