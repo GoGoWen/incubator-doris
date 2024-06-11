@@ -20,8 +20,8 @@
 // **Note**: default db will be create if not exist
 defaultDb = "regression_test"
 
-jdbcUrl = "jdbc:mysql://127.0.0.1:9030/?useLocalSessionState=true&allowLoadLocalInfile=true"
-targetJdbcUrl = "jdbc:mysql://127.0.0.1:9030/?useLocalSessionState=true&allowLoadLocalInfile=true"
+jdbcUrl = "jdbc:mysql://172.19.0.2:9131/?useLocalSessionState=true&allowLoadLocalInfile=true"
+targetJdbcUrl = "jdbc:mysql://172.19.0.2:9131/?useLocalSessionState=true&allowLoadLocalInfile=true"
 jdbcUser = "root"
 jdbcPassword = ""
 
@@ -35,7 +35,7 @@ feTargetThriftAddress = "127.0.0.1:9020"
 feSyncerUser = "root"
 feSyncerPassword = ""
 
-feHttpAddress = "127.0.0.1:8030"
+feHttpAddress = "172.19.0.2:8131"
 feHttpUser = "root"
 feHttpPassword = ""
 
@@ -77,6 +77,46 @@ excludeDirectories = "nereids_tpcds_shape_sf100_p0," +
     "fault_injection_p0"
 
 customConf1 = "test_custom_conf_value"
+
+// for test csv with header
+enableHdfs=false // set to true if hdfs is ready
+hdfsFs = "hdfs://127.0.0.1:9000"
+hdfsUser = "doris-test"
+hdfsPasswd = ""
+brokerName = "broker_name"
+
+// broker load test config
+enableBrokerLoad=true
+
+// jdbc connector test config
+// To enable jdbc test, you need first start mysql/pg container.
+// See `docker/thirdparties/start-thirdparties-docker.sh`
+enableJdbcTest=true
+mysql_57_port=7111
+pg_14_port=7121
+mariadb_10_port=3326
+// hive catalog test config
+// To enable jdbc test, you need first start hive container.
+// See `docker/thirdparties/start-thirdparties-docker.sh`
+enableHiveTest=true
+hms_port=7141
+hiveServerPort=10000
+
+// kafka test config
+// to enable kafka test, you need firstly to start kafka container
+// See `docker/thirdparties/start-thirdparties-docker.sh`
+enableKafkaTest=true
+kafka_port=19193
+
+// iceberg test config
+iceberg_rest_uri_port=18181
+
+enableEsTest=true
+es_6_port=19200
+es_7_port=29200
+es_8_port=39200
+
+cacheDataPath = "/data/regression/"
 
 s3Endpoint = "cos.ap-hongkong.myqcloud.com"
 s3BucketName = "doris-build-hk-1308700295"
