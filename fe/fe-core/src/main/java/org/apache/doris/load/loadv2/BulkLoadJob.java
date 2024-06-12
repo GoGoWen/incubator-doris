@@ -23,6 +23,7 @@ import org.apache.doris.analysis.InsertStmt;
 import org.apache.doris.analysis.LoadStmt;
 import org.apache.doris.analysis.SqlParser;
 import org.apache.doris.analysis.SqlScanner;
+import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.analysis.UnifiedLoadStmt;
 import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.catalog.AuthorizationInfo;
@@ -33,6 +34,7 @@ import org.apache.doris.catalog.TableIf;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.FeMetaVersion;
 import org.apache.doris.common.MetaNotFoundException;
+import org.apache.doris.common.UserException;
 import org.apache.doris.common.annotation.LogException;
 import org.apache.doris.common.io.Text;
 import org.apache.doris.common.util.LogBuilder;
@@ -266,12 +268,7 @@ public abstract class BulkLoadJob extends LoadJob {
                 Long.valueOf(sessionVariables.get(SessionVariable.SQL_MODE))));
         try {
             Database db = Env.getCurrentInternalCatalog().getDbOrDdlException(dbId);
-            LoadStmt stmt = (LoadStmt) ((UnifiedLoadStmt) SqlParserUtils.getStmt(parser, originStmt.idx))
-                    .getProxyStmt();
-            for (DataDescription dataDescription : stmt.getDataDescriptions()) {
-                dataDescription.analyzeWithoutCheckPriv(db.getFullName());
-            }
-            checkAndSetDataSourceInfo(db, stmt.getDataDescriptions());
+            analyzeStmt(SqlParserUtils.getStmt(parser, originStmt.idx), db);
         } catch (Exception e) {
             LOG.info(new LogBuilder(LogKey.LOAD_JOB, id)
                     .add("origin_stmt", originStmt)
@@ -280,6 +277,20 @@ public abstract class BulkLoadJob extends LoadJob {
                     .build(), e);
             cancelJobWithoutCheck(new FailMsg(FailMsg.CancelType.LOAD_RUN_FAIL, e.getMessage()), false, true);
         }
+    }
+
+    protected void analyzeStmt(StatementBase stmtBase, Database db) throws UserException {
+        LoadStmt stmt = null;
+        if (stmtBase instanceof UnifiedLoadStmt) {
+            stmt = (LoadStmt) ((UnifiedLoadStmt) stmtBase).getProxyStmt();
+        } else {
+            stmt = (LoadStmt) stmtBase;
+        }
+
+        for (DataDescription dataDescription : stmt.getDataDescriptions()) {
+            dataDescription.analyzeWithoutCheckPriv(db.getFullName());
+        }
+        checkAndSetDataSourceInfo(db, stmt.getDataDescriptions());
     }
 
     @Override
