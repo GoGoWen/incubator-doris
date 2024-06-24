@@ -287,7 +287,12 @@ public abstract class ExternalCatalog
         idToDb = tmpIdToDb;
         lastUpdateTime = System.currentTimeMillis();
         initCatalogLog.setLastUpdateTime(lastUpdateTime);
+
         Env.getCurrentEnv().getEditLog().logInitCatalog(initCatalogLog);
+    }
+
+    protected void prcessInitCatalogLog(InitCatalogLog initCatalogLog) {
+        
     }
 
     public void onRefresh(boolean invalidCache) {

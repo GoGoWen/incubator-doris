@@ -60,6 +60,8 @@ Status ByteArrayPlainDecoder::_decode_values(MutableColumnPtr& doris_column, Dat
     switch (logical_type) {
     case TypeIndex::String:
         [[fallthrough]];
+    case TypeIndex::HLL:
+    case TypeIndex::BitMap:
     case TypeIndex::FixedString: {
         ColumnSelectVector::DataReadType read_type;
         while (size_t run_length = select_vector.get_next_run<has_filter>(&read_type)) {

@@ -65,8 +65,21 @@ public class IcebergExternalTable extends ExternalTable {
             List<Types.NestedField> columns = schema.columns();
             List<Column> tmpSchema = Lists.newArrayListWithCapacity(columns.size());
             for (Types.NestedField field : columns) {
+                String defaultValue = field.getDefaultValue() == null ? null : field.getDefaultValue().toString();
+                String fullFieldName = dbName+"."+name+"."+field.name();
+                Type columnType = Type.UNSUPPORTED;
+                if (((IcebergExternalCatalog) catalog).getHllColumns() != null &&
+                    ((IcebergExternalCatalog) catalog).getHllColumns().contains(fullFieldName)) {
+                    columnType = ScalarType.createHllType();
+                } else if(((IcebergExternalCatalog) catalog).getBitmapColumns() != null &&
+                    ((IcebergExternalCatalog) catalog).getBitmapColumns().contains(fullFieldName)) {
+                    columnType = Type.BITMAP;
+                } else {
+                    columnType = icebergTypeToDorisType(field.type());
+                }
+
                 tmpSchema.add(new Column(field.name().toLowerCase(Locale.ROOT),
-                        icebergTypeToDorisType(field.type()), true, null, true, field.getDefaultValue().toString(), field.doc(), true,
+                        columnType, true, null, true, field.getDefaultValue().toString(), field.doc(), true,
                         schema.caseInsensitiveFindField(field.name()).fieldId()));
             }
             return tmpSchema;

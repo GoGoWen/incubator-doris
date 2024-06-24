@@ -29,6 +29,8 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,6 +38,8 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
 
     private static final Logger LOG = LogManager.getLogger(IcebergExternalCatalog.class);
     public static final String ICEBERG_CATALOG_TYPE = "iceberg.catalog.type";
+    public static final String ICEBERG_HLL_COLUMNS = "iceberg.hll.columns";
+    public static final String ICEBERG_BITMAP_COLUMNS = "iceberg.bitmap.columns";
     public static final String ICEBERG_REST = "rest";
     public static final String ICEBERG_HMS = "hms";
     public static final String ICEBERG_HADOOP = "hadoop";
@@ -44,6 +48,8 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     protected String icebergCatalogType;
     protected Catalog catalog;
     protected SupportsNamespaces nsCatalog;
+    private HashSet<String> hllColumns = new HashSet<>();
+    private HashSet<String> bitmapColumns = new HashSet<>();
 
     public IcebergExternalCatalog(long catalogId, String name, String comment) {
         super(catalogId, name, InitCatalogLog.Type.ICEBERG, comment);
@@ -52,7 +58,72 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     @Override
     protected void init() {
         nsCatalog = (SupportsNamespaces) catalog;
+        initColumnMapping();
         super.init();
+    }
+
+    @Override
+    protected void prcessInitCatalogLog(InitCatalogLog initCatalogLog) {
+        // init hllColumns
+        String hllColumnsStr = getProperties().get(ICEBERG_HLL_COLUMNS);
+        if (hllColumnsStr != null) {
+            initCatalogLog.setHllColumns(hllColumnsStr);
+        }
+        // init bitmapColumns
+        String bitmapColumnsStr = getProperties().get(ICEBERG_BITMAP_COLUMNS);
+        if (bitmapColumnsStr != null) {
+            initCatalogLog.setBitmapColumns(bitmapColumnsStr);
+        }
+    }
+
+    public HashSet<String> getHllColumns() {
+        return hllColumns;
+    }
+    public HashSet<String> getBitmapColumns() {
+        return bitmapColumns;
+    }
+    private void initColumnMapping() {
+        // init hllColumns
+        String hllColumnsStr = getProperties().get(ICEBERG_HLL_COLUMNS);
+        if (hllColumns == null) {
+            hllColumns = new HashSet<>();
+        }
+        if (hllColumnsStr != null) {
+            String[] columnsHll = hllColumnsStr.split(",");
+            hllColumns.addAll(Arrays.asList(columnsHll));
+        }
+        // init bitmapColumns
+        String bitmapColumnsStr = getProperties().get(ICEBERG_BITMAP_COLUMNS);
+        if (bitmapColumns == null) {
+            bitmapColumns = new HashSet<>();
+        }
+        if (bitmapColumnsStr != null) {
+            String[] columnsBitmap = bitmapColumnsStr.split(",");
+            bitmapColumns.addAll(Arrays.asList(columnsBitmap));
+        }
+    }
+
+    @Override
+    public void replayInitCatalog(InitCatalogLog log) {
+        super.replayInitCatalog(log);
+        // init hllColumns and bitmap columns
+        String hllCols = log.getHllColumns();
+        if (hllCols != null) {
+            if (hllColumns == null) {
+                hllColumns = new HashSet<>();
+            }
+            String[] columnsHll = hllCols.split(",");
+            hllColumns.addAll(Arrays.asList(columnsHll));
+        }
+        // init bitmapColumns
+        String bitmapColumnsStr = log.getHllColumns();
+        if (bitmapColumnsStr != null) {
+            if (bitmapColumns == null) {
+                bitmapColumns = new HashSet<>();
+            }
+            String[] columnsBitmap = bitmapColumnsStr.split(",");
+            bitmapColumns.addAll(Arrays.asList(columnsBitmap));
+        }
     }
 
     public Catalog getCatalog() {

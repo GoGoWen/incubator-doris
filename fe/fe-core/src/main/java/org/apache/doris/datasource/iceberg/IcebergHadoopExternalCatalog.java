@@ -63,4 +63,9 @@ public class IcebergHadoopExternalCatalog extends IcebergExternalCatalog {
         hadoopCatalog.initialize(icebergCatalogType, catalogProperties);
         catalog = hadoopCatalog;
     }
+
+    @Override
+    public void replayInitCatalog(InitCatalogLog log) {
+        super.replayInitCatalog(log);
+    }
 }
