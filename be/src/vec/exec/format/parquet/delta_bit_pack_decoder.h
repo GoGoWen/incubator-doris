@@ -58,6 +58,10 @@ public:
         switch (logical_type) {
         case TypeIndex::String:
             [[fallthrough]];
+        case TypeIndex::HLL:
+            [[fallthrough]];
+        case TypeIndex::BitMap:
+            [[fallthrough]];
         case TypeIndex::FixedString: {
             ColumnSelectVector::DataReadType read_type;
             while (size_t run_length = select_vector.get_next_run<has_filter>(&read_type)) {

@@ -129,6 +129,10 @@ Status ByteArrayDictDecoder::_decode_values(MutableColumnPtr& doris_column, Data
     switch (logical_type) {
     case TypeIndex::String:
         [[fallthrough]];
+    case TypeIndex::HLL:
+        [[fallthrough]];
+    case TypeIndex::BitMap:
+        [[fallthrough]];
     case TypeIndex::FixedString: {
         size_t dict_index = 0;
 

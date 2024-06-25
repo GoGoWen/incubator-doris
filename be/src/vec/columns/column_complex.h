@@ -66,6 +66,11 @@ public:
         data.push_back(*reinterpret_cast<const T*>(pos));
     }
 
+    void insert_many_strings_overflow(const StringRef* strings, size_t num,
+                                      size_t max_length) override {
+        insert_many_strings(strings, num);
+    }
+
     void insert_many_strings(const StringRef* strings, size_t num) override {
         for (size_t i = 0; i < num; i++) {
             uint32_t len = strings[i].size;
