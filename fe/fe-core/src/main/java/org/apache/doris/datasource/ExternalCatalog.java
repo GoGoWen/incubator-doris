@@ -292,7 +292,6 @@ public abstract class ExternalCatalog
     }
 
     protected void prcessInitCatalogLog(InitCatalogLog initCatalogLog) {
-        
     }
 
     public void onRefresh(boolean invalidCache) {

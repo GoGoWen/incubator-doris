@@ -70,7 +70,7 @@ public class InitCatalogLog implements Writable {
 
     @SerializedName(value = "hllColumns")
     private String hllColumns;
-    
+
     @SerializedName(value = "bitmapColumns")
     private String bitmapColumns;
 

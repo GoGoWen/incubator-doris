@@ -79,9 +79,11 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     public HashSet<String> getHllColumns() {
         return hllColumns;
     }
+
     public HashSet<String> getBitmapColumns() {
         return bitmapColumns;
     }
+
     private void initColumnMapping() {
         // init hllColumns
         String hllColumnsStr = getProperties().get(ICEBERG_HLL_COLUMNS);
