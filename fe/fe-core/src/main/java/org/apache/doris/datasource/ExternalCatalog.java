@@ -288,6 +288,7 @@ public abstract class ExternalCatalog
         lastUpdateTime = System.currentTimeMillis();
         initCatalogLog.setLastUpdateTime(lastUpdateTime);
 
+        prcessInitCatalogLog(initCatalogLog);
         Env.getCurrentEnv().getEditLog().logInitCatalog(initCatalogLog);
     }
 
