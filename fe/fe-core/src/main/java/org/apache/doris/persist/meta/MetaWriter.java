@@ -31,6 +31,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Image Format:
@@ -129,6 +132,46 @@ public class MetaWriter {
         long saveImageEndTime = System.currentTimeMillis();
         LOG.info("finished save image {} in {} ms. checksum is {}", imageFile.getAbsolutePath(),
                 (saveImageEndTime - saveImageStartTime), checksum.getRef());
+    }
+
+    public static void write_encode(File imageFile, Env env) throws IOException {
+        // save image does not need any lock. because only checkpoint thread will call this method.
+        LOG.info("start to save image to {}. is ckpt: {}",
+            imageFile.getAbsolutePath(), Env.isCheckpointThread());
+        final Reference<Long> checksum = new Reference<>(0L);
+        long saveImageStartTime = System.currentTimeMillis();
+        // MetaHeader should use output stream in the future.
+        long startPosition = MetaHeader.write(imageFile);
+        List<MetaIndex> metaIndices = Lists.newArrayList();
+        FileOutputStream imageFileOutOrg = new FileOutputStream(imageFile, true);
+        Deflater deflater = new Deflater();
+        DeflaterOutputStream imageFileOut = new DeflaterOutputStream(imageFileOutOrg, deflater);
+        try (CountingDataOutputStream dos = new CountingDataOutputStream(new DeflaterOutputStream(
+            new BufferedOutputStream(imageFileOutOrg), deflater), startPosition)) {
+            writer.setDelegate(dos, metaIndices);
+            long replayedJournalId = env.getReplayedJournalId();
+            // 1. write header first
+            checksum.setRef(
+                writer.doWork("header", () -> env.saveHeader(dos, replayedJournalId, checksum.getRef())));
+            // 2. write other modules
+            for (MetaPersistMethod m : PersistMetaModules.MODULES_IN_ORDER) {
+                checksum.setRef(writer.doWork(m.name, () -> {
+                    try {
+                        return (long) m.writeMethod.invoke(env, dos, checksum.getRef());
+                    } catch (IllegalAccessException | InvocationTargetException e) {
+                        LOG.warn("failed to write meta module: {}", m.name, e);
+                        throw new RuntimeException(e);
+                    }
+                }));
+            }
+            // 3. force sync to disk
+            imageFileOutOrg.getChannel().force(true);
+        }
+        MetaFooter.write(imageFile, metaIndices, checksum.getRef());
+
+        long saveImageEndTime = System.currentTimeMillis();
+        LOG.info("finished save image {} in {} ms. checksum is {}", imageFile.getAbsolutePath(),
+            (saveImageEndTime - saveImageStartTime), checksum.getRef());
     }
 
 }

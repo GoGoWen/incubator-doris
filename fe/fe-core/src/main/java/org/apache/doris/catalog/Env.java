@@ -2120,6 +2120,18 @@ public class Env {
         MetaWriter.write(curFile, this);
     }
 
+    public void saveImageEncode(File curFile, long replayedJournalId) throws IOException {
+        if (curFile.exists()) {
+            if (!curFile.delete()) {
+                throw new IOException(curFile.getName() + " can not be deleted.");
+            }
+        }
+        if (!curFile.createNewFile()) {
+            throw new IOException(curFile.getName() + " can not be created.");
+        }
+        MetaWriter.write_encode(curFile, this);
+    }
+
     public long saveHeader(CountingDataOutputStream dos, long replayedJournalId, long checksum) throws IOException {
         // Write meta version
         checksum ^= FeConstants.meta_version;
@@ -5002,6 +5014,55 @@ public class Env {
         return checksum;
     }
 
+    public String dumpImageEncode() {
+        LOG.info("begin to dump meta data");
+        String dumpFilePath;
+        List<DatabaseIf> databases = Lists.newArrayList();
+        List<List<TableIf>> tableLists = Lists.newArrayList();
+        tryLock(true);
+        try {
+            // sort all dbs to avoid potential dead lock
+            for (long dbId : getInternalCatalog().getDbIds()) {
+                Database db = getInternalCatalog().getDbNullable(dbId);
+                databases.add(db);
+            }
+            databases.sort(Comparator.comparing(DatabaseIf::getId));
+
+            // lock all dbs
+            MetaLockUtils.readLockDatabases(databases);
+            LOG.info("acquired all the dbs' read lock.");
+            // lock all tables
+            for (DatabaseIf db : databases) {
+                List<TableIf> tableList = db.getTablesOnIdOrder();
+                MetaLockUtils.readLockTables(tableList);
+                tableLists.add(tableList);
+            }
+            LOG.info("acquired all the tables' read lock.");
+
+            load.readLock();
+            LOG.info("acquired all jobs' read lock.");
+            long journalId = getMaxJournalId();
+            File dumpFile = new File(Config.meta_dir, "image." + journalId + ".encode");
+            dumpFilePath = dumpFile.getAbsolutePath();
+            try {
+                LOG.info("begin to dump {}", dumpFilePath);
+                saveImageEncode(dumpFile, journalId);
+            } catch (IOException e) {
+                LOG.error("failed to dump image to {}", dumpFilePath, e);
+            }
+        } finally {
+            // unlock all
+            load.readUnlock();
+            for (int i = databases.size() - 1; i >= 0; i--) {
+                MetaLockUtils.readUnlockTables(tableLists.get(i));
+            }
+            MetaLockUtils.readUnlockDatabases(databases);
+            unlock();
+        }
+
+        LOG.info("finished dumping image to {}", dumpFilePath);
+        return dumpFilePath;
+    }
 
     public String dumpImage() {
         LOG.info("begin to dump meta data");
