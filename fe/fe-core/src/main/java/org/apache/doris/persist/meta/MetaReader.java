@@ -146,11 +146,11 @@ public class MetaReader {
 
         long checksum = 0;
         long footerIndex = imageFile.length()
-            - metaFooter.length - MetaFooter.FOOTER_LENGTH_SIZE - MetaMagicNumber.MAGIC_STR.length();
+                - metaFooter.length - MetaFooter.FOOTER_LENGTH_SIZE - MetaMagicNumber.MAGIC_STR.length();
 
         Deflater deflater = new Deflater();
-        try (DataInputStream dis = new DataInputStream(new DeflaterInputStream( new BufferedInputStream(
-                new FileInputStream(imageFile)),deflater))) {
+        try (DataInputStream dis = new DataInputStream(new DeflaterInputStream(new BufferedInputStream(
+                new FileInputStream(imageFile)), deflater))) {
             // 1. Skip image file header
             IOUtils.skipFully(dis, metaHeader.getEnd());
             // 2. Read meta header first
@@ -164,7 +164,7 @@ public class MetaReader {
                     continue;
                 }
                 if (i < metaFooter.metaIndices.size() - 1
-                    && metaIndex.offset == metaFooter.metaIndices.get(i + 1).offset) {
+                        && metaIndex.offset == metaFooter.metaIndices.get(i + 1).offset) {
                     // skip empty meta
                     LOG.info("Skip {} module since empty meta length.", metaIndex.name);
                     continue;
