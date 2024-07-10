@@ -1791,6 +1791,13 @@ public class Env {
         MetaReader.read(curFile, this);
     }
 
+    public void loadImageEncode() throws IOException, DdlException {
+        Storage storage = new Storage(this.getImageDir());
+        File curFile = storage.getImageFileMock();
+
+        MetaReader.read_encode(curFile, this);
+    }
+
     public long loadHeader(DataInputStream dis, MetaHeader metaHeader, long checksum) throws IOException, DdlException {
         switch (metaHeader.getMetaFormat()) {
             case COR1:

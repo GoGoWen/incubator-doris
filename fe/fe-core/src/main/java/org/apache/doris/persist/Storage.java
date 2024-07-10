@@ -275,6 +275,10 @@ public class Storage {
         return getImageFile(new File(metaDir), version);
     }
 
+    public File getImageFileMock() {
+        return new File(new File(metaDir), "image.596227666.encode");
+    }
+
     public static File getImageFile(File dir, long version) {
         return new File(dir, IMAGE + "." + version);
     }

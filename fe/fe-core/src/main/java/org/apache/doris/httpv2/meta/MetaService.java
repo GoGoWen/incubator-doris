@@ -277,4 +277,26 @@ public class MetaService extends RestBaseController {
         return ResponseEntityBuilder.ok(res);
     }
 
+    @RequestMapping(value = "/load_encode", method = RequestMethod.GET)
+    public Object load_encode(HttpServletRequest request, HttpServletResponse response) throws DdlException {
+        if (Config.enable_all_http_auth) {
+            executeCheckPassword(request, response);
+        }
+
+        /*
+         * Before dump, we acquired the catalog read lock and all databases' read lock and all
+         * the jobs' read lock. This will guarantee the consistency of database and job queues.
+         * But Backend may still inconsistent.
+         *
+         * TODO: Still need to lock ClusterInfoService to prevent add or drop Backends
+         */
+        Map<String, String> res = Maps.newHashMap();
+        try {
+            Env.getCurrentEnv().loadImageEncode();
+        } catch (Exception e) {
+            res.put("exception", e.getMessage());
+        }
+        return ResponseEntityBuilder.ok(res);
+    }
+
 }
