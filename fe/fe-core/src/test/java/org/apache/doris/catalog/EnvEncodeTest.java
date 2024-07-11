@@ -89,7 +89,7 @@ public class EnvEncodeTest {
         File file = new File(dir, "image");
         file.createNewFile();
         Deflater deflater = new Deflater();
-        CountingDataOutputStream dos = new CountingDataOutputStream( new DeflaterOutputStream(
+        CountingDataOutputStream dos = new CountingDataOutputStream(new DeflaterOutputStream(
                 new FileOutputStream(file), deflater));
         Env env = Env.getCurrentEnv();
         MetaContext.get().setMetaVersion(FeConstants.meta_version);
