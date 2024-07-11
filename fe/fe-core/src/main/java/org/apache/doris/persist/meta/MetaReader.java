@@ -32,8 +32,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 

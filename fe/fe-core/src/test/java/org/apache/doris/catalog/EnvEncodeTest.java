@@ -17,21 +17,28 @@
 
 package org.apache.doris.catalog;
 
-import mockit.Expectations;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.io.CountingDataOutputStream;
 import org.apache.doris.load.Load;
 import org.apache.doris.meta.MetaContext;
 import org.apache.doris.persist.meta.MetaHeader;
-import org.apache.hadoop.shaded.org.apache.commons.io.output.DeferredFileOutputStream;
+
+import mockit.Expectations;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.lang.reflect.Field;
 import java.util.Random;
-import java.util.zip.*;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 public class EnvEncodeTest {
 
