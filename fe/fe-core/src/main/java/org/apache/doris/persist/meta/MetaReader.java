@@ -34,6 +34,8 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterInputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 /**
  * Image Format:
@@ -148,14 +150,14 @@ public class MetaReader {
         long footerIndex = imageFile.length()
                 - metaFooter.length - MetaFooter.FOOTER_LENGTH_SIZE - MetaMagicNumber.MAGIC_STR.length();
 
-        Deflater deflater = new Deflater();
+        Inflater inflater = new Inflater();
         try {
             FileInputStream disOrig = new FileInputStream(imageFile);
             // 1. Skip image file header
             IOUtils.skipFully(disOrig, metaHeader.getEnd());
 
-            DataInputStream dis = new DataInputStream(new DeflaterInputStream(
-                    new BufferedInputStream(disOrig), deflater));
+            DataInputStream dis = new DataInputStream(new InflaterInputStream(
+                    new BufferedInputStream(disOrig), inflater));
 
             // 2. Read meta header first
             checksum = env.loadHeader(dis, metaHeader, checksum);

@@ -31,9 +31,7 @@ import org.junit.Test;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.util.Random;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterInputStream;
-import java.util.zip.DeflaterOutputStream;
+import java.util.zip.*;
 
 public class EnvEncodeTest {
 
@@ -97,8 +95,9 @@ public class EnvEncodeTest {
         env = null;
         dos.close();
 
-        DataInputStream dis = new DataInputStream(new DeflaterInputStream(
-                new BufferedInputStream(new FileInputStream(file)), deflater));
+        Inflater inflater = new Inflater();
+        DataInputStream dis = new DataInputStream(new InflaterInputStream(
+                new BufferedInputStream(new FileInputStream(file)), inflater));
         env = Env.getCurrentEnv();
         long checksum2 = env.loadHeader(dis, MetaHeader.EMPTY_HEADER, 0);
         Assert.assertEquals(checksum1, checksum2);
