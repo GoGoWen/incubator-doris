@@ -149,10 +149,14 @@ public class MetaReader {
                 - metaFooter.length - MetaFooter.FOOTER_LENGTH_SIZE - MetaMagicNumber.MAGIC_STR.length();
 
         Deflater deflater = new Deflater();
-        try (DataInputStream dis = new DataInputStream(new DeflaterInputStream(new BufferedInputStream(
-                new FileInputStream(imageFile)), deflater))) {
+        try{
+            FileInputStream disOrig = new FileInputStream(imageFile);
             // 1. Skip image file header
-            IOUtils.skipFully(dis, metaHeader.getEnd());
+            IOUtils.skipFully(disOrig, metaHeader.getEnd());
+
+            DataInputStream dis = new DataInputStream(new DeflaterInputStream(
+                    new BufferedInputStream(disOrig), deflater));
+
             // 2. Read meta header first
             checksum = env.loadHeader(dis, metaHeader, checksum);
             // 3. Read other meta modules
