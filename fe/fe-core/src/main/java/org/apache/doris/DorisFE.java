@@ -103,11 +103,6 @@ public class DorisFE {
         CommandLineOptions cmdLineOpts = parseArgs(args);
 
         try {
-            // pid file
-            if (!createAndLockPidFile(pidDir + "/fe.pid")) {
-                throw new IOException("pid file is already locked.");
-            }
-
             // init config
             Config config = new Config();
             config.init(dorisHomeDir + "/conf/fe.conf");
@@ -115,13 +110,7 @@ public class DorisFE {
             // Must init custom config after init config, separately.
             // Because the path of custom config file is defined in fe.conf
             config.initCustom(Config.custom_config_dir + "/fe_custom.conf");
-            LOCK_FILE_PATH = Config.meta_dir + "/" + LOCK_FILE_NAME;
-            try {
-                tryLockProcess();
-            } catch (Exception e) {
-                LOG.error("start doris failed.", e);
-                System.exit(-1);
-            }
+
             LdapConfig ldapConfig = new LdapConfig();
             if (new File(dorisHomeDir + "/conf/ldap.conf").exists()) {
                 ldapConfig.init(dorisHomeDir + "/conf/ldap.conf");
@@ -140,8 +129,20 @@ public class DorisFE {
             // set dns cache ttl
             java.security.Security.setProperty("networkaddress.cache.ttl", "60");
 
+            // pid file
+            if (!cmdLineOpts.isVersion() && !createAndLockPidFile(pidDir + "/fe.pid")) {
+                throw new IOException("pid file is already locked.");
+            }
+
             // check command line options
             checkCommandLineOptions(cmdLineOpts);
+
+            try {
+                tryLockProcess();
+            } catch (Exception e) {
+                LOG.error("start doris failed.", e);
+                System.exit(-1);
+            }
 
             LOG.info("Doris FE starting...");
 
@@ -372,6 +373,20 @@ public class DorisFE {
         return new CommandLineOptions(false, null, null, "");
     }
 
+    private static void printVersion() {
+        System.out.println("Build version: " + Version.DORIS_BUILD_VERSION);
+        System.out.println("Build time: " + Version.DORIS_BUILD_TIME);
+        System.out.println("Build info: " + Version.DORIS_BUILD_INFO);
+        System.out.println("Build hash: " + Version.DORIS_BUILD_HASH);
+        System.out.println("Java compile version: " + Version.DORIS_JAVA_COMPILE_VERSION);
+
+        LOG.info("Build version: {}", Version.DORIS_BUILD_VERSION);
+        LOG.info("Build time: {}", Version.DORIS_BUILD_TIME);
+        LOG.info("Build info: {}", Version.DORIS_BUILD_INFO);
+        LOG.info("Build hash: {}", Version.DORIS_BUILD_HASH);
+        LOG.info("Java compile version: {}", Version.DORIS_JAVA_COMPILE_VERSION);
+    }
+
     private static void checkCommandLineOptions(CommandLineOptions cmdLineOpts) {
         if (cmdLineOpts.isVersion()) {
             System.out.println("Build version: " + Version.DORIS_BUILD_VERSION);
@@ -406,7 +421,7 @@ public class DorisFE {
                 }
             }
         }
-
+        printVersion();
         // go on
     }
 
@@ -442,6 +457,7 @@ public class DorisFE {
      */
     private static void tryLockProcess() {
         try {
+            LOCK_FILE_PATH = Config.meta_dir + "/" + LOCK_FILE_NAME;
             processLockFileChannel = FileChannel.open(new File(LOCK_FILE_PATH).toPath(), StandardOpenOption.WRITE,
                     StandardOpenOption.CREATE);
             processFileLock = processLockFileChannel.tryLock();
