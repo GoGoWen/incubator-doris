@@ -25,6 +25,7 @@ import org.apache.doris.ha.FrontendNodeType;
 import org.apache.doris.httpv2.entity.ResponseEntityBuilder;
 import org.apache.doris.httpv2.rest.RestBaseController;
 import org.apache.doris.master.MetaHelper;
+import org.apache.doris.meta.MetaContext;
 import org.apache.doris.persist.MetaCleaner;
 import org.apache.doris.persist.Storage;
 import org.apache.doris.persist.StorageInfo;
@@ -292,6 +293,8 @@ public class MetaService extends RestBaseController {
          */
         Map<String, String> res = Maps.newHashMap();
         try {
+            MetaContext metaContext = new MetaContext();
+            metaContext.setThreadLocalInfo();
             Env.getCurrentEnv().loadImageEncode();
         } catch (Exception e) {
             res.put("exception", e.getMessage());
