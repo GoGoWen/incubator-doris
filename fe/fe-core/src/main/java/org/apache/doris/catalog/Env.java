@@ -1791,6 +1791,13 @@ public class Env {
         MetaReader.read(curFile, this);
     }
 
+    public void loadImageOrigin() throws IOException, DdlException {
+        Storage storage = new Storage(this.getImageDir());
+        File curFile = storage.getImageFileOrigin();
+
+        MetaReader.read(curFile, this);
+    }
+
     public void loadImageEncode() throws IOException, DdlException {
         Storage storage = new Storage(this.getImageDir());
         File curFile = storage.getImageFileMock();

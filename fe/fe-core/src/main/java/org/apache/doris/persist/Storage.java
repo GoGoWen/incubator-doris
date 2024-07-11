@@ -279,6 +279,10 @@ public class Storage {
         return new File(new File(metaDir), "image.596227666.encode");
     }
 
+    public File getImageFileOrigin() {
+        return new File(new File(metaDir), "image.597418901");
+    }
+
     public static File getImageFile(File dir, long version) {
         return new File(dir, IMAGE + "." + version);
     }
