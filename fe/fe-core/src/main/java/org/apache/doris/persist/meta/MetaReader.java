@@ -149,7 +149,7 @@ public class MetaReader {
                 - metaFooter.length - MetaFooter.FOOTER_LENGTH_SIZE - MetaMagicNumber.MAGIC_STR.length();
 
         Deflater deflater = new Deflater();
-        try{
+        try {
             FileInputStream disOrig = new FileInputStream(imageFile);
             // 1. Skip image file header
             IOUtils.skipFully(disOrig, metaHeader.getEnd());
