@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.util.zip.InflaterInputStream;
 
 /**
  * Image Format:
@@ -77,9 +78,19 @@ public class MetaReader {
         long checksum = 0;
         long footerIndex = imageFile.length()
                 - metaFooter.length - MetaFooter.FOOTER_LENGTH_SIZE - MetaMagicNumber.MAGIC_STR.length();
-        try (DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(imageFile)))) {
+        try {
+            FileInputStream disTemp = new FileInputStream(imageFile);
             // 1. Skip image file header
-            IOUtils.skipFully(dis, metaHeader.getEnd());
+            IOUtils.skipFully(disTemp, metaHeader.getEnd());
+
+            DataInputStream dis = null;
+            if (!metaHeader.getMetaJsonHeader().compressed) {
+                dis = new DataInputStream(new BufferedInputStream(disTemp));
+            } else {
+                dis = new DataInputStream(new InflaterInputStream(
+                            new BufferedInputStream(disTemp)));
+            }
+
             // 2. Read meta header first
             checksum = env.loadHeader(dis, metaHeader, checksum);
             // 3. Read other meta modules

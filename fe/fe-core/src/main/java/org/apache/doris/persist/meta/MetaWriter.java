@@ -18,6 +18,7 @@
 package org.apache.doris.persist.meta;
 
 import org.apache.doris.catalog.Env;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.Reference;
 import org.apache.doris.common.io.CountingDataOutputStream;
 
@@ -31,6 +32,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.zip.DeflaterOutputStream;
 
 /**
  * Image Format:
@@ -93,28 +95,37 @@ public class MetaWriter {
         return delegate.doWork(name, method);
     }
 
-    public static void write(File imageFile, Env env) throws IOException {
+    @SuppressWarnings("checkstyle:EmptyBlock")
+    public static void write(File imageFile, Env env, boolean compressed) throws IOException {
         // save image does not need any lock. because only checkpoint thread will call this method.
         LOG.info("start to save image to {}. is ckpt: {}",
                 imageFile.getAbsolutePath(), Env.isCheckpointThread());
         final Reference<Long> checksum = new Reference<>(0L);
         long saveImageStartTime = System.currentTimeMillis();
         // MetaHeader should use output stream in the future.
-        long startPosition = MetaHeader.write(imageFile);
+        long startPosition = MetaHeader.write(imageFile, compressed);
         List<MetaIndex> metaIndices = Lists.newArrayList();
         FileOutputStream imageFileOut = new FileOutputStream(imageFile, true);
-        try (CountingDataOutputStream dos = new CountingDataOutputStream(new BufferedOutputStream(imageFileOut),
-                startPosition)) {
-            writer.setDelegate(dos, metaIndices);
+        try {
+            CountingDataOutputStream dos = null;
+            if (!compressed) {
+                dos = new CountingDataOutputStream(new BufferedOutputStream(imageFileOut),
+                    startPosition);
+            } else {
+                dos = new CountingDataOutputStream(new DeflaterOutputStream(new BufferedOutputStream(imageFileOut)),
+                    startPosition);
+            }
+            CountingDataOutputStream dosFinal = dos;
+            writer.setDelegate(dosFinal, metaIndices);
             long replayedJournalId = env.getReplayedJournalId();
             // 1. write header first
             checksum.setRef(
-                    writer.doWork("header", () -> env.saveHeader(dos, replayedJournalId, checksum.getRef())));
+                    writer.doWork("header", () -> env.saveHeader(dosFinal, replayedJournalId, checksum.getRef())));
             // 2. write other modules
             for (MetaPersistMethod m : PersistMetaModules.MODULES_IN_ORDER) {
                 checksum.setRef(writer.doWork(m.name, () -> {
                     try {
-                        return (long) m.writeMethod.invoke(env, dos, checksum.getRef());
+                        return (long) m.writeMethod.invoke(env, dosFinal, checksum.getRef());
                     } catch (IllegalAccessException | InvocationTargetException e) {
                         LOG.warn("failed to write meta module: {}", m.name, e);
                         throw new RuntimeException(e);
@@ -123,7 +134,10 @@ public class MetaWriter {
             }
             // 3. force sync to disk
             imageFileOut.getChannel().force(true);
+        } catch (IOException e) {
+            throw e;
         }
+
         MetaFooter.write(imageFile, metaIndices, checksum.getRef());
 
         long saveImageEndTime = System.currentTimeMillis();
