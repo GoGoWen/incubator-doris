@@ -168,6 +168,7 @@ public class DeleteStmt extends DdlStmt {
         }
 
         FromClause fromUsedInInsert;
+        targetTableRef.setPartitionNames(partitionNames);
         if (fromClause == null) {
             fromUsedInInsert = new FromClause(Lists.newArrayList(targetTableRef));
         } else {
