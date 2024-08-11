@@ -496,6 +496,7 @@ sortItem
 limitClause
     : (LIMIT limit=INTEGER_VALUE)
     | (LIMIT limit=INTEGER_VALUE OFFSET offset=INTEGER_VALUE)
+    | (OFFSET offset=INTEGER_VALUE LIMIT limit=INTEGER_VALUE)
     | (LIMIT offset=INTEGER_VALUE COMMA limit=INTEGER_VALUE)
     ;
 
@@ -1222,7 +1223,6 @@ nonReserved
     | NON_NULLABLE
     | NULLS
     | OF
-    | OFFSET
     | ONLY
     | OPEN
     | OPTIMIZED

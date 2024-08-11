@@ -7947,8 +7947,6 @@ keyword ::=
     {: RESULT = id; :}
     | KW_OF:id
     {: RESULT = id; :}
-    | KW_OFFSET:id
-    {: RESULT = id; :}
     | KW_ONLY:id
     {: RESULT = id; :}
     | KW_OPEN:id
