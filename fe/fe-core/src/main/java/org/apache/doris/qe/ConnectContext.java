@@ -242,6 +242,46 @@ public class ConnectContext {
     // it's default thread-safe
     private boolean isProxy = false;
 
+    private String erp = null;
+
+    private String source = null;
+
+    private String hadoopUserName = null;
+
+    private String userToken = null;
+
+    public void setErp(String erp) {
+        this.erp = erp;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    public void setHadoopUserName(String hadoopUserName) {
+        this.hadoopUserName = hadoopUserName;
+    }
+
+    public void setUserToken(String userToken) {
+        this.userToken = userToken;
+    }
+
+    public String getErp() {
+        return erp;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public String getHadoopUserName() {
+        return hadoopUserName;
+    }
+
+    public String getUserToken() {
+        return userToken;
+    }
+
     public void setUserQueryTimeout(int queryTimeout) {
         if (queryTimeout > 0) {
             sessionVariable.setQueryTimeoutS(queryTimeout);

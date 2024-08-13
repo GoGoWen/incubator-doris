@@ -22,8 +22,10 @@ import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.ErrorCode;
 import org.apache.doris.common.ErrorReport;
+import org.apache.doris.common.util.AESUtil;
 import org.apache.doris.datasource.CatalogIf;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.thrift.TBDPUserInfo;
 
 import com.google.common.base.Strings;
 import org.apache.logging.log4j.LogManager;
@@ -55,7 +57,6 @@ public class MysqlProto {
         if (strList.length > 1) {
             tmpUser = strList[0];
         }
-
         context.setQualifiedUser(tmpUser);
         return tmpUser;
     }
@@ -85,7 +86,6 @@ public class MysqlProto {
         MysqlChannel channel = context.getMysqlChannel();
         MysqlSerializer serializer = channel.getSerializer();
         context.getState().setOk();
-
         // Server send handshake packet to client.
         serializer.reset();
         MysqlHandshakePacket handshakePacket = new MysqlHandshakePacket(context.getConnectionId());
@@ -98,7 +98,6 @@ public class MysqlProto {
             }
             return false;
         }
-
         // Server receive request packet from client, we need to determine which request type it is.
         ByteBuffer clientRequestPacket = channel.fetchOnePacket();
         MysqlCapability capability = new MysqlCapability(MysqlProto.readLowestInt4(clientRequestPacket));
@@ -107,7 +106,6 @@ public class MysqlProto {
         ByteBuffer sslConnectionRequest;
         // Server receive authenticate packet from client.
         ByteBuffer handshakeResponse;
-
         if (capability.isClientUseSsl()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("client is using ssl connection.");
@@ -159,7 +157,6 @@ public class MysqlProto {
         } else {
             handshakeResponse = clientRequestPacket;
         }
-
         if (handshakeResponse == null) {
             // receive response failed.
             return false;
@@ -179,7 +176,6 @@ public class MysqlProto {
             sendResponsePacket(context);
             return false;
         }
-
         // check capability
         if (!MysqlCapability.isCompatible(context.getServerCapability(), authPacket.getCapability())) {
             // TODO: client return capability can not support
@@ -187,7 +183,6 @@ public class MysqlProto {
             sendResponsePacket(context);
             return false;
         }
-
         // change the capability of serializer
         context.setCapability(context.getServerCapability());
         serializer.setCapability(context.getCapability());
@@ -197,52 +192,91 @@ public class MysqlProto {
             sendResponsePacket(context);
             return false;
         }
-
+        TBDPUserInfo bdpUserInfo = null;
+        if (qualifiedUser.contains("$")) {
+            try {
+                String[] bdpAuthInfo = qualifiedUser.split("\\$");
+                if (bdpAuthInfo.length != 2) {
+                    context.getState().setError("invalid bdp auth user name format " + qualifiedUser);
+                    return false;
+                }
+                qualifiedUser = bdpAuthInfo[0];
+                String serviceName = bdpAuthInfo[1];
+                context.setQualifiedUser(qualifiedUser);
+                bdpUserInfo = AESUtil.decrypt(serviceName, authPacket.getDb());
+                if (!serviceName.equals(bdpUserInfo.getSource())) {
+                    context.getState().setError("the service name " + serviceName
+                            + " not be equal with decrypted service: " + bdpUserInfo.getSource());
+                    return false;
+                }
+                LOG.info("doris username {}, service {}, erp {}, source {}, hadoop_user_name {}, user_token {}",
+                        qualifiedUser, serviceName, bdpUserInfo.getErp(), bdpUserInfo.getSource(),
+                        bdpUserInfo.getHadoopUserName(), bdpUserInfo.getUserToken());
+            } catch (Exception e) {
+                context.getState().setError("decrypt bdp user info failed: " + e.getMessage());
+                LOG.warn("decrypt bdp user info failed", e);
+                return false;
+            }
+        }
         //  authenticate
         if (!Env.getCurrentEnv().getAuthenticatorManager()
-                .authenticate(context, qualifiedUser, channel, serializer, authPacket, handshakePacket)) {
+                .authenticate(context, qualifiedUser, channel, serializer, authPacket, handshakePacket, bdpUserInfo)) {
             return false;
         }
+        String catalogName = null;
+        String dbName = null;
+        if (bdpUserInfo != null) {
+            context.setErp(bdpUserInfo.getErp());
+            context.setSource(bdpUserInfo.getSource());
+            context.setHadoopUserName(bdpUserInfo.getHadoopUserName());
+            context.setUserToken(bdpUserInfo.getUserToken());
 
-        // set database
-        String db = authPacket.getDb();
-        if (!Strings.isNullOrEmpty(db)) {
-            String catalogName = null;
-            String dbName = null;
-            String[] dbNames = db.split("\\.");
-            if (dbNames.length == 1) {
-                dbName = db;
-            } else if (dbNames.length == 2) {
-                catalogName = dbNames[0];
-                dbName = dbNames[1];
-            } else if (dbNames.length > 2) {
-                context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "Only one dot can be in the name: " + db);
+            if (bdpUserInfo.isSetCatalog()) {
+                catalogName = bdpUserInfo.getCatalog();
+            }
+            if (bdpUserInfo.isSetDb()) {
+                dbName = bdpUserInfo.getDb();
+            }
+        } else {
+            // set database
+            String db = authPacket.getDb();
+            if (!Strings.isNullOrEmpty(db)) {
+                String[] dbNames = db.split("\\.");
+                if (dbNames.length == 1) {
+                    dbName = db;
+                } else if (dbNames.length == 2) {
+                    catalogName = dbNames[0];
+                    dbName = dbNames[1];
+                } else if (dbNames.length > 2) {
+                    context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "Only one dot can be in the name: " + db);
+                    return false;
+                }
+            }
+        }
+
+        // check catalog and db exists
+        if (catalogName != null) {
+            CatalogIf catalogIf = context.getEnv().getCatalogMgr().getCatalog(catalogName);
+            if (catalogIf == null) {
+                context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "No match catalog in doris: " + catalogName);
                 return false;
             }
-            String dbFullName = dbName;
-
-            // check catalog and db exists
+            if (catalogIf.getDbNullable(dbName) == null) {
+                context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "No match database in doris: " + dbName);
+                return false;
+            }
+        }
+        try {
             if (catalogName != null) {
-                CatalogIf catalogIf = context.getEnv().getCatalogMgr().getCatalog(catalogName);
-                if (catalogIf == null) {
-                    context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "No match catalog in doris: " + db);
-                    return false;
-                }
-                if (catalogIf.getDbNullable(dbFullName) == null) {
-                    context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "No match database in doris: " + db);
-                    return false;
-                }
+                context.getEnv().changeCatalog(context, catalogName);
             }
-            try {
-                if (catalogName != null) {
-                    context.getEnv().changeCatalog(context, catalogName);
-                }
-                Env.getCurrentEnv().changeDb(context, dbFullName);
-            } catch (DdlException e) {
-                context.getState().setError(e.getMysqlErrorCode(), e.getMessage());
-                sendResponsePacket(context);
-                return false;
+            if (dbName != null) {
+                Env.getCurrentEnv().changeDb(context, dbName);
             }
+        } catch (DdlException e) {
+            context.getState().setError(e.getMysqlErrorCode(), e.getMessage());
+            sendResponsePacket(context);
+            return false;
         }
 
         // set resource tag if has

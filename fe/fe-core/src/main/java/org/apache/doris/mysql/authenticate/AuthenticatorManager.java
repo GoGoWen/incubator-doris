@@ -20,11 +20,14 @@ package org.apache.doris.mysql.authenticate;
 import org.apache.doris.mysql.MysqlAuthPacket;
 import org.apache.doris.mysql.MysqlChannel;
 import org.apache.doris.mysql.MysqlHandshakePacket;
+import org.apache.doris.mysql.MysqlPassword;
 import org.apache.doris.mysql.MysqlProto;
 import org.apache.doris.mysql.MysqlSerializer;
 import org.apache.doris.mysql.authenticate.ldap.LdapAuthenticator;
+import org.apache.doris.mysql.authenticate.password.NativePassword;
 import org.apache.doris.mysql.authenticate.password.Password;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.thrift.TBDPUserInfo;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -57,13 +60,15 @@ public class AuthenticatorManager {
             MysqlChannel channel,
             MysqlSerializer serializer,
             MysqlAuthPacket authPacket,
-            MysqlHandshakePacket handshakePacket) throws IOException {
+            MysqlHandshakePacket handshakePacket,
+            TBDPUserInfo bdpUserInfo) throws IOException {
         Authenticator authenticator = chooseAuthenticator(userName);
         Optional<Password> password = authenticator.getPasswordResolver()
                 .resolvePassword(context, channel, serializer, authPacket, handshakePacket);
         if (!password.isPresent()) {
             return false;
         }
+
         String remoteIp = context.getMysqlChannel().getRemoteIp();
         AuthenticateRequest request = new AuthenticateRequest(userName, password.get(), remoteIp);
         AuthenticateResponse response = authenticator.authenticate(request);
@@ -71,10 +76,27 @@ public class AuthenticatorManager {
             MysqlProto.sendResponsePacket(context);
             return false;
         }
+        if (bdpUserInfo != null && !checkPasswordConsistency(bdpUserInfo, password.get())) {
+            context.getState().setError("bdp user info scramble password is inconsistent with password");
+        }
+
         context.setCurrentUserIdentity(response.getUserIdentity());
         context.setRemoteIP(remoteIp);
         context.setIsTempUser(response.isTemp());
         return true;
+    }
+
+    private boolean checkPasswordConsistency(TBDPUserInfo bdpUserInfo, Password password) {
+        byte[] saltPassword = MysqlPassword.getSaltFromPassword(bdpUserInfo.getScrambledPassword());
+        if (!(password instanceof NativePassword)) {
+            return false;
+        }
+        NativePassword nativePassword = (NativePassword) password;
+        byte[] remotePasswd = nativePassword.getRemotePasswd();
+        // when the length of password is zero, the user has no password
+        return (nativePassword.getRemotePasswd().length == saltPassword.length)
+                && (remotePasswd.length == 0
+                || MysqlPassword.checkScramble(remotePasswd, nativePassword.getRandomString(), saltPassword));
     }
 
     private Authenticator chooseAuthenticator(String userName) {
