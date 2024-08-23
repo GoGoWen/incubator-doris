@@ -70,11 +70,6 @@ if [[ "$(uname -s)" != 'Darwin' ]]; then
         echo "Please set vm.max_map_count to be 2000000 under root using 'sysctl -w vm.max_map_count=2000000'."
         exit 1
     fi
-
-    if [[ "$(swapon -s | wc -l)" -gt 1 ]]; then
-        echo "Please disable swap memory before installation."
-        exit 1
-    fi
 fi
 
 MAX_FILE_COUNT="$(ulimit -n)"
@@ -92,21 +87,7 @@ fi
 # instead of jars in hadoop libs, such as avro
 preload_jars=("preload-extensions")
 preload_jars+=("java-udf")
-
-DORIS_PRELOAD_JAR=
-for preload_jar_dir in "${preload_jars[@]}"; do
-    for f in "${DORIS_HOME}/lib/java_extensions/${preload_jar_dir}"/*.jar; do
-        if [[ "${f}" == *"preload-extensions-project.jar" ]]; then
-            DORIS_PRELOAD_JAR="${f}"
-            continue
-        elif [[ -z "${DORIS_CLASSPATH}" ]]; then
-            export DORIS_CLASSPATH="${f}"
-        else
-            export DORIS_CLASSPATH="${DORIS_CLASSPATH}:${f}"
-        fi
-    done
-done
-
+export DORIS_CLASSPATH=
 if [[ -d "${DORIS_HOME}/lib/hadoop_hdfs/" ]]; then
     # add hadoop libs
     for f in "${DORIS_HOME}/lib/hadoop_hdfs/common"/*.jar; do
@@ -122,6 +103,20 @@ if [[ -d "${DORIS_HOME}/lib/hadoop_hdfs/" ]]; then
         DORIS_CLASSPATH="${DORIS_CLASSPATH}:${f}"
     done
 fi
+
+DORIS_PRELOAD_JAR=
+for preload_jar_dir in "${preload_jars[@]}"; do
+    for f in "${DORIS_HOME}/lib/java_extensions/${preload_jar_dir}"/*.jar; do
+        if [[ "${f}" == *"preload-extensions-project.jar" ]]; then
+            DORIS_PRELOAD_JAR="${f}"
+            continue
+        elif [[ -z "${DORIS_CLASSPATH}" ]]; then
+            export DORIS_CLASSPATH="${f}"
+        else
+            export DORIS_CLASSPATH="${DORIS_CLASSPATH}:${f}"
+        fi
+    done
+done
 
 # add custom_libs to CLASSPATH
 if [[ -d "${DORIS_HOME}/custom_lib" ]]; then
@@ -352,6 +347,32 @@ if [[ "${MACHINE_OS}" == "Darwin" ]]; then
     if [[ -n "${JAVA_OPTS_FOR_JDK_17}" ]] && ! echo "${JAVA_OPTS_FOR_JDK_17}" | grep "${max_fd_limit/-/\\-}" >/dev/null; then
         export JAVA_OPTS="${JAVA_OPTS_FOR_JDK_17} ${max_fd_limit}"
     fi
+fi
+
+
+hadoop_user_key_value_env=`grep HADOOP_USER_KEY_VALUE $DORIS_HOME/conf/be.conf`
+if [ ! -z $hadoop_user_key_value_env ]; then
+   eval 'export "$hadoop_user_key_value_env"'
+fi
+
+hadoop_user_name_env=`grep HADOOP_USER_NAME $DORIS_HOME/conf/be.conf`
+if [ ! -z $hadoop_user_name_env ]; then
+   eval 'export "$hadoop_user_name_env"'
+fi
+
+hadoop_user_token_env=`grep HADOOP_USER_TOKEN $DORIS_HOME/conf/be.conf`
+if [ ! -z $hadoop_user_token_env ]; then
+   eval 'export "$hadoop_user_token_env"'
+fi
+
+bee_source_env=`grep BEE_SOURCE $DORIS_HOME/conf/be.conf`
+if [ ! -z $bee_source_env ]; then
+   eval 'export "$bee_source_env"'
+fi
+
+bee_user_env=`grep BEE_USER $DORIS_HOME/conf/be.conf`
+if [ ! -z $bee_user_env ]; then
+   eval 'export "$bee_user_env"'
 fi
 
 # set LIBHDFS_OPTS for hadoop libhdfs

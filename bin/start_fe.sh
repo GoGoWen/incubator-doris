@@ -225,6 +225,31 @@ if [[ -d "${DORIS_HOME}/custom_lib" ]]; then
     done
 fi
 
+hadoop_user_key_value_env=`grep HADOOP_USER_KEY_VALUE $DORIS_HOME/conf/fe.conf`
+if [ ! -z $hadoop_user_key_value_env ]; then
+   eval 'export "$hadoop_user_key_value_env"'
+fi
+
+hadoop_user_name_env=`grep HADOOP_USER_NAME $DORIS_HOME/conf/fe.conf`
+if [ ! -z $hadoop_user_name_env ]; then
+   eval 'export "$hadoop_user_name_env"'
+fi
+
+hadoop_user_token_env=`grep HADOOP_USER_TOKEN $DORIS_HOME/conf/fe.conf`
+if [ ! -z $hadoop_user_token_env ]; then
+   eval 'export "$hadoop_user_token_env"'
+fi
+
+bee_source_env=`grep BEE_SOURCE $DORIS_HOME/conf/fe.conf`
+if [ ! -z $bee_source_env ]; then
+   eval 'export "$bee_source_env"'
+fi
+
+bee_user_env=`grep BEE_USER $DORIS_HOME/conf/fe.conf`
+if [ ! -z $bee_user_env ]; then
+   eval 'export "$bee_user_env"'
+fi
+
 # make sure the doris-fe.jar is at first order, so that some classed
 # with same qualified name can be loaded priority from doris-fe.jar
 CLASSPATH="${DORIS_FE_JAR}:${CLASSPATH}"
