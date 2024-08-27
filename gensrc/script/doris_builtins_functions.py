@@ -882,6 +882,8 @@ visible_functions = {
         [['now', 'current_timestamp', 'localtime', 'localtimestamp'], 'DATETIMEV2', ['INT'], 'DEPEND_ON_ARGUMENT'],
         [['curtime', 'current_time'], 'TIME', [], 'ALWAYS_NOT_NULLABLE'],
         [['curdate', 'current_date'], 'DATE', [], 'ALWAYS_NOT_NULLABLE'],
+        [['sysdate'], 'STRING', [], 'ALWAYS_NOT_NULLABLE'],
+        [['sysdate'], 'STRING', ['INT'], 'ALWAYS_NOT_NULLABLE'],
         [['utc_timestamp'], 'DATETIME', [], 'ALWAYS_NOT_NULLABLE'],
         [['timestamp'], 'DATETIME', ['DATETIME'], 'ALWAYS_NULLABLE'],
 
@@ -1907,6 +1909,9 @@ visible_functions = {
         [['murmur_hash3_32'], 'INT', ['STRING', '...'], ''],
         [['murmur_hash3_64'], 'BIGINT', ['VARCHAR', '...'], ''],
         [['murmur_hash3_64'], 'BIGINT', ['STRING', '...'], ''],
+        [['hash'], 'INT', ['INT', '...'], ''],
+        [['hash'], 'INT', ['VARCHAR', '...'], ''],
+        [['hash'], 'INT', ['STRING', '...'], ''],
         [['xxhash_32'], 'INT', ['VARCHAR', '...'], ''],
         [['xxhash_32'], 'INT', ['STRING', '...'], ''],
         [['xxhash_64'], 'BIGINT', ['VARCHAR', '...'], ''],

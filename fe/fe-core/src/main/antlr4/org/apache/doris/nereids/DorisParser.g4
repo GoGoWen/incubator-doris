@@ -770,6 +770,7 @@ primaryExpression
                 | unitsAmount=valueExpression)
             RIGHT_PAREN                                                                        #arrayRange
     | name=CURRENT_DATE                                                                        #currentDate
+    | name=SYSDATE                                                                             #sysDate
     | name=CURRENT_TIME                                                                        #currentTime
     | name=CURRENT_TIMESTAMP                                                                   #currentTimestamp
     | name=LOCALTIME                                                                           #localTime
@@ -1306,6 +1307,7 @@ nonReserved
     | STRUCT
     | SUBDATE
     | SUM
+    | SYSDATE
     | TABLES
     | TASK
     | TASKS

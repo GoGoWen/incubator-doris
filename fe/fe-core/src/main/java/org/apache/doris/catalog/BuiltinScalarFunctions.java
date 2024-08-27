@@ -185,6 +185,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.GetJsonString
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Greatest;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Grouping;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.GroupingId;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Hash;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Hex;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.HllCardinality;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.HllEmpty;
@@ -399,6 +400,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.SubBitmap;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SubReplace;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Substring;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SubstringIndex;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SysDate;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Tan;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Tanh;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.TimeDiff;
@@ -572,6 +574,7 @@ public class BuiltinScalarFunctions implements FunctionHelper {
             scalar(CreateNamedStruct.class, "named_struct"),
             scalar(CurrentCatalog.class, "current_catalog"),
             scalar(CurrentDate.class, "curdate", "current_date"),
+            scalar(SysDate.class, "sysdate"),
             scalar(CurrentTime.class, "curtime", "current_time"),
             scalar(CurrentUser.class, "current_user"),
             scalar(CutIpv6.class, "cut_ipv6"),
@@ -625,6 +628,7 @@ public class BuiltinScalarFunctions implements FunctionHelper {
             scalar(Greatest.class, "greatest"),
             scalar(Grouping.class, "grouping"),
             scalar(GroupingId.class, "grouping_id"),
+            scalar(Hash.class, "hash"),
             scalar(Hex.class, "hex"),
             scalar(HllCardinality.class, "hll_cardinality"),
             scalar(HllEmpty.class, "hll_empty"),

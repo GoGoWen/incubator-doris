@@ -23,10 +23,14 @@ import org.apache.doris.nereids.trees.expressions.literal.DateLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.DateTimeLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.DateTimeV2Literal;
 import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
+import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
 import org.apache.doris.nereids.util.DateUtils;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Calendar;
+import java.util.Date;
 
 /**
  * executable functions:
@@ -84,6 +88,37 @@ public class DateTimeAcquire {
     @ExecFunction(name = "current_date", argTypes = {}, returnType = "DATE")
     public static Expression currentDate() {
         return DateLiteral.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
+    }
+
+    /**
+     * date acquire function: sysdate
+     */
+    @ExecFunction(name = "sysdate", argTypes = {}, returnType = "VARCHAR")
+    public static Expression sysDate() {
+        Calendar cl = Calendar.getInstance();
+        Long clTemp = Long.valueOf(cl.getTimeInMillis());
+        cl.setTimeInMillis(clTemp.longValue());
+        Date date = cl.getTime();
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+        String result = format.format(date);
+        return new StringLiteral(result);
+    }
+
+    /**
+     * date acquire function: sysdate
+     */
+    @ExecFunction(name = "sysdate", argTypes = { "INT" }, returnType = "VARCHAR")
+    public static Expression sysDate(IntegerLiteral arg) {
+        Calendar cl = Calendar.getInstance();
+        Long clTemp = Long.valueOf(cl.getTimeInMillis() + arg.getLongValue() * 24L * 60L * 60L * 1000L);
+        if (clTemp < 0L) {
+            clTemp = 0L;
+        }
+        cl.setTimeInMillis(clTemp.longValue());
+        Date date = cl.getTime();
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+        String result = format.format(date);
+        return new StringLiteral(result);
     }
 
     // comment these function temporally until we support TimeLiteral

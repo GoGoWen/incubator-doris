@@ -188,6 +188,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.GetJsonDouble
 import org.apache.doris.nereids.trees.expressions.functions.scalar.GetJsonInt;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.GetJsonString;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Greatest;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Hash;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Hex;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.HllCardinality;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.HllEmpty;
@@ -397,6 +398,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.SubBitmap;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SubReplace;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Substring;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SubstringIndex;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SysDate;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Tan;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Tanh;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.TimeDiff;
@@ -902,6 +904,10 @@ public interface ScalarFunctionVisitor<R, C> {
         return visitScalarFunction(currentDate, context);
     }
 
+    default R visitSysDate(SysDate sysDate, C context) {
+        return visitScalarFunction(sysDate, context);
+    }
+
     default R visitCurrentTime(CurrentTime currentTime, C context) {
         return visitScalarFunction(currentTime, context);
     }
@@ -1164,6 +1170,10 @@ public interface ScalarFunctionVisitor<R, C> {
 
     default R visitGreatest(Greatest greatest, C context) {
         return visitScalarFunction(greatest, context);
+    }
+
+    default R visitHash(Hash hash, C context) {
+        return visitScalarFunction(hash, context);
     }
 
     default R visitHex(Hex hex, C context) {
