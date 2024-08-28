@@ -30,7 +30,6 @@ public class HadoopSimpleAuthenticator implements HadoopAuthenticator {
         String hadoopUserName = System.getenv("HADOOP_USER_NAME");
         if (hadoopUserName == null) {
             hadoopUserName = "hadoop";
-            config.setUsername(hadoopUserName);
             LOG.warn("{} is unset, use default user: hadoop", AuthenticationConfig.HADOOP_USER_NAME);
         }
         ugi = UserGroupInformation.createRemoteUser(hadoopUserName, null, userToken);

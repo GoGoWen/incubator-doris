@@ -20,6 +20,7 @@ namespace java org.apache.doris.thrift
 
 include "Status.thrift"
 include "Types.thrift"
+include "BDPUserInfo.thrift"
 include "PaloInternalService.thrift"
 include "PlanNodes.thrift"
 include "Planner.thrift"
@@ -988,6 +989,7 @@ struct TFetchSchemaTableDataRequest {
   2: optional TSchemaTableName schema_table_name
   3: optional TMetadataTableRequestParams metada_table_params // used for tvf
   4: optional TSchemaTableRequestParams schema_table_params // used for request db information_schema's table
+  5: optional BDPUserInfo.TBDPAuthContext bdp_auth_context // used for iam 
 }
 
 struct TFetchSchemaTableDataResult {

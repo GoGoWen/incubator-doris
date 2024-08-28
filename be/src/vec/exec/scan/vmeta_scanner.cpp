@@ -221,6 +221,9 @@ Status VMetaScanner::_fill_block_with_remote_data(const std::vector<MutableColum
 Status VMetaScanner::_fetch_metadata(const TMetaScanRange& meta_scan_range) {
     VLOG_CRITICAL << "VMetaScanner::_fetch_metadata";
     TFetchSchemaTableDataRequest request;
+    if (meta_scan_range.__isset.bdp_auth_context) {
+        request.__set_bdp_auth_context(meta_scan_range.bdp_auth_context);
+    }
     switch (meta_scan_range.metadata_type) {
     case TMetadataType::ICEBERG:
         RETURN_IF_ERROR(_build_iceberg_metadata_request(meta_scan_range, &request));
@@ -429,6 +432,7 @@ Status VMetaScanner::_build_partitions_metadata_request(const TMetaScanRange& me
     TMetadataTableRequestParams metadata_table_params;
     metadata_table_params.__set_metadata_type(TMetadataType::PARTITIONS);
     metadata_table_params.__set_partitions_metadata_params(meta_scan_range.partitions_params);
+
 
     request->__set_metada_table_params(metadata_table_params);
     return Status::OK();

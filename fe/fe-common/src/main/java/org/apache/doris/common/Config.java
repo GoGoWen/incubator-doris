@@ -2802,4 +2802,13 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"表示最大锁持有时间，超过该时间会打印告警日志，单位秒",
             "Maximum lock hold time; logs a warning if exceeded"})
     public static long  max_lock_hold_threshold_seconds = 10;
+
+    @ConfField(description = {"IAM 渠道来源白名单", "IAM Source Whitelist"})
+    public static String[] iam_source_whitelist = {};
+
+    @ConfField(description = {"默认的渠道来源", "default source"})
+    public static String default_source = "easyolap";
+
+    @ConfField(description = {"是否开启非iam模式", "whether to enable no iam mode"})
+    public static boolean enable_no_iam_mode = false;
 }

@@ -366,7 +366,7 @@ public abstract class ExternalDatabase<T extends ExternalTable>
     public Set<String> getTableNamesWithLock() {
         makeSureInitialized();
         if (extCatalog.getUseMetaCache().get()) {
-            return Sets.newHashSet(metaCache.listNames());
+            return Sets.newHashSet(listTableNames());
         } else {
             return Sets.newHashSet(tableNameToId.keySet());
         }

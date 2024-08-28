@@ -24,6 +24,7 @@ import org.apache.doris.datasource.DatabaseMetadata;
 import org.apache.doris.datasource.TableMetadata;
 import org.apache.doris.datasource.hive.event.MetastoreNotificationFetchException;
 import org.apache.doris.datasource.property.constants.HMSProperties;
+import org.apache.doris.qe.BDPAuthContext;
 
 import com.aliyun.datalake.metastore.hive2.ProxyMetaStoreClient;
 import com.amazonaws.glue.catalog.metastore.AWSCatalogMetastoreClient;
@@ -62,6 +63,7 @@ import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import shade.doris.hive.org.apache.thrift.TException;
 
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
@@ -89,6 +91,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     private static final short MAX_LIST_PARTITION_NUM = Config.max_hive_list_partition_num;
 
     private Queue<ThriftHMSClient> clientPool = new LinkedList<>();
+
     private boolean isClosed = false;
     private final int poolSize;
     private final HiveConf hiveConf;
@@ -586,8 +589,11 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
         private final IMetaStoreClient client;
         private volatile Throwable throwable;
 
-        private ThriftHMSClient(HiveConf hiveConf) throws MetaException {
+        private String hadoopUserName;
+
+        private ThriftHMSClient(String hadoopUserName, String hadoopUserToken, HiveConf hiveConf) throws MetaException {
             String type = hiveConf.get(HMSProperties.HIVE_METASTORE_TYPE);
+            this.hadoopUserName = hadoopUserName;
             if (HMSProperties.DLF_TYPE.equalsIgnoreCase(type)) {
                 client = RetryingMetaStoreClient.getProxy(hiveConf, DUMMY_HOOK_LOADER,
                         ProxyMetaStoreClient.class.getName());
@@ -595,8 +601,6 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client = RetryingMetaStoreClient.getProxy(hiveConf, DUMMY_HOOK_LOADER,
                         AWSCatalogMetastoreClient.class.getName());
             } else {
-                String hadoopUserToken = System.getenv("HADOOP_USER_TOKEN");
-                String hadoopUserName = System.getenv("HADOOP_USER_NAME");
                 UserGroupInformation ugi = UserGroupInformation.createRemoteUser(hadoopUserName,
                         null, hadoopUserToken);
                 client = ugi.doAs((PrivilegedAction<IMetaStoreClient>) () -> {
@@ -611,12 +615,21 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
             }
         }
 
+        public String getHadoopUserName() {
+            return hadoopUserName;
+        }
+
+        public void setUGI(String hadoopUserName) throws TException {
+            this.hadoopUserName = hadoopUserName;
+            client.setMetaConf("UGI", hadoopUserName);
+        }
+
         public void setThrowable(Throwable throwable) {
             this.throwable = throwable;
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() {
             synchronized (clientPool) {
                 if (isClosed || throwable != null || clientPool.size() > poolSize) {
                     client.close();
@@ -631,12 +644,29 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
+            BDPAuthContext bdpAuthContext = BDPAuthContext.get();
+            Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
             synchronized (clientPool) {
-                ThriftHMSClient client = clientPool.poll();
-                if (client == null) {
-                    return new ThriftHMSClient(hiveConf);
+                try {
+                    ThriftHMSClient client = clientPool.poll();
+                    if (client == null) {
+                        HiveConf conf = new HiveConf(hiveConf);
+                        conf.set("BEE_SOURCE", bdpAuthContext.getSource());
+                        conf.set("BEE_USER", bdpAuthContext.getErp());
+                        client = new ThriftHMSClient(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(),
+                            hiveConf);
+                    } else {
+                        client.client.setMetaConf("BEE_SOURCE", bdpAuthContext.getSource());
+                        client.client.setMetaConf("BEE_USER", bdpAuthContext.getErp());
+                        if (!client.getHadoopUserName().equals(bdpAuthContext.getHadoopUserName())) {
+                            client.setUGI(bdpAuthContext.getHadoopUserName());
+                        }
+                    }
+                    return client;
+                } catch (Exception e) {
+                    LOG.warn("failed to set conf for hive client", e);
+                    throw new MetaException(e.getMessage());
                 }
-                return client;
             }
         } finally {
             Thread.currentThread().setContextClassLoader(classLoader);

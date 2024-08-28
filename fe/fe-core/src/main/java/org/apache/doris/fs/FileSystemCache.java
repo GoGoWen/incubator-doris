@@ -54,6 +54,8 @@ public class FileSystemCache {
     }
 
     public static class FileSystemCacheKey {
+
+        private final String hadoopUserName;
         private final FileSystemType type;
         // eg: hdfs://nameservices1
         private final String fsIdent;
@@ -62,10 +64,12 @@ public class FileSystemCache {
         // only for creating new file system
         private final Configuration conf;
 
-        public FileSystemCacheKey(Pair<FileSystemType, String> fs,
+        public FileSystemCacheKey(String hadoopUserName,
+                Pair<FileSystemType, String> fs,
                 Map<String, String> properties,
                 String bindBrokerName,
                 Configuration conf) {
+            this.hadoopUserName = hadoopUserName;
             this.type = fs.first;
             this.fsIdent = fs.second;
             this.properties = properties;
@@ -73,9 +77,9 @@ public class FileSystemCache {
             this.conf = conf;
         }
 
-        public FileSystemCacheKey(Pair<FileSystemType, String> fs,
+        public FileSystemCacheKey(String hadoopUserName, Pair<FileSystemType, String> fs,
                 Map<String, String> properties, String bindBrokerName) {
-            this(fs, properties, bindBrokerName, null);
+            this(hadoopUserName, fs, properties, bindBrokerName, null);
         }
 
         public Map<String, String> getFsProperties() {
@@ -96,7 +100,7 @@ public class FileSystemCache {
                 return false;
             }
             FileSystemCacheKey o = (FileSystemCacheKey) obj;
-            boolean equalsWithoutBroker = type.equals(o.type)
+            boolean equalsWithoutBroker = hadoopUserName.equals(o.hadoopUserName) && type.equals(o.type)
                     && fsIdent.equals(o.fsIdent)
                     && properties.equals(o.properties);
             if (bindBrokerName == null) {
@@ -108,9 +112,9 @@ public class FileSystemCache {
         @Override
         public int hashCode() {
             if (bindBrokerName == null) {
-                return Objects.hash(properties, fsIdent, type);
+                return Objects.hash(hadoopUserName, properties, fsIdent, type);
             }
-            return Objects.hash(properties, fsIdent, type, bindBrokerName);
+            return Objects.hash(hadoopUserName, properties, fsIdent, type, bindBrokerName);
         }
     }
 }

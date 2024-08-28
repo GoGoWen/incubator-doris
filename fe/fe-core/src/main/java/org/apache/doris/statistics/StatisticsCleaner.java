@@ -28,6 +28,7 @@ import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.util.MasterDaemon;
 import org.apache.doris.datasource.CatalogIf;
 import org.apache.doris.datasource.InternalCatalog;
+import org.apache.doris.datasource.hive.HMSExternalCatalog;
 import org.apache.doris.persist.TableStatsDeletionLog;
 import org.apache.doris.statistics.util.StatisticsUtil;
 
@@ -184,6 +185,9 @@ public class StatisticsCleaner extends MasterDaemon {
     private Map<Long, DatabaseIf> constructDbMap() {
         Map<Long, DatabaseIf> idToDb = Maps.newHashMap();
         for (CatalogIf<? extends DatabaseIf> ctl : idToCatalog.values()) {
+            if (ctl instanceof HMSExternalCatalog) {
+                continue;
+            }
             for (DatabaseIf db : ctl.getAllDbs()) {
                 idToDb.put(db.getId(), db);
             }

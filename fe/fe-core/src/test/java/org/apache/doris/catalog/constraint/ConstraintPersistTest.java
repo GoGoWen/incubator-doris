@@ -35,6 +35,7 @@ import org.apache.doris.nereids.util.RelationUtil;
 import org.apache.doris.persist.AlterConstraintLog;
 import org.apache.doris.persist.EditLog;
 import org.apache.doris.persist.OperationType;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.utframe.TestWithFeService;
 
 import com.google.common.collect.ImmutableList;
@@ -119,6 +120,8 @@ class ConstraintPersistTest extends TestWithFeService implements PlanPatternMatc
 
     @Test
     void dropConstraintLogPersistTest() throws Exception {
+        BDPAuthContext bdpAuthContext = new BDPAuthContext("test", "tets", "olap", "xxxxxxxxxxxxxx");
+        bdpAuthContext.setThreadLocalInfo();
         Config.edit_log_type = "local";
         addConstraint("alter table t1 add constraint pk primary key (k1)");
         addConstraint("alter table t2 add constraint pk primary key (k1)");
@@ -233,6 +236,8 @@ class ConstraintPersistTest extends TestWithFeService implements PlanPatternMatc
 
     @Test
     void addConstraintLogPersistForExternalTableTest() throws Exception {
+        BDPAuthContext bdpAuthContext = new BDPAuthContext("test", "tets", "olap", "xxxxxxxxxxxxxx");
+        bdpAuthContext.setThreadLocalInfo();
         Config.edit_log_type = "local";
         createCatalog("create catalog es properties('type' = 'es', 'elasticsearch.hosts' = 'http://192.168.0.1',"
                 + " 'elasticsearch.username' = 'user1');");
@@ -299,7 +304,8 @@ class ConstraintPersistTest extends TestWithFeService implements PlanPatternMatc
         Config.edit_log_type = "local";
         createCatalog("create catalog es2 properties('type' = 'es', 'elasticsearch.hosts' = 'http://192.168.0.1',"
                 + " 'elasticsearch.username' = 'user1');");
-
+        BDPAuthContext bdpAuthContext = new BDPAuthContext("test", "tets", "olap", "xxxxxxxxxxxxxx");
+        bdpAuthContext.setThreadLocalInfo();
         Env.getCurrentEnv().changeCatalog(connectContext, "es2");
         EsExternalCatalog esCatalog = (EsExternalCatalog) getCatalog("es2");
         EsExternalDatabase db = new EsExternalDatabase(esCatalog, 10002, "es_db1");

@@ -23,10 +23,12 @@ import org.apache.doris.common.DdlException;
 import org.apache.doris.common.ErrorCode;
 import org.apache.doris.common.ErrorReport;
 import org.apache.doris.common.util.AESUtil;
-import org.apache.doris.datasource.CatalogIf;
+import org.apache.doris.common.util.IAMUtil;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.thrift.TBDPUserInfo;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -201,8 +203,15 @@ public class MysqlProto {
                             + " not be equal with decrypted service: " + bdpUserInfo.getSource());
                     return false;
                 }
-                LOG.info("doris username {}, service {}, erp {}, source {}, hadoop_user_name {}, user_token {}",
-                        qualifiedUser, serviceName, bdpUserInfo.getErp(), bdpUserInfo.getSource(),
+                if (!IAMUtil.isSourceInWhitelist(bdpUserInfo.getSource())) {
+                    Preconditions.checkNotNull(bdpUserInfo.getErp(), "erp cannot be null");
+                    Preconditions.checkNotNull(bdpUserInfo.getHadoopUserName(),
+                            "hadoop user name cannot be null");
+                    Preconditions.checkNotNull(bdpUserInfo.getUserToken(),
+                            "hadoop user token cannot be null");
+                }
+                LOG.info("doris username: {}, erp: {}, source: {}, hadoop_user_name: {},"
+                        + " user_token: {}", qualifiedUser, bdpUserInfo.getErp(), bdpUserInfo.getSource(),
                         bdpUserInfo.getHadoopUserName(), bdpUserInfo.getUserToken());
             } catch (Exception e) {
                 context.getState().setError("decrypt bdp user info failed: " + e.getMessage());
@@ -218,11 +227,10 @@ public class MysqlProto {
         String catalogName = null;
         String dbName = null;
         if (bdpUserInfo != null) {
-            context.setErp(bdpUserInfo.getErp());
-            context.setSource(bdpUserInfo.getSource());
-            context.setHadoopUserName(bdpUserInfo.getHadoopUserName());
-            context.setUserToken(bdpUserInfo.getUserToken());
-
+            BDPAuthContext bdpAuthContext = new BDPAuthContext(bdpUserInfo.getErp(), bdpUserInfo.getSource(),
+                    bdpUserInfo.getHadoopUserName(), bdpUserInfo.getUserToken());
+            context.setBdpAuthContext(bdpAuthContext);
+            bdpAuthContext.setThreadLocalInfo();
             if (bdpUserInfo.isSetCatalog()) {
                 catalogName = bdpUserInfo.getCatalog();
             }
@@ -230,6 +238,15 @@ public class MysqlProto {
                 dbName = bdpUserInfo.getDb();
             }
         } else {
+            if (Config.enable_no_iam_mode) {
+                BDPAuthContext bdpAuthContext = new BDPAuthContext("", Config.default_source,
+                        System.getenv("HADOOP_USER_NAME"), System.getenv("HADOOP_USER_TOKEN"));
+                context.setBdpAuthContext(bdpAuthContext);
+                bdpAuthContext.setThreadLocalInfo();
+                LOG.info("set default auth, doris username: {}, erp: {}, source: {}, hadoop_user_name: {},"
+                        + " user_token: {}", qualifiedUser, bdpAuthContext.getErp(), bdpAuthContext.getSource(),
+                        bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken());
+            }
             // set database
             String db = authPacket.getDb();
             if (!Strings.isNullOrEmpty(db)) {
@@ -243,18 +260,6 @@ public class MysqlProto {
                     context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "Only one dot can be in the name: " + db);
                     return false;
                 }
-            }
-        }
-        // check catalog and db exists
-        if (catalogName != null) {
-            CatalogIf catalogIf = context.getEnv().getCatalogMgr().getCatalog(catalogName);
-            if (catalogIf == null) {
-                context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "No match catalog in doris: " + catalogName);
-                return false;
-            }
-            if (catalogIf.getDbNullable(dbName) == null) {
-                context.getState().setError(ErrorCode.ERR_BAD_DB_ERROR, "No match database in doris: " + dbName);
-                return false;
             }
         }
         try {

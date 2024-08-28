@@ -248,6 +248,7 @@ public class HiveScanNode extends FileQueryScanNode {
         HiveMetaStoreCache cache = Env.getCurrentEnv().getExtMetaCacheMgr()
                 .getMetaStoreCache((HMSExternalCatalog) hmsTable.getCatalog());
         Executor scheduleExecutor = Env.getCurrentEnv().getExtMetaCacheMgr().getScheduleExecutor();
+        Executor forkJoinPoolExecutor = Env.getCurrentEnv().getExtMetaCacheMgr().getForkJoinPoolExecutor();
         String bindBrokerName = hmsTable.getCatalog().bindBrokerName();
         AtomicInteger numFinishedPartitions = new AtomicInteger(0);
         CompletableFuture.runAsync(() -> {
@@ -269,7 +270,7 @@ public class HiveScanNode extends FileQueryScanNode {
                             numSplitsPerPartition.set(allFiles.size());
                         }
                         splitAssignment.addToQueue(allFiles);
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         batchException.set(new UserException(e.getMessage(), e));
                     } finally {
                         splittersOnFlight.release();
@@ -285,7 +286,7 @@ public class HiveScanNode extends FileQueryScanNode {
             if (batchException.get() != null) {
                 splitAssignment.setException(batchException.get());
             }
-        });
+        }, forkJoinPoolExecutor);
     }
 
     @Override

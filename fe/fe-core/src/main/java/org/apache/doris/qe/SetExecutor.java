@@ -25,6 +25,9 @@ import org.apache.doris.analysis.SetTransaction;
 import org.apache.doris.analysis.SetUserDefinedVar;
 import org.apache.doris.analysis.SetVar;
 import org.apache.doris.common.DdlException;
+import org.apache.doris.common.ErrorCode;
+import org.apache.doris.common.ErrorReport;
+import org.apache.doris.common.util.IAMUtil;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -57,6 +60,26 @@ public class SetExecutor {
             return;
         } else if (var instanceof SetUserDefinedVar) {
             ConnectContext.get().setUserVar(var);
+        } else if (var.getVariable().equalsIgnoreCase("erp")) {
+            if (ConnectContext.get().getBdpAuthContext() != null
+                    && IAMUtil.isSourceInWhitelist(ConnectContext.get().getBdpAuthContext().getSource())) {
+                ConnectContext.get().getBdpAuthContext().setErp(var.getValue().getStringValue());
+            } else {
+                ErrorReport.reportDdlException(ErrorCode.ERR_INVALID_OPERATION_FOR_IAM, var.getVariable());
+            }
+            LOG.info("succeed to set erp, " + ConnectContext.get().getBdpAuthContext().toString());
+        } else if (var.getVariable().equalsIgnoreCase("hadoop_user_name")) {
+            if (ConnectContext.get().getBdpAuthContext() != null
+                    && IAMUtil.isSourceInWhitelist(ConnectContext.get().getBdpAuthContext().getSource())) {
+                String hadoopUserName = var.getValue().getStringValue();
+                ConnectContext.get().getBdpAuthContext().setHadoopUserName(hadoopUserName);
+                ConnectContext.get().getBdpAuthContext().setUserToken(
+                        IAMUtil.getUserTokenByHadoopUserName(hadoopUserName));
+                LOG.info("succeed to set hadoop_user_name, " + ConnectContext.get().getBdpAuthContext().toString());
+            } else {
+                ErrorReport.reportDdlException(ErrorCode.ERR_INVALID_OPERATION_FOR_IAM, var.getVariable());
+            }
+
         } else {
             VariableMgr.setVar(ctx.getSessionVariable(), var);
         }

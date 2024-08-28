@@ -23,6 +23,7 @@ include "Types.thrift"
 include "Opcodes.thrift"
 include "Partitions.thrift"
 include "Descriptors.thrift"
+include "BDPUserInfo.thrift"
 
 enum TPlanNodeType {
   OLAP_SCAN_NODE,
@@ -542,6 +543,7 @@ struct TMetaScanRange {
   8: optional TTasksMetadataParams tasks_params
   9: optional TPartitionsMetadataParams partitions_params
   10: optional TMetaCacheStatsParams meta_cache_stats_params
+  11: optional BDPUserInfo.TBDPAuthContext bdp_auth_context
 }
 
 // Specification of an individual data range which is held in its entirety

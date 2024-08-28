@@ -128,6 +128,7 @@ Status create_hdfs_builder(const THdfsParams& hdfsParams, const std::string& fs_
         RETURN_IF_ERROR(builder->check_krb_params());
     }
     hdfsBuilderConfSetStr(builder->get(), "ipc.client.fallback-to-simple-auth-allowed", "true");
+    hdfsBuilderConfSetStr(builder->get(), "BEE_COMPUTE", "Doris");
     return Status::OK();
 }
 

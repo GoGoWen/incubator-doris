@@ -463,7 +463,7 @@ public abstract class ExternalCatalog
     public List<String> getDbNames() {
         makeSureInitialized();
         if (useMetaCache.get()) {
-            return metaCache.listNames();
+            return getFilteredDatabaseNames();
         } else {
             return new ArrayList<>(dbNameToId.keySet());
         }

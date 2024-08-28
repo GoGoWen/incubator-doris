@@ -34,6 +34,7 @@ import org.apache.doris.datasource.metacache.MetaCache;
 import org.apache.doris.fs.FileSystemCache;
 import org.apache.doris.nereids.exceptions.NotSupportedException;
 
+import com.alibaba.ttl.threadpool.TtlExecutors;
 import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
@@ -46,6 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 
 /**
  * Cache meta of external catalog
@@ -80,6 +82,8 @@ public class ExternalMetaCacheMgr {
     private ExecutorService fileListingExecutor;
     private ExecutorService scheduleExecutor;
 
+    private ExecutorService forkJoinPoolExecutor;
+
     // catalog id -> HiveMetaStoreCache
     private final Map<Long, HiveMetaStoreCache> cacheMap = Maps.newConcurrentMap();
     // catalog id -> table schema cache
@@ -94,27 +98,30 @@ public class ExternalMetaCacheMgr {
     private final MaxComputeMetadataCacheMgr maxComputeMetadataCacheMgr;
 
     public ExternalMetaCacheMgr() {
-        rowCountRefreshExecutor = ThreadPoolManager.newDaemonFixedThreadPool(
+        rowCountRefreshExecutor = TtlExecutors.getTtlExecutorService(ThreadPoolManager.newDaemonFixedThreadPool(
                 Config.max_external_cache_loader_thread_pool_size,
                 Config.max_external_cache_loader_thread_pool_size * 1000,
-                "RowCountRefreshExecutor", 0, true);
+                "RowCountRefreshExecutor", 0, true));
 
-        commonRefreshExecutor = ThreadPoolManager.newDaemonFixedThreadPool(
+        commonRefreshExecutor = TtlExecutors.getTtlExecutorService(ThreadPoolManager.newDaemonFixedThreadPool(
                 Config.max_external_cache_loader_thread_pool_size,
                 Config.max_external_cache_loader_thread_pool_size * 1000,
-                "CommonRefreshExecutor", 10, true);
+                "CommonRefreshExecutor", 10, true));
 
         // The queue size should be large enough,
         // because there may be thousands of partitions being queried at the same time.
-        fileListingExecutor = ThreadPoolManager.newDaemonFixedThreadPool(
+        fileListingExecutor = TtlExecutors.getTtlExecutorService(ThreadPoolManager.newDaemonFixedThreadPool(
                 Config.max_external_cache_loader_thread_pool_size,
                 Config.max_external_cache_loader_thread_pool_size * 1000,
-                "FileListingExecutor", 10, true);
+                "FileListingExecutor", 10, true));
 
-        scheduleExecutor = ThreadPoolManager.newDaemonFixedThreadPool(
+        scheduleExecutor = TtlExecutors.getTtlExecutorService(ThreadPoolManager.newDaemonFixedThreadPool(
                 Config.max_external_cache_loader_thread_pool_size,
                 Config.max_external_cache_loader_thread_pool_size * 1000,
-                "scheduleExecutor", 10, true);
+                "ScheduleExecutor", 10, true));
+
+        forkJoinPoolExecutor = TtlExecutors.getTtlExecutorService(new ForkJoinPool(Runtime.getRuntime()
+                .availableProcessors()));
 
         fsCache = new FileSystemCache();
         rowCountCache = new ExternalRowCountCache(rowCountRefreshExecutor);
@@ -130,6 +137,10 @@ public class ExternalMetaCacheMgr {
 
     public ExecutorService getScheduleExecutor() {
         return scheduleExecutor;
+    }
+
+    public ExecutorService getForkJoinPoolExecutor() {
+        return forkJoinPoolExecutor;
     }
 
     public HiveMetaStoreCache getMetaStoreCache(HMSExternalCatalog catalog) {

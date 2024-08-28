@@ -20,6 +20,7 @@ package org.apache.doris.nereids.stats;
 import org.apache.doris.analysis.IntLiteral;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.TableIf;
+import org.apache.doris.catalog.TableIf.TableType;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.CascadesContext;
@@ -819,7 +820,7 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
             }
             ColumnStatistic cache;
             if (!FeConstants.enableInternalSchemaDb
-                    || shouldIgnoreThisCol) {
+                    || shouldIgnoreThisCol || table.getType() == TableType.HMS_EXTERNAL_TABLE) {
                 cache = ColumnStatistic.UNKNOWN;
             } else {
                 cache = getColumnStatistic(table, colName, idxId);

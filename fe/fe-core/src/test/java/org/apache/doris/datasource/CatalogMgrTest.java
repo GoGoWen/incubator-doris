@@ -436,7 +436,7 @@ public class CatalogMgrTest extends TestWithFeService {
     public void testAddMultiColumnPartitionsCache() {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
-        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("hiveDb", "hiveTable",
+        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
                 Lists.newArrayList(Type.INT, Type.SMALLINT));
         HivePartitionValues hivePartitionValues = loadPartitionValues(partitionValueCacheKey,
                 Lists.newArrayList("y=2020/m=1", "y=2020/m=2"), metaStoreCache);
@@ -451,7 +451,7 @@ public class CatalogMgrTest extends TestWithFeService {
     public void testDropMultiColumnPartitionsCache() {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
-        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("hiveDb", "hiveTable",
+        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
                 Lists.newArrayList(Type.INT, Type.SMALLINT));
         HivePartitionValues hivePartitionValues = loadPartitionValues(partitionValueCacheKey,
                 Lists.newArrayList("y=2020/m=1", "y=2020/m=2"), metaStoreCache);
@@ -466,7 +466,7 @@ public class CatalogMgrTest extends TestWithFeService {
     public void testAddSingleColumnPartitionsCache() {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
-        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("hiveDb", "hiveTable",
+        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
                 Lists.newArrayList(Type.SMALLINT));
         HivePartitionValues hivePartitionValues = loadPartitionValues(partitionValueCacheKey,
                 Lists.newArrayList("m=1", "m=2"), metaStoreCache);
@@ -482,7 +482,7 @@ public class CatalogMgrTest extends TestWithFeService {
     public void testDropSingleColumnPartitionsCache() {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
-        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("hiveDb", "hiveTable",
+        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
                 Lists.newArrayList(Type.SMALLINT));
         HivePartitionValues hivePartitionValues = loadPartitionValues(partitionValueCacheKey,
                 Lists.newArrayList("m=1", "m=2"), metaStoreCache);
@@ -497,7 +497,7 @@ public class CatalogMgrTest extends TestWithFeService {
     public void testAddPartitionsCacheToLargeTable() {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
-        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("hiveDb", "hiveTable",
+        PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
                 Lists.newArrayList(Type.INT));
         List<String> pNames = new ArrayList<>(100000);
         for (int i = 1; i <= 100000; i++) {

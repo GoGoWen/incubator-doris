@@ -24,8 +24,10 @@ import org.apache.doris.metric.GaugeMetric;
 import org.apache.doris.metric.Metric;
 import org.apache.doris.metric.MetricLabel;
 import org.apache.doris.metric.MetricRepo;
+import org.apache.doris.qe.BDPAuthContext;
 
 import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import lombok.Data;
 import org.apache.logging.log4j.LogManager;
@@ -51,13 +53,13 @@ public class ExternalSchemaCache {
     }
 
     private void init(ExecutorService executor) {
-        CacheFactory schemaCacheeFactory = new CacheFactory(
+        CacheFactory schemaCacheFactory = new CacheFactory(
                 OptionalLong.of(86400L),
                 OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60),
                 Config.max_external_schema_cache_num,
                 false,
                 null);
-        schemaCache = schemaCacheeFactory.buildCache(key -> loadSchema(key), null, executor);
+        schemaCache = schemaCacheFactory.buildCache(key -> loadSchema(key), null, executor);
     }
 
     private void initMetrics() {
@@ -74,6 +76,8 @@ public class ExternalSchemaCache {
     }
 
     private Optional<SchemaCacheValue> loadSchema(SchemaCacheKey key) {
+        // reload sync if connect_context is null
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         Optional<SchemaCacheValue> schema = catalog.getSchema(key.dbName, key.tblName);
         if (LOG.isDebugEnabled()) {
             LOG.debug("load schema for {} in catalog {}", key, catalog.getName());
@@ -82,18 +86,24 @@ public class ExternalSchemaCache {
     }
 
     public Optional<SchemaCacheValue> getSchemaValue(String dbName, String tblName) {
-        SchemaCacheKey key = new SchemaCacheKey(dbName, tblName);
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        SchemaCacheKey key = new SchemaCacheKey(BDPAuthContext.get().getHadoopUserName(), dbName, tblName);
         return schemaCache.get(key);
     }
 
     public void addSchemaForTest(String dbName, String tblName, ImmutableList<Column> schema) {
-        SchemaCacheKey key = new SchemaCacheKey(dbName, tblName);
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        SchemaCacheKey key = new SchemaCacheKey(BDPAuthContext.get().getHadoopUserName(), dbName, tblName);
         schemaCache.put(key, Optional.of(new SchemaCacheValue(schema)));
     }
 
     public void invalidateTableCache(String dbName, String tblName) {
-        SchemaCacheKey key = new SchemaCacheKey(dbName, tblName);
-        schemaCache.invalidate(key);
+        Set<SchemaCacheKey> keys = schemaCache.asMap().keySet();
+        for (SchemaCacheKey key : keys) {
+            if (key.dbName.equals(dbName) && key.tblName.equals(tblName)) {
+                schemaCache.invalidate(key);
+            }
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("invalid schema cache for {}.{} in catalog {}", dbName, tblName, catalog.getName());
         }
@@ -122,10 +132,12 @@ public class ExternalSchemaCache {
 
     @Data
     public static class SchemaCacheKey {
+        private String hadoopUserName;
         private String dbName;
         private String tblName;
 
-        public SchemaCacheKey(String dbName, String tblName) {
+        public SchemaCacheKey(String hadoopUserName, String dbName, String tblName) {
+            this.hadoopUserName = hadoopUserName;
             this.dbName = dbName;
             this.tblName = tblName;
         }
@@ -138,7 +150,9 @@ public class ExternalSchemaCache {
             if (!(obj instanceof SchemaCacheKey)) {
                 return false;
             }
-            return dbName.equals(((SchemaCacheKey) obj).dbName) && tblName.equals(((SchemaCacheKey) obj).tblName);
+            return hadoopUserName.equals(((SchemaCacheKey) obj).hadoopUserName)
+                    && dbName.equals(((SchemaCacheKey) obj).dbName)
+                    && tblName.equals(((SchemaCacheKey) obj).tblName);
         }
 
         @Override
@@ -148,7 +162,8 @@ public class ExternalSchemaCache {
 
         @Override
         public String toString() {
-            return "SchemaCacheKey{" + "dbName='" + dbName + '\'' + ", tblName='" + tblName + '\'' + '}';
+            return "SchemaCacheKey{" + "hadoopUserName='" + hadoopUserName + '\''
+                    + ", dbName='" + dbName + '\'' + ", tblName='" + tblName + '\'' + '}';
         }
     }
 }

@@ -25,7 +25,9 @@ import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.ErrorCode;
 import org.apache.doris.common.ErrorReport;
 import org.apache.doris.mysql.privilege.PrivPredicate;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.thrift.TBDPAuthContext;
 import org.apache.doris.thrift.TIcebergMetadataParams;
 import org.apache.doris.thrift.TIcebergQueryType;
 import org.apache.doris.thrift.TMetaScanRange;
@@ -126,6 +128,11 @@ public class IcebergTableValuedFunction extends MetadataTableValuedFunction {
     @Override
     public TMetaScanRange getMetaScanRange() {
         TMetaScanRange metaScanRange = new TMetaScanRange();
+        if (BDPAuthContext.get() != null) {
+            BDPAuthContext bdpAuthContext = BDPAuthContext.get();
+            metaScanRange.setBdpAuthContext(new TBDPAuthContext(bdpAuthContext.getSource(), bdpAuthContext.getErp(),
+                    bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken()));
+        }
         metaScanRange.setMetadataType(TMetadataType.ICEBERG);
         // set iceberg metadata params
         TIcebergMetadataParams icebergMetadataParams = new TIcebergMetadataParams();
