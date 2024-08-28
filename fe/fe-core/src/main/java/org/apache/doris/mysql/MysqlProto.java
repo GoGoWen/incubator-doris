@@ -253,7 +253,6 @@ public class MysqlProto {
                 }
             }
         }
-
         // check catalog and db exists
         if (catalogName != null) {
             CatalogIf catalogIf = context.getEnv().getCatalogMgr().getCatalog(catalogName);
@@ -278,7 +277,6 @@ public class MysqlProto {
             sendResponsePacket(context);
             return false;
         }
-
         // set resource tag if has
         context.setResourceTags(Env.getCurrentEnv().getAuth().getResourceTags(qualifiedUser));
         return true;

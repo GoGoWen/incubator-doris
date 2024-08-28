@@ -108,12 +108,21 @@ Status create_hdfs_builder(const THdfsParams& hdfsParams, const std::string& fs_
     } else if (hdfsParams.__isset.user) {
         hdfsBuilderSetUserName(builder->get(), hdfsParams.user.c_str());
     }
+    bool getTokenByConf = false;
     // set other conf
     if (hdfsParams.__isset.hdfs_conf) {
         for (const THdfsConf& conf : hdfsParams.hdfs_conf) {
-            hdfsBuilderConfSetStr(builder->get(), conf.key.c_str(), conf.value.c_str());
-                LOG(INFO) << "set hdfs config: " << conf.key << ", value: " << conf.value;
+            LOG(INFO) << "set hdfs config: " << conf.key << ", value: " << conf.value;
+            if (strcmp(conf.key.c_str(), "HADOOP_USER_TOKEN") == 0) {
+                hdfsBuilderSetUserToken(builder->get(), conf.value.c_str());
+                getTokenByConf = true;
+            } else {
+                hdfsBuilderConfSetStr(builder->get(), conf.key.c_str(), conf.value.c_str());
+            }
         }
+    }
+    if (!getTokenByConf && std::getenv("HADOOP_USER_TOKEN") != nullptr) {
+        hdfsBuilderSetUserToken(builder->get(), std::getenv("HADOOP_USER_TOKEN"));
     }
     if (builder->is_kerberos()) {
         RETURN_IF_ERROR(builder->check_krb_params());

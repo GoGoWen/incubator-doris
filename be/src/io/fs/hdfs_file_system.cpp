@@ -115,7 +115,7 @@ Status HdfsFileHandleCache::get_file(const std::shared_ptr<HdfsFileSystem>& fs, 
     bool cache_hit;
     std::string fname = file.string();
     RETURN_IF_ERROR(HdfsFileHandleCache::instance()->cache().get_file_handle(
-            fs->_fs_handle->hdfs_fs, fname, mtime, file_size, false, accessor, &cache_hit));
+            fs->_fs_handle->hdfs_fs, fs->_hdfs_params.user, fname, mtime, file_size, false, accessor, &cache_hit));
     accessor->set_fs(fs);
 
     return Status::OK();
