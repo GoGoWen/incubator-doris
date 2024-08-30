@@ -73,7 +73,6 @@ public class AuthenticatorManager {
         AuthenticateRequest request = new AuthenticateRequest(userName, password.get(), remoteIp);
         AuthenticateResponse response = authenticator.authenticate(request);
         if (!response.isSuccess()) {
-            MysqlProto.sendResponsePacket(context);
             return false;
         }
         if (bdpUserInfo != null && !checkPasswordConsistency(bdpUserInfo, password.get())) {

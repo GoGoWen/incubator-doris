@@ -101,7 +101,6 @@ public class MysqlProto {
         // Server receive request packet from client, we need to determine which request type it is.
         ByteBuffer clientRequestPacket = channel.fetchOnePacket();
         MysqlCapability capability = new MysqlCapability(MysqlProto.readLowestInt4(clientRequestPacket));
-
         // Server receive SSL connection request packet from client.
         ByteBuffer sslConnectionRequest;
         // Server receive authenticate packet from client.
@@ -126,7 +125,6 @@ public class MysqlProto {
                 MysqlSslPacket sslPacket = new MysqlSslPacket();
                 if (!sslPacket.readFrom(sslConnectionRequest)) {
                     ErrorReport.report(ErrorCode.ERR_NOT_SUPPORTED_AUTH_MODE);
-                    sendResponsePacket(context);
                     return false;
                 }
                 // try to establish ssl connection.
@@ -136,7 +134,6 @@ public class MysqlProto {
                     // The ssl handshake phase still uses plaintext.
                     if (!mysqlSslContext.sslExchange(channel)) {
                         ErrorReport.report(ErrorCode.ERR_NOT_SUPPORTED_AUTH_MODE);
-                        sendResponsePacket(context);
                         return false;
                     }
                 } catch (Exception e) {
@@ -164,7 +161,6 @@ public class MysqlProto {
         if (capability.isDeprecatedEOF()) {
             context.getMysqlChannel().setClientDeprecatedEOF();
         }
-
         // we do not save client capability to context, so here we save CLIENT_MULTI_STATEMENTS to MysqlChannel
         if (capability.isClientMultiStatements()) {
             context.getMysqlChannel().setClientMultiStatements();
@@ -173,23 +169,19 @@ public class MysqlProto {
         MysqlAuthPacket authPacket = new MysqlAuthPacket();
         if (!authPacket.readFrom(handshakeResponse)) {
             ErrorReport.report(ErrorCode.ERR_NOT_SUPPORTED_AUTH_MODE);
-            sendResponsePacket(context);
             return false;
         }
         // check capability
         if (!MysqlCapability.isCompatible(context.getServerCapability(), authPacket.getCapability())) {
             // TODO: client return capability can not support
             ErrorReport.report(ErrorCode.ERR_NOT_SUPPORTED_AUTH_MODE);
-            sendResponsePacket(context);
             return false;
         }
         // change the capability of serializer
         context.setCapability(context.getServerCapability());
         serializer.setCapability(context.getCapability());
-
         String qualifiedUser = parseUser(context, authPacket.getAuthResponse(), authPacket.getUser());
         if (qualifiedUser == null) {
-            sendResponsePacket(context);
             return false;
         }
         TBDPUserInfo bdpUserInfo = null;
@@ -274,7 +266,6 @@ public class MysqlProto {
             }
         } catch (DdlException e) {
             context.getState().setError(e.getMysqlErrorCode(), e.getMessage());
-            sendResponsePacket(context);
             return false;
         }
         // set resource tag if has
