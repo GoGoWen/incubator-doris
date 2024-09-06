@@ -44,6 +44,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.Concat;
 import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
 import org.apache.doris.nereids.util.PlanChecker;
 import org.apache.doris.policy.FilterType;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.utframe.TestWithFeService;
 
 import com.google.common.collect.ImmutableList;
@@ -108,6 +109,8 @@ public class TestCheckPrivileges extends TestWithFeService implements GeneratedM
         String table3 = "test_tbl3";
         String table4 = "test_tbl4";
 
+        BDPAuthContext bdpAuthContext = new BDPAuthContext("test", "tets", "olap", "xxxxxxxxxxxxxx");
+        bdpAuthContext.setThreadLocalInfo();
         String view1 = "query_tbl2_view1";
         createView("create view " + internalDb + "."
                 + view1 + " as select * from custom_catalog.test_db." + table2);

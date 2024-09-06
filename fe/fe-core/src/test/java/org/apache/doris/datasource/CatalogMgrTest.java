@@ -57,6 +57,7 @@ import org.apache.doris.mysql.privilege.Auth;
 import org.apache.doris.planner.ColumnBound;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PartitionPrunerV2Base.UniqueId;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.ShowResultSet;
 import org.apache.doris.utframe.TestWithFeService;
@@ -101,7 +102,8 @@ public class CatalogMgrTest extends TestWithFeService {
         ConnectContext rootCtx = createDefaultCtx();
         env = Env.getCurrentEnv();
         auth = env.getAuth();
-
+        BDPAuthContext bdpAuthContext = new BDPAuthContext("test", "tets", "olap", "xxxxxxxxxxxxxx");
+        bdpAuthContext.setThreadLocalInfo();
         // grant with no catalog is switched, internal catalog works.
         CreateRoleStmt createRole1 = (CreateRoleStmt) parseAndAnalyzeStmt("create role role1;", rootCtx);
         auth.createRole(createRole1);

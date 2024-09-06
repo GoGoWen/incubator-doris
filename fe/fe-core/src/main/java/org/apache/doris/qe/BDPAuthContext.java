@@ -32,6 +32,16 @@ public class BDPAuthContext {
 
     private String userToken = null;
 
+    private volatile boolean erpChanged = false;
+
+    public void setErpChanged(boolean erpChanged) {
+        this.erpChanged = erpChanged;
+    }
+
+    public boolean isErpChanged() {
+        return erpChanged;
+    }
+
     public BDPAuthContext() {
     }
 

@@ -349,32 +349,6 @@ if [[ "${MACHINE_OS}" == "Darwin" ]]; then
     fi
 fi
 
-
-hadoop_user_key_value_env=`grep HADOOP_USER_KEY_VALUE $DORIS_HOME/conf/be.conf`
-if [ ! -z $hadoop_user_key_value_env ]; then
-   eval 'export "$hadoop_user_key_value_env"'
-fi
-
-hadoop_user_name_env=`grep HADOOP_USER_NAME $DORIS_HOME/conf/be.conf`
-if [ ! -z $hadoop_user_name_env ]; then
-   eval 'export "$hadoop_user_name_env"'
-fi
-
-hadoop_user_token_env=`grep HADOOP_USER_TOKEN $DORIS_HOME/conf/be.conf`
-if [ ! -z $hadoop_user_token_env ]; then
-   eval 'export "$hadoop_user_token_env"'
-fi
-
-bee_source_env=`grep BEE_SOURCE $DORIS_HOME/conf/be.conf`
-if [ ! -z $bee_source_env ]; then
-   eval 'export "$bee_source_env"'
-fi
-
-bee_user_env=`grep BEE_USER $DORIS_HOME/conf/be.conf`
-if [ ! -z $bee_user_env ]; then
-   eval 'export "$bee_user_env"'
-fi
-
 # set LIBHDFS_OPTS for hadoop libhdfs
 export LIBHDFS_OPTS="${final_java_opt}"
 

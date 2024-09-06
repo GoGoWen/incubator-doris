@@ -35,6 +35,7 @@ import org.apache.doris.datasource.infoschema.ExternalMysqlTable;
 import org.apache.doris.datasource.test.TestExternalCatalog;
 import org.apache.doris.datasource.test.TestExternalTable;
 import org.apache.doris.mysql.privilege.Auth;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.DdlExecutor;
 import org.apache.doris.utframe.TestWithFeService;
@@ -79,6 +80,8 @@ public class RefreshTableTest extends TestWithFeService {
         CatalogIf test1 = env.getCatalogMgr().getCatalog("test1");
         TestExternalTable table = (TestExternalTable) test1.getDbNullable("db1").getTable("tbl11").get();
         Assertions.assertFalse(table.isObjectCreated());
+        BDPAuthContext bdpAuthContext = new BDPAuthContext("test", "tets", "olap", "xxxxxxxxxxxxxx");
+        bdpAuthContext.setThreadLocalInfo();
         long l1 = table.getSchemaUpdateTime();
         Assertions.assertTrue(l1 == 0);
         table.makeSureInitialized();
