@@ -77,7 +77,7 @@ public class Config extends ConfigBase {
                     + "BRIEF is asynchronous output without location information. "
                     + "The performance of the three log output modes increases in turn"},
             options = {"NORMAL", "ASYNC", "BRIEF"})
-    public static String sys_log_mode = "NORMAL";
+    public static String sys_log_mode = "ASYNC";
 
     @ConfField(description = {"FE 日志文件的最大数量。超过这个数量后，最老的日志文件会被删除",
             "The maximum number of FE log files. After exceeding this number, the oldest log file will be deleted"})
