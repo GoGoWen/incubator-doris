@@ -1065,6 +1065,7 @@ public class FrontendServiceImpl implements FrontendService.Iface {
             context.getState().setOk();
         }
         ConnectContext.remove();
+        BDPAuthContext.clear();
         return result;
     }
 
