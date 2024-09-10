@@ -191,6 +191,7 @@ import org.apache.doris.nereids.DorisParser.TableValuedFunctionContext;
 import org.apache.doris.nereids.DorisParser.TimestampaddContext;
 import org.apache.doris.nereids.DorisParser.TimestampdiffContext;
 import org.apache.doris.nereids.DorisParser.TypeConstructorContext;
+import org.apache.doris.nereids.DorisParser.UnicodeStringLiteralContext;
 import org.apache.doris.nereids.DorisParser.UnitIdentifierContext;
 import org.apache.doris.nereids.DorisParser.UnsupportedContext;
 import org.apache.doris.nereids.DorisParser.UpdateAssignmentContext;
@@ -2338,8 +2339,22 @@ public class LogicalPlanBuilder extends DorisParserBaseVisitor<Object> {
         return ((c >= '0') && (c <= '9')) || ((c >= 'A') && (c <= 'F')) || ((c >= 'a') && (c <= 'f'));
     }
 
-    private static String decodeUnicodeLiteral(String rawUnicodeString, StringLiteralContext ctx) {
-        char escape = '\\';
+    private static boolean isValidUnicodeEscape(char c) {
+        return c < 0x7F && c > 0x20 && !isHexDigit(c) && c != '"' && c != '+' && c != '\'';
+    }
+
+    private static String decodeUnicodeLiteral(String rawUnicodeString, UnicodeStringLiteralContext ctx) {
+        char escape;
+        if (ctx.UESCAPE() != null) {
+            String escapeString = ctx.STRING_LITERAL().getText().substring(1,
+                            ctx.STRING_LITERAL().getText().length() - 1).replace("''", "'");
+            Preconditions.checkState(!escapeString.isEmpty(), "Empty Unicode escape character");
+            Preconditions.checkState(escapeString.length() == 1, "Invalid Unicode escape character: " + escapeString);
+            escape = escapeString.charAt(0);
+            Preconditions.checkState(isValidUnicodeEscape(escape), "Invalid Unicode escape character: " + escapeString);
+        } else {
+            escape = '\\';
+        }
         String rawContent = rawUnicodeString.substring(3, rawUnicodeString.length() - 1).replace("''", "'");
         StringBuilder unicodeStringBuilder = new StringBuilder();
         StringBuilder escapedCharacterBuilder = new StringBuilder();
@@ -2409,10 +2424,24 @@ public class LogicalPlanBuilder extends DorisParserBaseVisitor<Object> {
     }
 
     @Override
+    public Literal visitUnicodeStringLiteral(UnicodeStringLiteralContext ctx) {
+        String txt = ctx.STRING_LITERAL().getText();
+        String s = decodeUnicodeLiteral(txt, ctx);
+        if (!SqlModeHelper.hasNoBackSlashEscapes()) {
+            s = LogicalPlanBuilderAssistant.escapeBackSlash(s);
+        }
+
+        int strLength = Utils.containChinese(s) ? s.length() * StringLikeLiteral.CHINESE_CHAR_BYTE_LENGTH : s.length();
+        if (strLength > ScalarType.MAX_VARCHAR_LENGTH) {
+            return new StringLiteral(s);
+        }
+        return new VarcharLiteral(s, strLength);
+    }
+
+    @Override
     public Literal visitStringLiteral(StringLiteralContext ctx) {
         String txt = ctx.STRING_LITERAL().getText();
-        boolean isUnicodeString = txt.startsWith("U&") || txt.startsWith("u&");
-        String s = isUnicodeString ? decodeUnicodeLiteral(txt, ctx) : txt.substring(1, txt.length() - 1);
+        String s = txt.substring(1, txt.length() - 1);
         if (txt.charAt(0) == '\'') {
             // for single quote string, '' should be converted to '
             s = s.replace("''", "'");

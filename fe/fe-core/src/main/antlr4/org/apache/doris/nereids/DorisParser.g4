@@ -879,6 +879,7 @@ constant
     | number                                                                                   #numericLiteral
     | booleanValue                                                                             #booleanLiteral
     | BINARY? STRING_LITERAL                                                                   #stringLiteral
+    | UNICODE_STRING_LITERAL (UESCAPE STRING_LITERAL)?                                         #unicodeStringLiteral
     | LEFT_BRACKET (items+=constant)? (COMMA items+=constant)* RIGHT_BRACKET                   #arrayLiteral
     | LEFT_BRACE (items+=constant COLON items+=constant)?
        (COMMA items+=constant COLON items+=constant)* RIGHT_BRACE                              #mapLiteral
@@ -1321,6 +1322,7 @@ nonReserved
     | TRUNCATE
     | TYPE
     | TYPES
+    | UESCAPE
     | UNCOMMITTED
     | UNLOCK
     | UP
