@@ -38,9 +38,9 @@ import org.apache.doris.persist.OperationType;
 import org.apache.doris.utframe.TestWithFeService;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import mockit.Mock;
 import mockit.MockUp;
-import org.apache.hadoop.util.Lists;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

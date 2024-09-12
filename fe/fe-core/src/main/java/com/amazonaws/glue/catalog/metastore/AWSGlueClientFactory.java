@@ -81,13 +81,7 @@ public final class AWSGlueClientFactory implements GlueClientFactory {
         logger.info("Setting region to : " + regionStr);
         glueClientBuilder.setRegion(regionStr);
       } else {
-        Region currentRegion = Regions.getCurrentRegion();
-        if (currentRegion != null) {
-          logger.info("Using region from ec2 metadata : " + currentRegion.getName());
-          glueClientBuilder.setRegion(currentRegion.getName());
-        } else {
-          logger.info("No region info found, using SDK default region: us-east-1");
-        }
+        logger.info("No region info found, using SDK default region: us-east-1");
       }
 
       glueClientBuilder.setClientConfiguration(buildClientConfiguration(conf));

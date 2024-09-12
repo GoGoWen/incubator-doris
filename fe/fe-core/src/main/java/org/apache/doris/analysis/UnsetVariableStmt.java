@@ -25,7 +25,8 @@ import org.apache.doris.common.UserException;
 import org.apache.doris.mysql.privilege.PrivPredicate;
 import org.apache.doris.qe.ConnectContext;
 
-import com.amazonaws.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
+
 
 // Unset variables statement
 public class UnsetVariableStmt extends StatementBase {
@@ -67,7 +68,7 @@ public class UnsetVariableStmt extends StatementBase {
 
     @Override
     public void analyze(Analyzer analyzer) throws UserException {
-        if (StringUtils.isNullOrEmpty(variable) && !applyToAll) {
+        if (StringUtils.isEmpty(variable) && !applyToAll) {
             throw new AnalysisException("You should specific the unset variable.");
         }
 
@@ -85,7 +86,7 @@ public class UnsetVariableStmt extends StatementBase {
 
         sb.append("UNSET ");
         sb.append(setType).append(" VARIABLE ");
-        if (!StringUtils.isNullOrEmpty(variable)) {
+        if (!StringUtils.isEmpty(variable)) {
             sb.append(variable).append(" ");
         } else if (applyToAll) {
             sb.append("ALL");

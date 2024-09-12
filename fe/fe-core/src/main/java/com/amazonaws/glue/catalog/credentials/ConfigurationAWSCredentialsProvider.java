@@ -23,7 +23,7 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import com.amazonaws.glue.catalog.util.AWSGlueConfig;
-import com.amazonaws.util.StringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
 public class ConfigurationAWSCredentialsProvider implements AWSCredentialsProvider {
@@ -39,8 +39,8 @@ public class ConfigurationAWSCredentialsProvider implements AWSCredentialsProvid
         String accessKey = StringUtils.trim(conf.get(AWSGlueConfig.AWS_GLUE_ACCESS_KEY));
         String secretKey = StringUtils.trim(conf.get(AWSGlueConfig.AWS_GLUE_SECRET_KEY));
         String sessionToken = StringUtils.trim(conf.get(AWSGlueConfig.AWS_GLUE_SESSION_TOKEN));
-        if (!StringUtils.isNullOrEmpty(accessKey) && !StringUtils.isNullOrEmpty(secretKey)) {
-            return (StringUtils.isNullOrEmpty(sessionToken) ? new BasicAWSCredentials(accessKey,
+        if (!StringUtils.isEmpty(accessKey) && !StringUtils.isEmpty(secretKey)) {
+            return (StringUtils.isEmpty(sessionToken) ? new BasicAWSCredentials(accessKey,
                     secretKey) : new BasicSessionCredentials(accessKey, secretKey, sessionToken));
         } else {
             throw new SdkClientException(

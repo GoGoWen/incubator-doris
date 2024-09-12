@@ -34,6 +34,7 @@ import org.apache.doris.common.ErrorReport;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.info.SimpleTableInfo;
 import org.apache.doris.common.security.authentication.HadoopAuthenticator;
+import org.apache.doris.common.security.authentication.SimpleAuthenticationConfig;
 import org.apache.doris.datasource.ExternalDatabase;
 import org.apache.doris.datasource.jdbc.client.JdbcClient;
 import org.apache.doris.datasource.jdbc.client.JdbcClientConfig;
@@ -68,7 +69,7 @@ public class HiveMetadataOps implements ExternalMetadataOps {
         this(catalog, createCachedClient(hiveConf,
                 Math.max(MIN_CLIENT_POOL_SIZE, Config.max_external_cache_loader_thread_pool_size),
                 jdbcClientConfig));
-        hadoopAuthenticator = catalog.getAuthenticator();
+        hadoopAuthenticator = HadoopAuthenticator.getHadoopAuthenticator(new SimpleAuthenticationConfig());
         client.setHadoopAuthenticator(hadoopAuthenticator);
     }
 

@@ -270,7 +270,7 @@ public class PropertyConverterTest extends TestWithFeService {
         Assertions.assertEquals(13, properties.size());
 
         Map<String, String> hdProps = catalog.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(22, hdProps.size());
+        Assertions.assertEquals(15, hdProps.size());
     }
 
     @Test
@@ -288,7 +288,7 @@ public class PropertyConverterTest extends TestWithFeService {
         Assertions.assertEquals(12, properties.size());
 
         Map<String, String> hdProps = catalog.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(21, hdProps.size());
+        Assertions.assertEquals(14, hdProps.size());
     }
 
     @Test
@@ -440,7 +440,7 @@ public class PropertyConverterTest extends TestWithFeService {
         Assertions.assertEquals("s3.us-east-1.amazonaws.com", properties.get(S3Properties.ENDPOINT));
 
         Map<String, String> hdProps = catalog.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(30, hdProps.size());
+        Assertions.assertEquals(23, hdProps.size());
 
         String query = "create catalog hms_glue properties (\n"
                 + "    'type'='hms',\n"
@@ -458,7 +458,7 @@ public class PropertyConverterTest extends TestWithFeService {
         Assertions.assertEquals("s3.us-east-1.amazonaws.com.cn", propertiesNew.get(S3Properties.ENDPOINT));
 
         Map<String, String> hdPropsNew = catalogNew.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(30, hdPropsNew.size());
+        Assertions.assertEquals(23, hdPropsNew.size());
     }
 
     @Test
@@ -494,7 +494,7 @@ public class PropertyConverterTest extends TestWithFeService {
                 + "    'minio.secret_key' = 'skk'\n"
                 + ");";
         testS3CompatibleCatalogProperties(catalogName2, MinioProperties.MINIO_PREFIX,
-                "http://127.0.0.1", query2, 12, 21);
+                "http://127.0.0.1", query2, 12, 14);
 
         String catalogName3 = "hms_obs";
         String query3 = "create catalog hms_obs properties (\n"

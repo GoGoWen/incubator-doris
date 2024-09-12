@@ -20,11 +20,7 @@ package org.apache.doris.common.credentials;
 import com.amazonaws.SdkClientException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.auth.BasicSessionCredentials;
-import com.amazonaws.util.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.s3a.Constants;
 
 public class DataLakeAWSCredentialsProvider implements AWSCredentialsProvider  {
 
@@ -36,16 +32,8 @@ public class DataLakeAWSCredentialsProvider implements AWSCredentialsProvider  {
 
     @Override
     public AWSCredentials getCredentials() {
-        String accessKey = StringUtils.trim(conf.get(Constants.ACCESS_KEY));
-        String secretKey = StringUtils.trim(conf.get(Constants.SECRET_KEY));
-        String sessionToken = StringUtils.trim(conf.get(Constants.SESSION_TOKEN));
-        if (!StringUtils.isNullOrEmpty(accessKey) && !StringUtils.isNullOrEmpty(secretKey)) {
-            return (StringUtils.isNullOrEmpty(sessionToken) ? new BasicAWSCredentials(accessKey,
-                secretKey) : new BasicSessionCredentials(accessKey, secretKey, sessionToken));
-        } else {
-            throw new SdkClientException(
-                "Unable to load AWS credentials from hive conf (fs.s3a.access.key and fs.s3a.secret.key)");
-        }
+        throw new SdkClientException(
+           "Unable to load AWS credentials from hive conf (fs.s3a.access.key and fs.s3a.secret.key)");
     }
 
     @Override

@@ -68,6 +68,7 @@ public abstract class RemoteFileSystem extends PersistentFileSystem {
         } catch (FileNotFoundException e) {
             return new Status(Status.ErrCode.NOT_FOUND, e.getMessage());
         } catch (Exception e) {
+            e.printStackTrace();
             return new Status(Status.ErrCode.COMMON_ERROR, e.getMessage());
         }
         return Status.OK;

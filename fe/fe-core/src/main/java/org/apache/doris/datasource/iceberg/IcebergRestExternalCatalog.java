@@ -22,7 +22,6 @@ import org.apache.doris.datasource.property.PropertyConverter;
 import org.apache.doris.datasource.property.constants.S3Properties;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.aws.AwsClientProperties;
@@ -58,12 +57,6 @@ public class IcebergRestExternalCatalog extends IcebergExternalCatalog {
         String usePahStyle = catalogProperties.getOrDefault(PropertyConverter.USE_PATH_STYLE, "true");
         // Set path style
         conf.set(PropertyConverter.USE_PATH_STYLE, usePahStyle);
-        conf.set(Constants.PATH_STYLE_ACCESS, usePahStyle);
-        // Get AWS client retry limit
-        conf.set(Constants.RETRY_LIMIT, catalogProperties.getOrDefault(Constants.RETRY_LIMIT, "1"));
-        conf.set(Constants.RETRY_THROTTLE_LIMIT, catalogProperties.getOrDefault(Constants.RETRY_THROTTLE_LIMIT, "1"));
-        conf.set(Constants.S3GUARD_CONSISTENCY_RETRY_LIMIT,
-                catalogProperties.getOrDefault(Constants.S3GUARD_CONSISTENCY_RETRY_LIMIT, "1"));
         return conf;
     }
 

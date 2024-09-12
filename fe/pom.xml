@@ -231,7 +231,7 @@ under the License.
         <cos.dependency.scope>compile</cos.dependency.scope>
         <gcs.dependency.scope>compile</gcs.dependency.scope>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <doris.hive.catalog.shade.version>2.1.1</doris.hive.catalog.shade.version>
+        <doris.hive.catalog.shade.version>2.1.0-jd-SNAPSHOT</doris.hive.catalog.shade.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <!--plugin parameters-->
@@ -320,8 +320,6 @@ under the License.
         <arrow.version>17.0.0</arrow.version>
         <!-- hudi -->
         <hudi.version>0.14.1</hudi.version>
-        <presto.hadoop.version>2.7.4-11</presto.hadoop.version>
-        <presto.hive.version>3.0.0-8</presto.hive.version>
 
         <parquet.version>1.13.1</parquet.version>
         <commons-collections.version>3.2.2</commons-collections.version>
@@ -335,7 +333,7 @@ under the License.
         <httpcore.version>4.4.15</httpcore.version>
         <aws-java-sdk.version>1.12.669</aws-java-sdk.version>
         <mariadb-java-client.version>3.0.9</mariadb-java-client.version>
-        <hadoop.version>3.3.6</hadoop.version>
+        <hadoop.version>2.100.72.2023112716-SNAPSHOT</hadoop.version>
         <hbase.version>2.4.9</hbase.version>
         <antlr4.version>4.9.3</antlr4.version>
         <joda.version>2.8.1</joda.version>
@@ -595,7 +593,7 @@ under the License.
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-aliyun</artifactId>
-                <version>${hadoop.version}</version>
+                <version>3.3.6</version>
                 <exclusions>
                     <!-- pls confirm if this is a mandatory dependency  -->
                     <exclusion>
@@ -1139,6 +1137,21 @@ under the License.
                 <version>${spark.version}</version>
                 <scope>provided</scope>
             </dependency>
+
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-yarn-api</artifactId>
+                <version>${hadoop.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-yarn-common</artifactId>
+                <version>${hadoop.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            
             <!-- https://mvnrepository.com/artifact/org.apache.spark/spark-sql_2.12 -->
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -1220,6 +1233,10 @@ under the License.
                 <artifactId>hadoop-common</artifactId>
                 <version>${hadoop.version}</version>
                 <exclusions>
+                    <exclusion>
+                        <groupId>javax.servlet</groupId>
+                        <artifactId>servlet-api</artifactId>
+                    </exclusion>
                     <exclusion>
                         <groupId>jdk.tools</groupId>
                         <artifactId>jdk.tools</artifactId>

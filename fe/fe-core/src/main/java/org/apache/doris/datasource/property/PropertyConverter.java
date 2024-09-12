@@ -20,28 +20,30 @@ package org.apache.doris.datasource.property;
 import org.apache.doris.common.credentials.CloudCredential;
 import org.apache.doris.common.credentials.CloudCredentialWithEndpoint;
 import org.apache.doris.common.util.LocationPath;
+import org.apache.doris.common.util.PrintableMap;
 import org.apache.doris.datasource.CatalogMgr;
 import org.apache.doris.datasource.InitCatalogLog.Type;
 import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
 import org.apache.doris.datasource.property.constants.CosProperties;
 import org.apache.doris.datasource.property.constants.DLFProperties;
+import org.apache.doris.datasource.property.constants.DLFProperties.Site;
 import org.apache.doris.datasource.property.constants.GCSProperties;
 import org.apache.doris.datasource.property.constants.GlueProperties;
 import org.apache.doris.datasource.property.constants.HMSProperties;
 import org.apache.doris.datasource.property.constants.MinioProperties;
 import org.apache.doris.datasource.property.constants.ObsProperties;
+import org.apache.doris.datasource.property.constants.ObsProperties.FS;
 import org.apache.doris.datasource.property.constants.OssProperties;
 import org.apache.doris.datasource.property.constants.PaimonProperties;
 import org.apache.doris.datasource.property.constants.S3Properties;
+import org.apache.doris.datasource.property.constants.S3Properties.Env;
 
 import com.aliyun.datalake.metastore.common.DataLakeConfig;
 import com.amazonaws.glue.catalog.util.AWSGlueConfig;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem;
-import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.TemporaryAWSCredentialsProvider;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -71,7 +73,7 @@ public class PropertyConverter {
      *                 s3.access_key -> AWS_ACCESS_KEY
      * These properties will be used for catalog/resource, and persisted to catalog/resource properties.
      * Some properties like AWS_XXX will be hidden, can find from HIDDEN_KEY in PrintableMap
-     * @see org.apache.doris.common.util.PrintableMap
+     * @see PrintableMap
      */
     public static Map<String, String> convertToMetaProperties(Map<String, String> props) {
         Map<String, String> metaProperties = new HashMap<>();
@@ -85,7 +87,7 @@ public class PropertyConverter {
         } else if (props.containsKey(DLFProperties.ENDPOINT)
                 || props.containsKey(DataLakeConfig.CATALOG_ENDPOINT)) {
             metaProperties = convertToDLFProperties(props, DLFProperties.getCredential(props));
-        } else if (props.containsKey(S3Properties.Env.ENDPOINT)) {
+        } else if (props.containsKey(Env.ENDPOINT)) {
             if (!hasS3Properties(props)) {
                 // checkout env in the end
                 // if meet AWS_XXX properties, convert to s3 properties
@@ -125,7 +127,7 @@ public class PropertyConverter {
             Map<String, String> s3Properties = convertToS3Properties(props, s3Credential);
             String s3CliEndpoint = props.get(S3Properties.ENDPOINT);
             return convertToCompatibleS3Properties(props, s3CliEndpoint, s3Credential, s3Properties);
-        } else if (props.containsKey(S3Properties.Env.ENDPOINT)) {
+        } else if (props.containsKey(Env.ENDPOINT)) {
             // checkout env in the end
             // compatible with the s3,obs,oss,cos when they use aws client.
             CloudCredentialWithEndpoint envCredentials = S3Properties.getEnvironmentCredentialWithEndpoint(props);
@@ -168,7 +170,7 @@ public class PropertyConverter {
             obsProperties.put(ObsProperties.HadoopFsObsConstants.SECRET_KEY, credential.getSecretKey());
         }
         if (credential.isTemporary()) {
-            obsProperties.put(ObsProperties.FS.SESSION_TOKEN, credential.getSessionToken());
+            obsProperties.put(FS.SESSION_TOKEN, credential.getSessionToken());
         }
         for (Map.Entry<String, String> entry : props.entrySet()) {
             if (entry.getKey().startsWith(ObsProperties.OBS_FS_PREFIX)) {
@@ -196,20 +198,20 @@ public class PropertyConverter {
         // Old properties to new properties
         properties.put(S3Properties.ENDPOINT, credential.getEndpoint());
         properties.put(S3Properties.REGION,
-                    checkRegion(credential.getEndpoint(), credential.getRegion(), S3Properties.Env.REGION));
+                    checkRegion(credential.getEndpoint(), credential.getRegion(), Env.REGION));
         properties.put(S3Properties.ACCESS_KEY, credential.getAccessKey());
         properties.put(S3Properties.SECRET_KEY, credential.getSecretKey());
-        if (properties.containsKey(S3Properties.Env.TOKEN)) {
+        if (properties.containsKey(Env.TOKEN)) {
             properties.put(S3Properties.SESSION_TOKEN, credential.getSessionToken());
         }
-        if (properties.containsKey(S3Properties.Env.MAX_CONNECTIONS)) {
-            properties.put(S3Properties.MAX_CONNECTIONS, properties.get(S3Properties.Env.MAX_CONNECTIONS));
+        if (properties.containsKey(Env.MAX_CONNECTIONS)) {
+            properties.put(S3Properties.MAX_CONNECTIONS, properties.get(Env.MAX_CONNECTIONS));
         }
-        if (properties.containsKey(S3Properties.Env.REQUEST_TIMEOUT_MS)) {
-            properties.put(S3Properties.REQUEST_TIMEOUT_MS, properties.get(S3Properties.Env.REQUEST_TIMEOUT_MS));
+        if (properties.containsKey(Env.REQUEST_TIMEOUT_MS)) {
+            properties.put(S3Properties.REQUEST_TIMEOUT_MS, properties.get(Env.REQUEST_TIMEOUT_MS));
         }
-        if (properties.containsKey(S3Properties.Env.CONNECTION_TIMEOUT_MS)) {
-            properties.put(S3Properties.REQUEST_TIMEOUT_MS, properties.get(S3Properties.Env.CONNECTION_TIMEOUT_MS));
+        if (properties.containsKey(Env.CONNECTION_TIMEOUT_MS)) {
+            properties.put(S3Properties.REQUEST_TIMEOUT_MS, properties.get(Env.CONNECTION_TIMEOUT_MS));
         }
         if (isMeta) {
             return properties;
@@ -225,19 +227,6 @@ public class PropertyConverter {
             return PaimonProperties.convertToS3Properties(properties, credential);
         }
         Map<String, String> s3Properties = Maps.newHashMap();
-        String endpoint = properties.get(S3Properties.ENDPOINT);
-        s3Properties.put(Constants.ENDPOINT, endpoint);
-        s3Properties.put(Constants.AWS_REGION,
-                    checkRegion(endpoint, properties.get(S3Properties.REGION), S3Properties.REGION));
-        if (properties.containsKey(S3Properties.MAX_CONNECTIONS)) {
-            s3Properties.put(Constants.MAXIMUM_CONNECTIONS, properties.get(S3Properties.MAX_CONNECTIONS));
-        }
-        if (properties.containsKey(S3Properties.REQUEST_TIMEOUT_MS)) {
-            s3Properties.put(Constants.REQUEST_TIMEOUT, properties.get(S3Properties.REQUEST_TIMEOUT_MS));
-        }
-        if (properties.containsKey(S3Properties.CONNECTION_TIMEOUT_MS)) {
-            s3Properties.put(Constants.SOCKET_TIMEOUT, properties.get(S3Properties.CONNECTION_TIMEOUT_MS));
-        }
         setS3FsAccess(s3Properties, properties, credential);
         s3Properties.putAll(properties);
         // remove extra meta properties
@@ -259,22 +248,12 @@ public class PropertyConverter {
 
     private static void setS3FsAccess(Map<String, String> s3Properties, Map<String, String> properties,
                                       CloudCredential credential) {
-        s3Properties.put(Constants.MAX_ERROR_RETRIES, "2");
         s3Properties.put("fs.s3.impl.disable.cache", "true");
         s3Properties.putIfAbsent("fs.s3.impl", S3AFileSystem.class.getName());
-        String credentialsProviders = getAWSCredentialsProviders(properties);
-        s3Properties.put(Constants.AWS_CREDENTIALS_PROVIDER, credentialsProviders);
-        if (credential.isWhole()) {
-            s3Properties.put(Constants.ACCESS_KEY, credential.getAccessKey());
-            s3Properties.put(Constants.SECRET_KEY, credential.getSecretKey());
-        }
         if (credential.isTemporary()) {
-            s3Properties.put(Constants.SESSION_TOKEN, credential.getSessionToken());
-            s3Properties.put(Constants.AWS_CREDENTIALS_PROVIDER, TemporaryAWSCredentialsProvider.class.getName());
             s3Properties.put("fs.s3.impl.disable.cache", "true");
             s3Properties.put("fs.s3a.impl.disable.cache", "true");
         }
-        s3Properties.put(Constants.PATH_STYLE_ACCESS, properties.getOrDefault(USE_PATH_STYLE, "false"));
         for (Map.Entry<String, String> entry : properties.entrySet()) {
             if (entry.getKey().startsWith(S3Properties.S3_FS_PREFIX)) {
                 s3Properties.put(entry.getKey(), entry.getValue());
@@ -283,15 +262,7 @@ public class PropertyConverter {
     }
 
     public static String getAWSCredentialsProviders(Map<String, String> properties) {
-        String credentialsProviders;
-        String hadoopCredProviders = properties.get(Constants.AWS_CREDENTIALS_PROVIDER);
-        if (hadoopCredProviders != null) {
-            credentialsProviders = hadoopCredProviders;
-        } else {
-            String defaultProviderList = String.join(",", S3Properties.AWS_CREDENTIALS_PROVIDERS);
-            credentialsProviders = properties.getOrDefault(S3Properties.CREDENTIALS_PROVIDER, defaultProviderList);
-        }
-        return credentialsProviders;
+        return null;
     }
 
     private static Map<String, String> convertToGCSProperties(Map<String, String> props, CloudCredential credential) {
@@ -443,7 +414,7 @@ public class PropertyConverter {
             props.put(DataLakeConfig.CATALOG_PROXY_MODE, props.getOrDefault(DLFProperties.PROXY_MODE, "DLF_ONLY"));
             props.put(DataLakeConfig.CATALOG_ACCESS_KEY_ID, credential.getAccessKey());
             props.put(DataLakeConfig.CATALOG_ACCESS_KEY_SECRET, credential.getSecretKey());
-            props.put(DLFProperties.Site.ACCESS_PUBLIC, props.getOrDefault(DLFProperties.ACCESS_PUBLIC, "false"));
+            props.put(Site.ACCESS_PUBLIC, props.getOrDefault(DLFProperties.ACCESS_PUBLIC, "false"));
         }
         String uid = props.get(DataLakeConfig.CATALOG_USER_ID);
         if (Strings.isNullOrEmpty(uid)) {
@@ -461,7 +432,7 @@ public class PropertyConverter {
         if (credential.isTemporary()) {
             props.put(OssProperties.SESSION_TOKEN, credential.getSessionToken());
         }
-        String publicAccess = props.getOrDefault(DLFProperties.Site.ACCESS_PUBLIC, "false");
+        String publicAccess = props.getOrDefault(Site.ACCESS_PUBLIC, "false");
         String region = props.getOrDefault(DataLakeConfig.CATALOG_REGION_ID, props.get(DLFProperties.REGION));
         if (!Strings.isNullOrEmpty(region)) {
             boolean hdfsEnabled = Boolean.parseBoolean(props.getOrDefault(OssProperties.OSS_HDFS_ENABLED, "false"));
@@ -488,7 +459,7 @@ public class PropertyConverter {
         props.put(DLFProperties.PROXY_MODE, props.getOrDefault(DataLakeConfig.CATALOG_PROXY_MODE, "DLF_ONLY"));
         props.put(DLFProperties.ACCESS_KEY, credential.getAccessKey());
         props.put(DLFProperties.SECRET_KEY, credential.getSecretKey());
-        props.put(DLFProperties.ACCESS_PUBLIC, props.getOrDefault(DLFProperties.Site.ACCESS_PUBLIC, "false"));
+        props.put(DLFProperties.ACCESS_PUBLIC, props.getOrDefault(Site.ACCESS_PUBLIC, "false"));
     }
 
     private static String getOssEndpoint(String region, boolean publicAccess) {

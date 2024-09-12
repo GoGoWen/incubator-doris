@@ -233,9 +233,7 @@ Status HdfsFileSystem::exists_impl(const Path& path, bool* res) const {
     //  https://github.com/apache/hadoop/blob/5cda162a804fb0cfc2a5ac0058ab407662c5fb00/
     //  hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/hdfs.c#L1923-L1924
     if (is_exists != 0 && errno != ENOENT) {
-        char* root_cause = hdfsGetLastExceptionRootCause();
-        return Status::IOError("failed to check path existence {}: {}", path.native(),
-                               (root_cause ? root_cause : "unknown"));
+        return Status::IOError("failed to check path existence {}: {}", path.native(), hdfs_error());
     }
 #endif
     *res = (is_exists == 0);

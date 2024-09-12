@@ -36,12 +36,12 @@ import org.apache.doris.statistics.AnalysisInfo.ScheduleType;
 import org.apache.doris.statistics.util.StatisticsUtil;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import mockit.Expectations;
 import mockit.Injectable;
 import mockit.Mock;
 import mockit.MockUp;
 import mockit.Mocked;
-import org.apache.hadoop.util.Lists;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -278,7 +278,7 @@ public class AnalysisManagerTest {
 
             @Mock
             public List<Column> getBaseSchema() {
-                return org.apache.hadoop.util.Lists.newArrayList(c);
+                return Lists.newArrayList(c);
             }
 
             @Mock

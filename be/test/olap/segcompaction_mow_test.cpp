@@ -76,6 +76,7 @@ public:
         options.store_paths = paths;
 
         s_engine = new StorageEngine(options);
+        ExecEnv::GetInstance()->set_master_info(nullptr);
         ExecEnv::GetInstance()->set_storage_engine(s_engine);
 
         Status s = s_engine->open();

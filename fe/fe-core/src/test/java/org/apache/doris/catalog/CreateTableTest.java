@@ -357,7 +357,8 @@ public class CreateTableTest extends TestWithFeService {
         // single partition column with multi keys
         ExceptionChecker
                 .expectThrowsWithMsg(AnalysisException.class,
-                                        "partition item's size out of partition columns: Index: 1, Size: 1",
+                                        "errCode = 2, detailMessage = partition item's size "
+                                        + "out of partition columns: Index: 1, Size: 1",
                                         () -> createTable("create table test.tbl10\n"
                                         + "(k1 int not null, k2 varchar(128), k3 int, v1 int, v2 int)\n"
                                         + "partition by list(k1)\n" + "(\n"
@@ -382,7 +383,8 @@ public class CreateTableTest extends TestWithFeService {
 
         // multi partition columns with multi keys
         ExceptionChecker
-                .expectThrowsWithMsg(AnalysisException.class, "partition item's size out of partition columns: Index: 2, Size: 2",
+                .expectThrowsWithMsg(AnalysisException.class, "errCode = 2, "
+                                + "detailMessage = partition item's size out of partition columns: Index: 2, Size: 2",
                         () -> createTable("create table test.tbl12\n"
                                 + "(k1 int not null, k2 varchar(128) not null, k3 int, v1 int, v2 int)\n"
                                 + "partition by list(k1, k2)\n"
