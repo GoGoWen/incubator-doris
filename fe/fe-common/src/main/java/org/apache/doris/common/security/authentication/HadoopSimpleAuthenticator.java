@@ -17,6 +17,7 @@
 
 package org.apache.doris.common.security.authentication;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -26,9 +27,9 @@ public class HadoopSimpleAuthenticator implements HadoopAuthenticator {
     private final UserGroupInformation ugi;
 
     public HadoopSimpleAuthenticator(SimpleAuthenticationConfig config) {
-        String userToken = System.getenv("HADOOP_USER_TOKEN");
         String hadoopUserName = System.getenv("HADOOP_USER_NAME");
-        if (hadoopUserName == null) {
+        String userToken = System.getenv("HADOOP_USER_TOKEN");
+        if (Strings.isNullOrEmpty(hadoopUserName)) {
             hadoopUserName = "hadoop";
             LOG.warn("{} is unset, use default user: hadoop", AuthenticationConfig.HADOOP_USER_NAME);
         }
