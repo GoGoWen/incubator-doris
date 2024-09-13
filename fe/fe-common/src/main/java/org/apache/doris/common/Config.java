@@ -2811,4 +2811,10 @@ public class Config extends ConfigBase {
 
     @ConfField(description = {"是否开启非iam模式", "whether to enable no iam mode"})
     public static boolean enable_no_iam_mode = false;
+
+    @ConfField (mutable = true, description = {"sql_converter连接超时", "default 5000ms"})
+    public static int sql_converter_connect_timeout_ms = 5000;
+
+    @ConfField (mutable = true, description = {"sql_converter请求超时", "default 5000ms"})
+    public static int sql_converter_read_timeout_ms = 5000;
 }
