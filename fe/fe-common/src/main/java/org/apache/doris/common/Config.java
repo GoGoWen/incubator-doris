@@ -2811,4 +2811,8 @@ public class Config extends ConfigBase {
 
     @ConfField(description = {"是否开启非iam模式", "whether to enable no iam mode"})
     public static boolean enable_no_iam_mode = false;
+
+    @ConfField(mutable = true, description = {"降级到catalog", "fallback to catalog"})
+    public static String sql_fallback_catalog = "";
+
 }
