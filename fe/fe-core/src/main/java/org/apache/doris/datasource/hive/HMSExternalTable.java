@@ -921,4 +921,10 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         String bindBrokerName = catalog.bindBrokerName();
         return cache.getFilesByPartitionsWithoutCache(hivePartitions, bindBrokerName);
     }
+
+    @Override
+    public boolean isPartitionedTable() {
+        makeSureInitialized();
+        return !isView() && remoteTable.getPartitionKeysSize() > 0;
+    }
 }

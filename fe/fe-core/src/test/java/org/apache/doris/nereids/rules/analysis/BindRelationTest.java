@@ -18,11 +18,16 @@
 package org.apache.doris.nereids.rules.analysis;
 
 import org.apache.doris.catalog.Column;
+import org.apache.doris.catalog.Database;
+import org.apache.doris.catalog.DatabaseIf;
 import org.apache.doris.catalog.KeysType;
 import org.apache.doris.catalog.OlapTable;
 import org.apache.doris.catalog.PartitionInfo;
 import org.apache.doris.catalog.RandomDistributionInfo;
 import org.apache.doris.catalog.Type;
+import org.apache.doris.datasource.CatalogIf;
+import org.apache.doris.datasource.ExternalCatalog;
+import org.apache.doris.datasource.hive.HMSExternalCatalog;
 import org.apache.doris.nereids.analyzer.UnboundRelation;
 import org.apache.doris.nereids.pattern.GeneratedPlanPatterns;
 import org.apache.doris.nereids.rules.RulePromise;
@@ -84,12 +89,22 @@ class BindRelationTest extends TestWithFeService implements GeneratedPlanPattern
     @Test
     public void bindExternalRelation() {
         connectContext.setDatabase(DEFAULT_CLUSTER_PREFIX + DB1);
+        String dbName = "external_db";
         String tableName = "external_table";
 
         List<Column> externalTableColumns = ImmutableList.of(
                 new Column("id", Type.INT),
                 new Column("name", Type.VARCHAR)
         );
+
+        ExternalCatalog externalCatalog = new HMSExternalCatalog();
+
+        Database db = new Database(2, dbName) {
+            @Override
+            public CatalogIf getCatalog() {
+                return externalCatalog;
+            }
+        };
 
         OlapTable externalOlapTable = new OlapTable(1, tableName, externalTableColumns, KeysType.DUP_KEYS,
                 new PartitionInfo(), new RandomDistributionInfo(10)) {
@@ -101,6 +116,11 @@ class BindRelationTest extends TestWithFeService implements GeneratedPlanPattern
             @Override
             public boolean hasDeleteSign() {
                 return false;
+            }
+
+            @Override
+            public DatabaseIf getDatabase() {
+                return db;
             }
         };
 
