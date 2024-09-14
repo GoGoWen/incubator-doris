@@ -65,7 +65,6 @@ public final class GlobalVariable {
 
     public static final String ENABLE_FETCH_ICEBERG_STATS = "enable_fetch_iceberg_stats";
 
-    
     @VariableMgr.VarAttr(name = VERSION_COMMENT, flag = VariableMgr.READ_ONLY)
     public static String versionComment = "Doris version "
             + Version.DORIS_BUILD_VERSION + "-" + Version.DORIS_BUILD_SHORT_HASH;
