@@ -17,10 +17,11 @@
 
 package org.apache.doris.plugin.dialect;
 
+import org.apache.doris.common.Config;
+
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import lombok.Data;
-import org.apache.doris.common.Config;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
