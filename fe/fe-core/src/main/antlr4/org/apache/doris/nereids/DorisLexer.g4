@@ -525,7 +525,6 @@ TRUNCATE: 'TRUNCATE';
 TYPE: 'TYPE';
 TYPECAST: 'TYPE_CAST';
 TYPES: 'TYPES';
-UESCAPE: 'UESCAPE';
 UNBOUNDED: 'UNBOUNDED';
 UNCOMMITTED: 'UNCOMMITTED';
 UNINSTALL: 'UNINSTALL';
@@ -595,10 +594,7 @@ STRING_LITERAL
     | '"' ( '\\'. | '""' | ~('"'| '\\') )* '"'
     | 'R\'' (~'\'')* '\''
     | 'R"'(~'"')* '"'
-    ;
-
-UNICODE_STRING_LITERAL
-    : 'U&\'' ( ~'\'' | '\'\'' )* '\''
+    | 'U&\'' ( ~'\'' | '\'\'' )* '\''
     ;
 
 LEADING_STRING

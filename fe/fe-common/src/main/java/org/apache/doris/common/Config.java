@@ -2817,4 +2817,8 @@ public class Config extends ConfigBase {
 
     @ConfField (mutable = true, description = {"sql_converter请求超时", "sql_converter read timeout_ms"})
     public static int sql_converter_read_timeout_ms = 5000;
+
+    @ConfField(mutable = true, description = {"降级到catalog", "fallback to catalog"})
+    public static String sql_fallback_catalog = "";
+
 }

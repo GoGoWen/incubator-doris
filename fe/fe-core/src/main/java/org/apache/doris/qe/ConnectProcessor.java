@@ -203,13 +203,62 @@ public abstract class ConnectProcessor {
 
     // only throw an exception when there is a problem interacting with the requesting client
     protected void handleQuery(MysqlCommand mysqlCommand, String originStmt) throws ConnectionException {
+        String fallbackCatalog = Config.sql_fallback_catalog;
+        boolean shouldFallback = !ctx.getSessionVariable().getSqlDialect().equals("doris")
+                && !Strings.isNullOrEmpty(fallbackCatalog);
         try {
             executeQuery(mysqlCommand, originStmt);
+        } catch (ConnectionException exception) {
+            if (!shouldFallback) {
+                throw exception;
+            }
+        } catch (Exception ignored) {
+            // saved use handleQueryException
+        } finally {
+            if (ctx.getState().getStateType() != MysqlStateType.OK
+                    && shouldFallback) {
+                fallbackHandleQuery(mysqlCommand, originStmt, fallbackCatalog);
+            }
+            return;
+        }
+    }
+
+    private void fallbackHandleQuery(MysqlCommand mysqlCommand,
+                                     String originStmt, String fallbackCatalog) throws ConnectionException {
+        try {
+            String fallbackStmt = forwardToFallbackCatalog(originStmt, fallbackCatalog);
+            executeQuery(mysqlCommand, fallbackStmt);
         } catch (ConnectionException exception) {
             throw exception;
         } catch (Exception ignored) {
             // saved use handleQueryException
         }
+    }
+
+    private static String forwardToFallbackCatalog(String originStmt, String fallbackCatalog) {
+        StringBuilder sqlBuilder = new StringBuilder();
+        sqlBuilder.append("select * from query(catalog=").append(fallbackCatalog).append(",").append("query=");
+        sqlBuilder.append('"').append(escapeSql(originStmt)).append('"').append(");");
+        return sqlBuilder.toString();
+    }
+
+    public static String escapeSql(String input) {
+        if (input == null) {
+            return null;
+        }
+
+        StringBuilder escapedString = new StringBuilder();
+        for (char c : input.toCharArray()) {
+            switch (c) {
+                case '\"':
+                    escapedString.append("\\\""); // 双引号转义为反斜杠加双引号
+                    break;
+                default:
+                    escapedString.append(c);
+                    break;
+            }
+        }
+        return escapedString.toString();
     }
 
     public void executeQuery(MysqlCommand mysqlCommand, String originStmt) throws Exception {
@@ -389,7 +438,7 @@ public abstract class ConnectProcessor {
                     parsedPlan = new ExplainCommand(
                             explainOptions.getExplainLevel(),
                             parsedPlan,
-                            explainOptions.showPlanProcess()
+                        explainOptions.showPlanProcess()
                     );
                 }
 
@@ -426,7 +475,7 @@ public abstract class ConnectProcessor {
                     }
                 } catch (Throwable throwable) {
                     LOG.warn("Convert sql with dialect {} failed, plugin: {}, sql: {}, use origin sql.",
-                                sqlDialect, plugin.getClass().getSimpleName(), originStmt, throwable);
+                            sqlDialect, plugin.getClass().getSimpleName(), originStmt, throwable);
                 }
             }
         }
@@ -600,8 +649,8 @@ public abstract class ConnectProcessor {
         // explain query stmt do not have profile
         if (executor != null && executor.getParsedStmt() != null && !executor.getParsedStmt().isExplain()
                 && (executor.getParsedStmt() instanceof QueryStmt // currently only QueryStmt and insert need profile
-                || executor.getParsedStmt() instanceof LogicalPlanAdapter
-                || executor.getParsedStmt() instanceof InsertStmt)) {
+                        || executor.getParsedStmt() instanceof LogicalPlanAdapter
+                        || executor.getParsedStmt() instanceof InsertStmt)) {
             executor.updateProfile(true);
             StatsErrorEstimator statsErrorEstimator = ConnectContext.get().getStatsErrorEstimator();
             if (statsErrorEstimator != null) {

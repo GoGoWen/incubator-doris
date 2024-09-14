@@ -74,6 +74,7 @@ public class JdbcResource extends Resource {
     public static final String JDBC_SAP_HANA = "jdbc:sap";
     public static final String JDBC_TRINO = "jdbc:trino";
     public static final String JDBC_PRESTO = "jdbc:presto";
+    public static final String JDBC_JDPRESTO = "jdbc:jdpresto";
     public static final String JDBC_OCEANBASE = "jdbc:oceanbase";
     public static final String JDBC_DB2 = "jdbc:db2";
 
@@ -317,7 +318,7 @@ public class JdbcResource extends Resource {
             return SAP_HANA;
         } else if (url.startsWith(JDBC_TRINO)) {
             return TRINO;
-        } else if (url.startsWith(JDBC_PRESTO)) {
+        } else if (url.startsWith(JDBC_PRESTO) || url.startsWith(JDBC_JDPRESTO)) {
             return PRESTO;
         } else if (url.startsWith(JDBC_OCEANBASE)) {
             return OCEANBASE;
