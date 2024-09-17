@@ -95,7 +95,7 @@ public class RefreshManager {
         }
         DatabaseIf db = catalog.getDbOrDdlException(dbName);
         ((ExternalDatabase) db).setUnInitialized(stmt.isInvalidCache());
-
+        Env.getCurrentEnv().getExtMetaCacheMgr().invalidateDbCache(catalog.getId(), dbName);
         ExternalObjectLog log = new ExternalObjectLog();
         log.setCatalogId(catalog.getId());
         log.setDbId(db.getId());
@@ -114,6 +114,7 @@ public class RefreshManager {
         // Because each FE fetch the meta data independently.
         db.ifPresent(e -> {
             e.setUnInitialized(invalidCache);
+            Env.getCurrentEnv().getExtMetaCacheMgr().invalidateDbCache(catalogId, e.getFullName());
             LOG.info("refresh database {} in catalog {} with invalidCache {}", e.getFullName(),
                     catalog.getName(), invalidCache);
         });
