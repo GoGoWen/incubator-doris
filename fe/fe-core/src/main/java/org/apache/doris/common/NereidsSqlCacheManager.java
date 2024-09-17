@@ -104,15 +104,15 @@ public class NereidsSqlCacheManager {
         sqlCacheManager.sqlCaches = sqlCaches;
     }
 
-    private static Cache<String, SqlCacheContext> buildSqlCaches(int sqlCacheNum, long expireAfterAccessSeconds) {
+    private static Cache<String, SqlCacheContext> buildSqlCaches(int sqlCacheNum, long expireAfterWriteSeconds) {
         Caffeine<Object, Object> cacheBuilder = Caffeine.newBuilder()
                 // auto evict cache when jvm memory too low
                 .softValues();
         if (sqlCacheNum > 0) {
             cacheBuilder = cacheBuilder.maximumSize(sqlCacheNum);
         }
-        if (expireAfterAccessSeconds > 0) {
-            cacheBuilder = cacheBuilder.expireAfterAccess(Duration.ofSeconds(expireAfterAccessSeconds));
+        if (expireAfterWriteSeconds > 0) {
+            cacheBuilder = cacheBuilder.expireAfterWrite(Duration.ofSeconds(expireAfterWriteSeconds));
         }
 
         return cacheBuilder.build();

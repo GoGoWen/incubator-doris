@@ -54,7 +54,7 @@ public class ExternalSchemaCache {
 
     private void init(ExecutorService executor) {
         CacheFactory schemaCacheFactory = new CacheFactory(
-                OptionalLong.of(86400L),
+                OptionalLong.of(Config.external_schema_cache_expire_time_minutes_after_write * 60),
                 OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60),
                 Config.max_external_schema_cache_num,
                 false,

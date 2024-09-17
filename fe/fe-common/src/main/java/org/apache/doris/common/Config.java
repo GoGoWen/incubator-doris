@@ -2038,6 +2038,13 @@ public class Config extends ConfigBase {
     public static long max_external_schema_cache_num = 10000;
 
     /**
+     * The expiration time of a cache object after last write of it.
+     * For external schema cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_schema_cache_expire_time_minutes_after_write = 60; // 60 mins
+
+    /**
      * The expiration time of a cache object after last access of it.
      * For external schema cache and hive meta cache.
      */
