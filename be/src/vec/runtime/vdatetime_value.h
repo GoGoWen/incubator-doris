@@ -1229,6 +1229,42 @@ public:
     }
     operator int64_t() const { return to_int64(); }
 
+    template <TimeUnit unit>
+    void unchecked_set_time_unit(uint32_t val) {
+        // is uint so need check upper bound only
+        if constexpr (unit == TimeUnit::YEAR) {
+            date_v2_value_.year_ = val;
+        } else if constexpr (unit == TimeUnit::MONTH) {
+            date_v2_value_.month_ = val;
+        } else if constexpr (unit == TimeUnit::DAY) {
+            date_v2_value_.day_ = val;
+        } else if constexpr (unit == TimeUnit::HOUR) {
+            if constexpr (is_datetime) {
+                date_v2_value_.hour_ = val;
+            } else {
+                DCHECK(false) << "shouldn't set for date";
+            }
+        } else if constexpr (unit == TimeUnit::MINUTE) {
+            if constexpr (is_datetime) {
+                date_v2_value_.minute_ = val;
+            } else {
+                DCHECK(false) << "shouldn't set for date";
+            }
+        } else if constexpr (unit == TimeUnit::SECOND) {
+            if constexpr (is_datetime) {
+                date_v2_value_.second_ = val;
+            } else {
+                DCHECK(false) << "shouldn't set for date";
+            }
+        } else if constexpr (unit == TimeUnit::MICROSECOND) {
+            if constexpr (is_datetime) {
+                date_v2_value_.microsecond_ = val;
+            } else {
+                DCHECK(false) << "shouldn't set for date";
+            }
+        }
+    }
+
     int64_t to_int64() const {
         if constexpr (is_datetime) {
             return (date_v2_value_.year_ * 10000L + date_v2_value_.month_ * 100 +
