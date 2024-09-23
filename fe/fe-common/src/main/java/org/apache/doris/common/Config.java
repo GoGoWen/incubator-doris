@@ -2828,4 +2828,8 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"降级到catalog", "fallback to catalog"})
     public static String sql_fallback_catalog = "";
 
+    @ConfField(mutable = true, description = {"是否忽略hive表的transaction属性",
+            "whether to ignore the transaction property of the hive table"})
+    public static boolean ignore_hive_table_transaction = true;
+
 }
