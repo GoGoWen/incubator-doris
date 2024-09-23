@@ -19,6 +19,7 @@ package org.apache.doris.tablefunction;
 
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.catalog.Column;
+import org.apache.doris.catalog.JdbcResource;
 import org.apache.doris.catalog.JdbcTable;
 import org.apache.doris.catalog.TableIf.TableType;
 import org.apache.doris.common.AnalysisException;
@@ -26,7 +27,9 @@ import org.apache.doris.datasource.jdbc.JdbcExternalCatalog;
 import org.apache.doris.datasource.jdbc.source.JdbcScanNode;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.planner.ScanNode;
+import org.apache.doris.qe.ConnectContext;
 
+import com.google.common.base.Strings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -49,6 +52,20 @@ public class JdbcQueryTableValueFunction extends QueryTableValueFunction {
     @Override
     public ScanNode getScanNode(PlanNodeId id, TupleDescriptor desc) {
         JdbcExternalCatalog catalog = (JdbcExternalCatalog) catalogIf;
+
+        ConnectContext ctx = ConnectContext.get();
+        String databaseName = ctx.getDatabase();
+        if (!Strings.isNullOrEmpty(databaseName)) {
+            Map<String, String> properties = catalog.getProperties();
+            String defaultJdbcUrl = catalog.getJdbcUrl();
+            int lastSlashIndex = defaultJdbcUrl.lastIndexOf('/');
+            if (lastSlashIndex != -1) {
+                String newJdbcUrl = defaultJdbcUrl.substring(0, lastSlashIndex + 1) + databaseName;
+                properties.replace(JdbcResource.JDBC_URL, newJdbcUrl);
+                catalog.modifyCatalogProps(properties);
+            }
+        }
+
         JdbcTable jdbcTable = new JdbcTable(1, desc.getTable().getName(), desc.getTable().getFullSchema(),
                 TableType.JDBC);
         catalog.configureJdbcTable(jdbcTable, desc.getTable().getName());

@@ -204,41 +204,62 @@ public abstract class ConnectProcessor {
     // only throw an exception when there is a problem interacting with the requesting client
     protected void handleQuery(MysqlCommand mysqlCommand, String originStmt) throws ConnectionException {
         String fallbackCatalog = Config.sql_fallback_catalog;
-        boolean shouldFallback = !ctx.getSessionVariable().getSqlDialect().equals("doris")
+        String dialect = ctx.getSessionVariable().getSqlDialect();
+        boolean shouldFallback = !dialect.equals("doris")
                 && !Strings.isNullOrEmpty(fallbackCatalog);
         try {
-            executeQuery(mysqlCommand, originStmt);
-        } catch (ConnectionException exception) {
-            if (!shouldFallback) {
-                throw exception;
+            if (MetricRepo.isInit) {
+                MetricRepo.COUNTER_REQUEST_ALL.increase(1L);
             }
-        } catch (Exception ignored) {
-            // saved use handleQueryException
+
+            // 1、query directly by originStmt
+            handleQueryOnce(mysqlCommand, originStmt);
+
+            // parse or execute Exception
+            // 2、try to query by convertedStmt
+            if (ctx.getState().getStateType() != MysqlStateType.OK) {
+                String convertedStmt = convertOriginStmt(originStmt, dialect);
+                // if originStmt equals convertedStmt just skip this
+                if (!originStmt.equals(convertedStmt)) {
+                    if (MetricRepo.isInit) {
+                        MetricRepo.COUNTER_CONVERT_ALL.increase(1L);
+                    }
+                    handleQueryOnce(mysqlCommand, convertedStmt);
+                }
+            }
         } finally {
-            if (ctx.getState().getStateType() != MysqlStateType.OK
-                    && shouldFallback) {
-                fallbackHandleQuery(mysqlCommand, originStmt, fallbackCatalog);
+            // 3、try to query by fallback catalog
+            if (ctx.getState().getStateType() != MysqlStateType.OK && shouldFallback) {
+                if (MetricRepo.isInit) {
+                    MetricRepo.COUNTER_FALLBACK_ALL.increase(1L);
+                }
+
+                handleQueryOnce(mysqlCommand,
+                        forwardToFallbackCatalog(originStmt, fallbackCatalog, dialect));
             }
-            return;
         }
     }
 
-    private void fallbackHandleQuery(MysqlCommand mysqlCommand,
-                                     String originStmt, String fallbackCatalog) throws ConnectionException {
+    private void handleQueryOnce(MysqlCommand mysqlCommand,
+                                     String originStmt) throws ConnectionException {
         try {
-            String fallbackStmt = forwardToFallbackCatalog(originStmt, fallbackCatalog);
-            executeQuery(mysqlCommand, fallbackStmt);
+            executeQuery(mysqlCommand, originStmt);
         } catch (ConnectionException exception) {
             throw exception;
         } catch (Exception ignored) {
             // saved use handleQueryException
+        } catch (Throwable throwable) {
+            // parse or execute Exception
         }
     }
 
-    private static String forwardToFallbackCatalog(String originStmt, String fallbackCatalog) {
+    private static String forwardToFallbackCatalog(String originStmt, String fallbackCatalog, String dialect) {
         StringBuilder sqlBuilder = new StringBuilder();
-        sqlBuilder.append("select * from query(catalog=").append(fallbackCatalog).append(",").append("query=");
-        sqlBuilder.append('"').append(escapeSql(originStmt)).append('"').append(");");
+        sqlBuilder.append("SET sql_dialect=doris;select * from query('catalog'='");
+        sqlBuilder.append(fallbackCatalog).append("',");
+        sqlBuilder.append("'query'=").append('"');
+        sqlBuilder.append(escapeSql(originStmt));
+        sqlBuilder.append('"').append(");SET sql_dialect=").append(dialect).append(";");
         return sqlBuilder.toString();
     }
 
@@ -262,12 +283,7 @@ public abstract class ConnectProcessor {
     }
 
     public void executeQuery(MysqlCommand mysqlCommand, String originStmt) throws Exception {
-        if (MetricRepo.isInit) {
-            MetricRepo.COUNTER_REQUEST_ALL.increase(1L);
-        }
-
-        String convertedStmt = convertOriginStmt(originStmt);
-        String sqlHash = DigestUtils.md5Hex(convertedStmt);
+        String sqlHash = DigestUtils.md5Hex(originStmt);
         ctx.setSqlHash(sqlHash);
 
         SessionVariable sessionVariable = ctx.getSessionVariable();
@@ -293,15 +309,15 @@ public abstract class ConnectProcessor {
 
             if (cachedStmts == null) {
                 try {
-                    stmts = new NereidsParser().parseSQL(convertedStmt, sessionVariable);
+                    stmts = new NereidsParser().parseSQL(originStmt, sessionVariable);
                 } catch (NotSupportedException e) {
                     // Parse sql failed, audit it and return
-                    handleQueryException(e, convertedStmt, null, null);
+                    handleQueryException(e, originStmt, null, null);
                     return;
                 } catch (ParseException e) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Nereids parse sql failed. Reason: {}. Statement: \"{}\".",
-                                e.getMessage(), convertedStmt);
+                                e.getMessage(), originStmt);
                     }
                     // ATTN: Do not set nereidsParseException in this case.
                     // Because ParseException means the sql is not supported by Nereids.
@@ -311,7 +327,7 @@ public abstract class ConnectProcessor {
                     // TODO: We should catch all exception here until we support all query syntax.
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Nereids parse sql failed with other exception. Reason: {}. Statement: \"{}\".",
-                                e.getMessage(), convertedStmt);
+                                e.getMessage(), originStmt);
                     }
                     nereidsParseException = e;
                 }
@@ -321,7 +337,7 @@ public abstract class ConnectProcessor {
         // stmts == null when Nereids cannot planner this query or Nereids is disabled.
         if (stmts == null) {
             try {
-                stmts = parse(convertedStmt);
+                stmts = parse(originStmt);
             } catch (Throwable throwable) {
                 // if NereidsParser and oldParser both failed,
                 // prove is a new feature implemented only on the nereids,
@@ -330,7 +346,7 @@ public abstract class ConnectProcessor {
                     throwable = nereidsParseException;
                 }
                 // Parse sql failed, audit it and return
-                handleQueryException(throwable, convertedStmt, null, null);
+                handleQueryException(throwable, originStmt, null, null);
                 return;
             }
         }
@@ -339,16 +355,16 @@ public abstract class ConnectProcessor {
         // if stmts.size() > 1, split originStmt to multi singleStmts
         if (stmts.size() > 1) {
             try {
-                origSingleStmtList = SqlUtils.splitMultiStmts(convertedStmt);
+                origSingleStmtList = SqlUtils.splitMultiStmts(originStmt);
             } catch (Exception ignore) {
-                LOG.warn("Try to parse multi origSingleStmt failed, originStmt: \"{}\"", convertedStmt);
+                LOG.warn("Try to parse multi origSingleStmt failed, originStmt: \"{}\"", originStmt);
             }
         }
         long parseSqlFinishTime = System.currentTimeMillis();
 
         boolean usingOrigSingleStmt = origSingleStmtList != null && origSingleStmtList.size() == stmts.size();
         for (int i = 0; i < stmts.size(); ++i) {
-            String auditStmt = usingOrigSingleStmt ? origSingleStmtList.get(i) : convertedStmt;
+            String auditStmt = usingOrigSingleStmt ? origSingleStmtList.get(i) : originStmt;
             try {
                 ctx.getState().reset();
                 if (i > 0) {
@@ -460,9 +476,9 @@ public abstract class ConnectProcessor {
         return null;
     }
 
-    private String convertOriginStmt(String originStmt) {
+    private String convertOriginStmt(String originStmt, String dialect) {
         String convertedStmt = originStmt;
-        @Nullable Dialect sqlDialect = Dialect.getByName(ctx.getSessionVariable().getSqlDialect());
+        @Nullable Dialect sqlDialect = Dialect.getByName(dialect);
         if (sqlDialect != null && sqlDialect != Dialect.DORIS) {
             PluginMgr pluginMgr = Env.getCurrentEnv().getPluginMgr();
             List<DialectConverterPlugin> plugins = pluginMgr.getActiveDialectPluginList(sqlDialect);

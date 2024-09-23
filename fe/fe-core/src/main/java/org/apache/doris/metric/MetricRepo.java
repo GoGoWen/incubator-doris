@@ -132,6 +132,11 @@ public final class MetricRepo {
     public static GaugeMetricImpl<Double> GAUGE_REQUEST_PER_SECOND;
     public static GaugeMetricImpl<Double> GAUGE_QUERY_ERR_RATE;
     public static GaugeMetricImpl<Long> GAUGE_MAX_TABLET_COMPACTION_SCORE;
+
+    // statistics sql convert and fallback to catalog
+    public static LongCounterMetric COUNTER_CONVERT_ALL;
+    public static LongCounterMetric COUNTER_FALLBACK_ALL;
+
     private static Map<Pair<EtlJobType, JobState>, Long> loadJobNum = Maps.newHashMap();
 
     private static ScheduledThreadPoolExecutor metricTimer = ThreadPoolManager.newDaemonScheduledThreadPool(1,
@@ -345,6 +350,12 @@ public final class MetricRepo {
             new LongCounterMetric("query_rpc_failed", MetricUnit.NOUNIT, ""));
         BE_COUNTER_QUERY_RPC_SIZE = addLabeledMetrics("be", () ->
             new LongCounterMetric("query_rpc_size", MetricUnit.BYTES, ""));
+
+        // statistics sql convert and fallback to catalog
+        COUNTER_CONVERT_ALL = new LongCounterMetric("convert_total", MetricUnit.REQUESTS, "total convert request");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_CONVERT_ALL);
+        COUNTER_FALLBACK_ALL = new LongCounterMetric("fallback_total", MetricUnit.REQUESTS, "total fallback request");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_FALLBACK_ALL);
 
         // cache
         COUNTER_CACHE_ADDED_SQL = new LongCounterMetric("cache_added", MetricUnit.REQUESTS,

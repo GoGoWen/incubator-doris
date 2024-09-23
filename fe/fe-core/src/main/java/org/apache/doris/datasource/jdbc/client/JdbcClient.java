@@ -25,7 +25,9 @@ import org.apache.doris.common.DdlException;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.datasource.jdbc.JdbcIdentifierMapping;
 import org.apache.doris.datasource.jdbc.util.JdbcFieldSchema;
+import org.apache.doris.qe.ConnectContext;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.zaxxer.hikari.HikariDataSource;
@@ -224,8 +226,16 @@ public abstract class JdbcClient {
      */
     public List<Column> getColumnsFromQuery(String query) {
         Connection conn = getConnection();
+        ConnectContext ctx = ConnectContext.get();
         List<Column> columns = Lists.newArrayList();
         try {
+            String databaseName = ctx.getDatabase();
+            if (!Strings.isNullOrEmpty(databaseName)) {
+                conn.setSchema(databaseName);
+                Statement stmt = conn.createStatement();
+                stmt.executeUpdate("USE " + databaseName);
+            }
+
             PreparedStatement pstmt = conn.prepareStatement(query);
             ResultSetMetaData metaData = pstmt.getMetaData();
             if (metaData == null) {
