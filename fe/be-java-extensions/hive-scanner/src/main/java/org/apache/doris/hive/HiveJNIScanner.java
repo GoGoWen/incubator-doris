@@ -17,14 +17,12 @@
 
 package org.apache.doris.hive;
 
-import org.apache.doris.avro.S3Utils;
 import org.apache.doris.common.jni.JniScanner;
 import org.apache.doris.common.jni.vec.ColumnType;
 import org.apache.doris.common.jni.vec.TableSchema;
 import org.apache.doris.thrift.TFileFormatType;
 import org.apache.doris.thrift.TFileType;
 
-import io.trino.spi.classloader.ThreadContextClassLoader;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -41,11 +39,13 @@ import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -94,6 +94,15 @@ public class HiveJNIScanner extends JniScanner {
         this.fieldInspectors = new ObjectInspector[requiredFields.length];
     }
 
+    private void processHDFSConf(String beeUser, String source, JobConf jobConf) {
+        if (!StringUtils.isEmpty(beeUser)) {
+            jobConf.set(HiveProperties.BEE_USER, beeUser);
+        }
+        if (!StringUtils.isEmpty(source)) {
+            jobConf.set(HiveProperties.BEE_SOURCE, source);
+        }
+    }
+
     private void processS3Conf(String accessKey, String secretKey, String endpoint,
             String region, JobConf jobConf) {
         if (!StringUtils.isEmpty(accessKey) && !StringUtils.isEmpty(secretKey)) {
@@ -115,8 +124,12 @@ public class HiveJNIScanner extends JniScanner {
         Properties properties = createProperties();
         JobConf jobConf = makeJobConf(properties);
         switch (fileType) {
-            case FILE_LOCAL:
             case FILE_HDFS:
+                String beeUser = requiredParams.get(HiveProperties.BEE_USER);
+                String source = requiredParams.get(HiveProperties.BEE_SOURCE);
+                processHDFSConf(beeUser, source, jobConf);
+                break;
+            case FILE_LOCAL:
                 break;
             case FILE_S3:
                 String accessKey = requiredParams.get(HiveProperties.S3_ACCESS_KEY);
@@ -132,7 +145,23 @@ public class HiveJNIScanner extends JniScanner {
         Path path = new Path(uri);
         FileSplit fileSplit = new FileSplit(path, splitStartOffset, splitSize, (String[]) null);
         InputFormat<?, ?> inputFormatClass = createInputFormat(jobConf, hiveFileContext.getInputFormat());
-        reader = (RecordReader<Writable, Writable>) inputFormatClass.getRecordReader(fileSplit, jobConf, Reporter.NULL);
+        UserGroupInformation userGroupInformation = null;
+        if (requiredParams.get(HiveProperties.HADOOP_USER_NAME) != null) {
+            String hadoopUserName = requiredParams.get(HiveProperties.HADOOP_USER_NAME);
+            String hadoopUserToken = requiredParams.get(HiveProperties.HADOOP_USER_TOKEN);
+            userGroupInformation = UserGroupInformation.createRemoteUser(hadoopUserName, null, hadoopUserToken);
+        }
+
+        reader = userGroupInformation == null ? (RecordReader<Writable, Writable>) inputFormatClass.getRecordReader(
+                fileSplit, jobConf, Reporter.NULL) : userGroupInformation.doAs(
+                        (PrivilegedAction<RecordReader<Writable, Writable>>) () -> {
+                            try {
+                                    return (RecordReader<Writable, Writable>) inputFormatClass.getRecordReader(
+                                            fileSplit, jobConf, Reporter.NULL);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                        });
         deserializer = getDeserializer(jobConf, properties, hiveFileContext.getSerde());
         rowInspector = getTableObjectInspector(deserializer);
         for (int i = 0; i < requiredFields.length; i++) {

@@ -31,6 +31,7 @@ import com.google.common.base.Strings;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 
 public class FileFormatUtils {
@@ -205,7 +206,7 @@ public class FileFormatUtils {
             }
             throw new AnalysisException("Invalid struct type: " + typeStr);
         } else {
-            throw new AnalysisException("Unsupported type: " + typeStr);
+            throw new AnalysisException("Unsupported column type: " + typeStr);
         }
     }
 

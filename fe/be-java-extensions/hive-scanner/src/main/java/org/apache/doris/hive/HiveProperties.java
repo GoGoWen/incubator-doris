@@ -27,6 +27,15 @@ public class HiveProperties {
     protected static final String FILE_TYPE = "file_type";
     protected static final String FILE_FORMAT = "file_format";
     protected static final String URI = "uri";
+
+    protected static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
+
+    protected static final String HADOOP_USER_TOKEN = "HADOOP_USER_TOKEN";
+
+    protected static final String BEE_SOURCE = "BEE_SOURCE";
+
+    protected static final String BEE_USER = "BEE_USER";
+
     protected static final String S3_ACCESS_KEY = "s3.access_key";
     protected static final String S3_SECRET_KEY = "s3.secret_key";
     protected static final String S3_ENDPOINT = "s3.endpoint";

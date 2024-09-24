@@ -74,7 +74,7 @@ Status HiveJNIReader::init_fetch_table_reader(
             {"columns_types", columns_types.str()},
             {"split_start_offset", std::to_string(_range.start_offset)},
             {"split_size", std::to_string(_range.size)}};
-    if (type == TFileType::FILE_S3) {
+    if (type == TFileType::FILE_S3 || type == TFileType::FILE_HDFS) {
         required_params.insert(_params.properties.begin(), _params.properties.end());
     }
     _jni_connector = std::make_unique<JniConnector>("org/apache/doris/hive/HiveJNIScanner",

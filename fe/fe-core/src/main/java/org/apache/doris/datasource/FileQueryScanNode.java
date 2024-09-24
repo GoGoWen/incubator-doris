@@ -38,6 +38,7 @@ import org.apache.doris.datasource.hive.AcidInfo.DeleteDeltaInfo;
 import org.apache.doris.datasource.hive.source.HiveScanNode;
 import org.apache.doris.datasource.hive.source.HiveSplit;
 import org.apache.doris.planner.PlanNodeId;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
@@ -433,7 +434,6 @@ public abstract class FileQueryScanNode extends FileScanNode {
 
             if (locationType == TFileType.FILE_BROKER) {
                 params.setProperties(locationProperties);
-
                 if (!params.isSetBrokerAddresses()) {
                     FsBroker broker;
                     if (brokerName != null) {
@@ -450,6 +450,22 @@ public abstract class FileQueryScanNode extends FileScanNode {
                         throw new UserException("No alive broker.");
                     }
                     params.addToBrokerAddresses(new TNetworkAddress(broker.host, broker.port));
+                }
+            } else {
+                if (BDPAuthContext.get() != null) {
+                    BDPAuthContext bdpAuthContext = BDPAuthContext.get();
+                    if (bdpAuthContext.getHadoopUserName() != null) {
+                        params.putToProperties("HADOOP_USER_NAME", bdpAuthContext.getHadoopUserName());
+                    }
+                    if (bdpAuthContext.getErp() != null) {
+                        params.putToProperties("BEE_USER", bdpAuthContext.getErp());
+                    }
+                    if (bdpAuthContext.getSource() != null) {
+                        params.properties.put("BEE_SOURCE", bdpAuthContext.getSource());
+                    }
+                    if (bdpAuthContext.getUserToken() != null) {
+                        params.properties.put("HADOOP_USER_TOKEN", bdpAuthContext.getUserToken());
+                    }
                 }
             }
         } else if ((locationType == TFileType.FILE_S3 || locationType == TFileType.FILE_LOCAL)

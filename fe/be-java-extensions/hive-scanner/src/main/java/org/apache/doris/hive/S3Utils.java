@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.avro;
+package org.apache.doris.hive;
 
 import org.apache.commons.lang3.StringUtils;
 
