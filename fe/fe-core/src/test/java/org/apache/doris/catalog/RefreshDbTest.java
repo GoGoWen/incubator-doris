@@ -18,16 +18,27 @@
 package org.apache.doris.catalog;
 
 import org.apache.doris.analysis.CreateCatalogStmt;
+import org.apache.doris.analysis.CreateDbStmt;
+import org.apache.doris.analysis.CreateTableStmt;
 import org.apache.doris.analysis.CreateUserStmt;
 import org.apache.doris.analysis.DropCatalogStmt;
+import org.apache.doris.analysis.DropDbStmt;
+import org.apache.doris.analysis.DropTableStmt;
 import org.apache.doris.analysis.GrantStmt;
 import org.apache.doris.analysis.RefreshDbStmt;
 import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.common.AnalysisException;
+import org.apache.doris.common.DdlException;
 import org.apache.doris.common.ExceptionChecker;
 import org.apache.doris.common.FeConstants;
+import org.apache.doris.common.UserException;
 import org.apache.doris.datasource.CatalogIf;
+import org.apache.doris.datasource.ExternalCatalog;
 import org.apache.doris.datasource.ExternalDatabase;
+import org.apache.doris.datasource.TestHMSCachedClient;
+import org.apache.doris.datasource.hive.HMSExternalCatalog;
+import org.apache.doris.datasource.hive.HiveMetadataOps;
+import org.apache.doris.datasource.operations.ExternalMetadataOps;
 import org.apache.doris.datasource.test.TestExternalCatalog;
 import org.apache.doris.datasource.test.TestExternalDatabase;
 import org.apache.doris.datasource.test.TestExternalTable;
@@ -38,6 +49,7 @@ import org.apache.doris.utframe.TestWithFeService;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import mockit.Expectations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +59,8 @@ import java.util.Map;
 public class RefreshDbTest extends TestWithFeService {
     private static Env env;
     private ConnectContext rootCtx;
+
+    private ExternalMetadataOps metadataOps;
 
     @Override
     protected void runBeforeAll() throws Exception {

@@ -210,9 +210,8 @@ public class MysqlProto {
                     Preconditions.checkNotNull(bdpUserInfo.getUserToken(),
                             "hadoop user token cannot be null");
                 }
-                LOG.info("doris username: {}, erp: {}, source: {}, hadoop_user_name: {},"
-                        + " user_token: {}", qualifiedUser, bdpUserInfo.getErp(), bdpUserInfo.getSource(),
-                        bdpUserInfo.getHadoopUserName(), bdpUserInfo.getUserToken());
+                LOG.info("doris username: {}, erp: {}, source: {}, hadoop_user_name: {}",
+                        qualifiedUser, bdpUserInfo.getErp(), bdpUserInfo.getSource(), bdpUserInfo.getHadoopUserName());
             } catch (Exception e) {
                 context.getState().setError("decrypt bdp user info failed: " + e.getMessage());
                 LOG.warn("decrypt bdp user info failed", e);
@@ -239,13 +238,14 @@ public class MysqlProto {
             }
         } else {
             if (Config.enable_no_iam_mode) {
-                BDPAuthContext bdpAuthContext = new BDPAuthContext("", Config.default_source,
+                String erp = System.getenv("BEE_USER");
+                BDPAuthContext bdpAuthContext = new BDPAuthContext(erp == null ? "" : erp, Config.default_source,
                         System.getenv("HADOOP_USER_NAME"), System.getenv("HADOOP_USER_TOKEN"));
                 context.setBdpAuthContext(bdpAuthContext);
                 bdpAuthContext.setThreadLocalInfo();
-                LOG.info("set default auth, doris username: {}, erp: {}, source: {}, hadoop_user_name: {},"
-                        + " user_token: {}", qualifiedUser, bdpAuthContext.getErp(), bdpAuthContext.getSource(),
-                        bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken());
+                LOG.info("set default auth, doris username: {}, erp: {}, source: {}, hadoop_user_name: {}",
+                        qualifiedUser, bdpAuthContext.getErp(), bdpAuthContext.getSource(),
+                        bdpAuthContext.getHadoopUserName());
             }
             // set database
             String db = authPacket.getDb();

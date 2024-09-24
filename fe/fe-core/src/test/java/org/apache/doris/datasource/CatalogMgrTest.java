@@ -53,6 +53,7 @@ import org.apache.doris.datasource.hive.HiveMetaStoreCache.FileCacheKey;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache.FileCacheValue;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache.HivePartitionValues;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache.PartitionValueCacheKey;
+import org.apache.doris.datasource.hive.HiveMetadataOps;
 import org.apache.doris.mysql.privilege.Auth;
 import org.apache.doris.planner.ColumnBound;
 import org.apache.doris.planner.ListPartitionPrunerV2;
@@ -170,6 +171,14 @@ public class CatalogMgrTest extends TestWithFeService {
             tbl.setNewFullSchema(schema);
             db.addTableForTest(tbl);
             hmsCatalog.addDatabaseForTest(db);
+            hmsCatalog.makeSureInitialized();
+            hmsCatalog.metadataOps = new HiveMetadataOps(hmsCatalog,
+                    new TestHMSCachedClient() {
+                @Override
+                public List<String> getAllDatabases() {
+                    return Lists.newArrayList("tpch");
+                }
+            });
         } else if (catalog instanceof EsExternalCatalog) {
             EsExternalCatalog esCatalog = (EsExternalCatalog) catalog;
             EsExternalDatabase db = new EsExternalDatabase(esCatalog, 10002, "es_db1");

@@ -662,6 +662,9 @@ public abstract class ExternalCatalog
         if (dbName.equals(MysqlDb.DATABASE_NAME)) {
             return new ExternalMysqlDatabase(this, dbId);
         }
+        if (metadataOps != null && !metadataOps.databaseExist(dbName)) {
+            return null;
+        }
         switch (logType) {
             case HMS:
                 return new HMSExternalDatabase(this, dbId, dbName);
