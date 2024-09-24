@@ -134,7 +134,6 @@ public final class MetricRepo {
     public static GaugeMetricImpl<Long> GAUGE_MAX_TABLET_COMPACTION_SCORE;
 
     // statistics sql convert and fallback to catalog
-    public static LongCounterMetric COUNTER_CONVERT_ALL;
     public static LongCounterMetric COUNTER_FALLBACK_ALL;
 
     private static Map<Pair<EtlJobType, JobState>, Long> loadJobNum = Maps.newHashMap();
@@ -352,8 +351,6 @@ public final class MetricRepo {
             new LongCounterMetric("query_rpc_size", MetricUnit.BYTES, ""));
 
         // statistics sql convert and fallback to catalog
-        COUNTER_CONVERT_ALL = new LongCounterMetric("convert_total", MetricUnit.REQUESTS, "total convert request");
-        DORIS_METRIC_REGISTER.addMetrics(COUNTER_CONVERT_ALL);
         COUNTER_FALLBACK_ALL = new LongCounterMetric("fallback_total", MetricUnit.REQUESTS, "total fallback request");
         DORIS_METRIC_REGISTER.addMetrics(COUNTER_FALLBACK_ALL);
 
