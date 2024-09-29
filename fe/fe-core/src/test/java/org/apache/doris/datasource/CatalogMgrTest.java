@@ -174,11 +174,12 @@ public class CatalogMgrTest extends TestWithFeService {
             hmsCatalog.makeSureInitialized();
             hmsCatalog.metadataOps = new HiveMetadataOps(hmsCatalog,
                     new TestHMSCachedClient() {
-                @Override
-                public List<String> getAllDatabases() {
-                    return Lists.newArrayList("tpch");
-                }
-            });
+                        @Override
+                        public List<String> getAllDatabases() {
+                            return Lists.newArrayList("tpch");
+                        }
+                    }
+            );
         } else if (catalog instanceof EsExternalCatalog) {
             EsExternalCatalog esCatalog = (EsExternalCatalog) catalog;
             EsExternalDatabase db = new EsExternalDatabase(esCatalog, 10002, "es_db1");

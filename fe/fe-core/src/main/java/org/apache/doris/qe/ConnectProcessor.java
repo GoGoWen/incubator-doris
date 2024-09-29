@@ -65,6 +65,7 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalSqlCache;
 import org.apache.doris.plugin.DialectConverterPlugin;
 import org.apache.doris.plugin.PluginMgr;
 import org.apache.doris.proto.Data;
+import org.apache.doris.qe.QueryState.ErrType;
 import org.apache.doris.qe.QueryState.MysqlStateType;
 import org.apache.doris.qe.cache.CacheAnalyzer;
 import org.apache.doris.thrift.TBDPAuthContext;
@@ -400,6 +401,46 @@ public abstract class ConnectProcessor {
                             break;
                         }
                     }
+                    // The following code is hideous, but due to the syntax differences between Presto and Doris,
+                    // this is the best way I can think of to make the SQL compatible with both Presto and Doris.
+                    if (ctx.getState().getStateType() == MysqlStateType.ERR
+                            && ctx.getState().getErrType().equals(ErrType.ANALYSIS_ERR)
+                            && connectType.equals(ConnectType.MYSQL)
+                            && !ctx.sessionVariable.getSqlDialect().equals("doris")
+                            && !convertedStmt.equals(originStmt)) {
+                        LOG.warn("execute convert stmt failed, now try original stmt, {}", originStmt);
+                        ctx.getState().reset();
+                        if (i > 0) {
+                            ctx.resetReturnRows();
+                        }
+                        auditStmt = usingOrigSingleStmt ? origSingleStmtList.get(i) : originStmt;
+                        parsedStmt = new NereidsParser().parseSQL(auditStmt, sessionVariable).get(0);
+                        parsedStmt.setOrigStmt(new OriginStatement(auditStmt, usingOrigSingleStmt ? 0 : i));
+                        parsedStmt.setUserInfo(ctx.getCurrentUserIdentity());
+                        executor = new StmtExecutor(ctx, parsedStmt);
+                        executor.getProfile().getSummaryProfile().setParseSqlStartTime(parseSqlStartTime);
+                        executor.getProfile().getSummaryProfile().setParseSqlFinishTime(parseSqlFinishTime);
+                        ctx.setExecutor(executor);
+
+                        if (cacheKeyType != null) {
+                            SqlCacheContext sqlCacheContext =
+                                    executor.getContext().getStatementContext().getSqlCacheContext().get();
+                            sqlCacheContext.setCacheKeyType(cacheKeyType);
+                        }
+                        executor.execute();
+                        if (i != stmts.size() - 1) {
+                            ctx.getState().serverStatus |= MysqlServerStatusFlag.SERVER_MORE_RESULTS_EXISTS;
+                            if (ctx.getState().getStateType() != MysqlStateType.ERR) {
+                                // here, doris do different with mysql.
+                                // when client not request CLIENT_MULTI_STATEMENTS, mysql treat all query as
+                                // single statement. Doris treat it with multi statement, but only return
+                                // the last statement result.
+                                if (getConnectContext().getMysqlChannel().clientMultiStatements()) {
+                                    finalizeCommand();
+                                }
+                            }
+                        }
+                    }
                     auditAfterExec(auditStmt, executor.getParsedStmt(), executor.getQueryStatisticsForAuditLog(),
                             true);
                     // execute failed, skip remaining stmts
@@ -408,7 +449,7 @@ public abstract class ConnectProcessor {
                     }
                 } catch (Throwable throwable) {
                     handleQueryException(throwable, auditStmt, executor.getParsedStmt(),
-                            executor.getQueryStatisticsForAuditLog());
+                                executor.getQueryStatisticsForAuditLog());
                     // execute failed, skip remaining stmts
                     throw throwable;
                 }
