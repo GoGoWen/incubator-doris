@@ -323,6 +323,30 @@ public class HiveScanNode extends FileQueryScanNode {
             splitAllFiles(allFiles, hiveFileStatuses);
             return;
         }
+        if (!isSplitSizeSetBySession) {
+            long totalFileSize = 0;
+            for (HiveMetaStoreCache.FileCacheValue fileCacheValue : fileCaches) {
+                if (fileCacheValue.getFiles() != null) {
+                    for (HiveMetaStoreCache.HiveFileStatus status : fileCacheValue.getFiles()) {
+                        totalFileSize += status.getLength();
+                    }
+                }
+            }
+            if (totalFileSize <= Config.file_size_range_to_decide_split_size[0]) {
+                fileSplitSize = TINY_SPLIT_FILE_SIZE;
+            } else if (totalFileSize <= Config.file_size_range_to_decide_split_size[1]) {
+                fileSplitSize = SMALL_SPLIT_FILE_SIZE;
+            } else if (totalFileSize <= Config.file_size_range_to_decide_split_size[2]) {
+                fileSplitSize = MEDIUM_SPLIT_FILE_SIZE;
+            } else if (totalFileSize <= Config.file_size_range_to_decide_split_size[3]) {
+                fileSplitSize = LARGE_SPLIT_FILE_SIZE;
+            } else if (totalFileSize <= Config.file_size_range_to_decide_split_size[4]) {
+                fileSplitSize = HUGE_SPLIT_FILE_SIZE;
+            } else {
+                fileSplitSize = DEFAULT_SPLIT_SIZE;
+            }
+        }
+
         for (HiveMetaStoreCache.FileCacheValue fileCacheValue : fileCaches) {
             if (fileCacheValue.getFiles() != null) {
                 boolean isSplittable = fileCacheValue.isSplittable();

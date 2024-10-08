@@ -2832,4 +2832,9 @@ public class Config extends ConfigBase {
             "whether to ignore the transaction property of the hive table"})
     public static boolean ignore_hive_table_transaction = true;
 
+    @ConfField(mutable = true, description = {"根据文件总量大小范围来决定文件切分的大小",
+            "file size range to decide split size"})
+    public static long[] file_size_range_to_decide_split_size = {
+            20 * 1024 * 1024 * 1024L, 40 * 1024 * 1024 * 1024L, 80 * 1024 * 1024 * 1024L, 160 * 1024 * 1024 * 1024L,
+            320 * 1024 * 1024 * 1024L};
 }

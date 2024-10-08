@@ -1128,6 +1128,7 @@ DECLARE_Bool(enable_set_in_bitmap_value);
 
 // max number of hdfs file handle in cache
 DECLARE_Int64(max_hdfs_file_handle_cache_num);
+DECLARE_Int64(num_partitions_for_hdfs_file_handle_cache);
 DECLARE_Int32(max_hdfs_file_handle_cache_time_sec);
 
 // max number of meta info of external files, such as parquet footer

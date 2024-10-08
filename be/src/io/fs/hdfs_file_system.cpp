@@ -105,7 +105,7 @@ public:
 private:
     FileHandleCache _cache;
     HdfsFileHandleCache()
-            : _cache(config::max_hdfs_file_handle_cache_num, 16,
+            : _cache(config::max_hdfs_file_handle_cache_num, config::num_partitions_for_hdfs_file_handle_cache,
                      config::max_hdfs_file_handle_cache_time_sec * 1000L) {};
 };
 
