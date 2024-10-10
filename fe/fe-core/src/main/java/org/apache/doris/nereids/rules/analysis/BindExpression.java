@@ -510,7 +510,13 @@ public class BindExpression implements AnalysisRuleFactory {
         LogicalJoin<Plan, Plan> join = ctx.root;
         CascadesContext cascadesContext = ctx.cascadesContext;
 
-        checkConflictAlias(join);
+        ConnectContext connectContext = ConnectContext.get();
+        if (connectContext != null) {
+            String dialect = connectContext.getSessionVariable().getSqlDialect();
+            if (!dialect.equals("presto")) {
+                checkConflictAlias(join);
+            }
+        }
 
         SimpleExprAnalyzer analyzer = buildSimpleExprAnalyzer(
                 join, cascadesContext, join.children(), true, true);
