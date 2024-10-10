@@ -209,6 +209,16 @@ public class MysqlProto {
                             "hadoop user name cannot be null");
                     Preconditions.checkNotNull(bdpUserInfo.getUserToken(),
                             "hadoop user token cannot be null");
+                } else {
+                    if (Strings.isNullOrEmpty(bdpUserInfo.getUserToken())) {
+                        String userToken = IAMUtil.getUserTokenByHadoopUserName(bdpUserInfo.getErp(),
+                                bdpUserInfo.getHadoopUserName());
+                        if (Strings.isNullOrEmpty(userToken)) {
+                            throw new IllegalArgumentException("get user token failed with erp: " + bdpUserInfo.getErp()
+                                    + ", hadoop_user_name: " + bdpUserInfo.getHadoopUserName());
+                        }
+                        bdpUserInfo.setUserToken(userToken);
+                    }
                 }
                 LOG.info("doris username: {}, erp: {}, source: {}, hadoop_user_name: {}",
                         qualifiedUser, bdpUserInfo.getErp(), bdpUserInfo.getSource(), bdpUserInfo.getHadoopUserName());
