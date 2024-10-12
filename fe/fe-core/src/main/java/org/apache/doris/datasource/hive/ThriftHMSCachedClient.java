@@ -20,6 +20,7 @@ package org.apache.doris.datasource.hive;
 import org.apache.doris.analysis.TableName;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.common.Config;
+import org.apache.doris.common.Pair;
 import org.apache.doris.datasource.DatabaseMetadata;
 import org.apache.doris.datasource.TableMetadata;
 import org.apache.doris.datasource.hive.event.MetastoreNotificationFetchException;
@@ -29,8 +30,10 @@ import org.apache.doris.qe.BDPAuthContext;
 import com.aliyun.datalake.metastore.hive2.ProxyMetaStoreClient;
 import com.amazonaws.glue.catalog.metastore.AWSCatalogMetastoreClient;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
@@ -63,19 +66,18 @@ import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import shade.doris.hive.org.apache.thrift.TException;
 
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Queue;
+import java.util.PriorityQueue;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -90,7 +92,11 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     // -1 means no limit on the partitions returned.
     private static final short MAX_LIST_PARTITION_NUM = Config.max_hive_list_partition_num;
 
-    private Queue<ThriftHMSClient> clientPool = new LinkedList<>();
+    private Multimap<String, ThriftHMSClient> clientPool = ArrayListMultimap.create();
+
+    private PriorityQueue<Pair<String, Long>> priorityQueue = new PriorityQueue<>(
+            Comparator.comparingLong(Pair::value)
+    );
 
     private boolean isClosed = false;
     private final int poolSize;
@@ -111,13 +117,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     public void close() {
         synchronized (clientPool) {
             this.isClosed = true;
-            while (!clientPool.isEmpty()) {
-                try {
-                    clientPool.poll().close();
-                } catch (Exception e) {
-                    LOG.warn("failed to close thrift client", e);
-                }
-            }
+            clientPool.clear();
         }
     }
 
@@ -588,12 +588,13 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     private class ThriftHMSClient implements AutoCloseable {
         private final IMetaStoreClient client;
         private volatile Throwable throwable;
-
+        private volatile boolean readyToClose;
         private String hadoopUserName;
 
         private ThriftHMSClient(String hadoopUserName, String hadoopUserToken, HiveConf hiveConf) throws MetaException {
             String type = hiveConf.get(HMSProperties.HIVE_METASTORE_TYPE);
             this.hadoopUserName = hadoopUserName;
+            this.readyToClose = false;
             if (HMSProperties.DLF_TYPE.equalsIgnoreCase(type)) {
                 client = RetryingMetaStoreClient.getProxy(hiveConf, DUMMY_HOOK_LOADER,
                         ProxyMetaStoreClient.class.getName());
@@ -615,27 +616,32 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
             }
         }
 
-        public String getHadoopUserName() {
-            return hadoopUserName;
-        }
-
-        public void setUGI(String hadoopUserName) throws TException {
-            this.hadoopUserName = hadoopUserName;
-            client.setMetaConf("UGI", hadoopUserName);
-        }
-
         public void setThrowable(Throwable throwable) {
             this.throwable = throwable;
+        }
+
+        public void setReadyToClose() {
+            readyToClose = true;
         }
 
         @Override
         public void close() {
             synchronized (clientPool) {
-                if (isClosed || throwable != null || clientPool.size() > poolSize) {
-                    client.close();
+                if (isClosed || throwable != null || readyToClose) {
+                    readyToClose = true;
                 } else {
-                    clientPool.offer(this);
+                    clientPool.put(hadoopUserName, this);
+                    priorityQueue.add(Pair.of(hadoopUserName, System.currentTimeMillis()));
+                    if (clientPool.size() > poolSize) {
+                        Pair<String, Long> pair = priorityQueue.poll();
+                        List<ThriftHMSClient> clients = (List<ThriftHMSClient>) clientPool.get(pair.first);
+                        ThriftHMSClient removeClient = clients.remove(clients.size() - 1);
+                        removeClient.setReadyToClose();
+                    }
                 }
+            }
+            if (readyToClose) {
+                client.close();
             }
         }
     }
@@ -646,27 +652,27 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
             Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
             BDPAuthContext bdpAuthContext = BDPAuthContext.get();
             Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
-            synchronized (clientPool) {
-                try {
-                    ThriftHMSClient client = clientPool.poll();
-                    if (client == null) {
-                        HiveConf conf = new HiveConf(hiveConf);
-                        conf.set("BEE_SOURCE", bdpAuthContext.getSource());
-                        conf.set("BEE_USER", bdpAuthContext.getErp());
-                        client = new ThriftHMSClient(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(),
-                            hiveConf);
-                    } else {
+            try {
+                ThriftHMSClient client = null;
+                synchronized (clientPool) {
+                    client = clientPool.get(bdpAuthContext.getHadoopUserName()).stream()
+                            .findFirst().orElse(null);
+                    if (client != null) {
+                        clientPool.remove(bdpAuthContext.getHadoopUserName(), client);
                         client.client.setMetaConf("BEE_SOURCE", bdpAuthContext.getSource());
                         client.client.setMetaConf("BEE_USER", bdpAuthContext.getErp());
-                        if (!client.getHadoopUserName().equals(bdpAuthContext.getHadoopUserName())) {
-                            client.setUGI(bdpAuthContext.getHadoopUserName());
-                        }
+                        return client;
                     }
-                    return client;
-                } catch (Exception e) {
-                    LOG.warn("failed to set conf for hive client", e);
-                    throw new MetaException(e.getMessage());
                 }
+                HiveConf conf = new HiveConf(hiveConf);
+                conf.set("BEE_SOURCE", bdpAuthContext.getSource());
+                conf.set("BEE_USER", bdpAuthContext.getErp());
+                client = new ThriftHMSClient(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(),
+                        hiveConf);
+                return client;
+            } catch (Exception e) {
+                LOG.warn("failed to get hive client", e);
+                throw new MetaException(e.getMessage());
             }
         } finally {
             Thread.currentThread().setContextClassLoader(classLoader);
