@@ -203,14 +203,10 @@ public class MysqlProto {
                             + " not be equal with decrypted service: " + bdpUserInfo.getSource());
                     return false;
                 }
-                if (!IAMUtil.isSourceInWhitelist(bdpUserInfo.getSource())) {
-                    Preconditions.checkNotNull(bdpUserInfo.getErp(), "erp cannot be null");
-                    Preconditions.checkNotNull(bdpUserInfo.getHadoopUserName(),
-                            "hadoop user name cannot be null");
-                    Preconditions.checkNotNull(bdpUserInfo.getUserToken(),
-                            "hadoop user token cannot be null");
-                } else {
-                    if (Strings.isNullOrEmpty(bdpUserInfo.getUserToken())) {
+                if (IAMUtil.isSourceInWhitelist(bdpUserInfo.getSource())) {
+                    if (Strings.isNullOrEmpty(bdpUserInfo.getUserToken())
+                            && !Strings.isNullOrEmpty(bdpUserInfo.getErp())
+                            && !Strings.isNullOrEmpty(bdpUserInfo.getHadoopUserName())) {
                         String userToken = IAMUtil.getUserTokenByHadoopUserName(bdpUserInfo.getErp(),
                                 bdpUserInfo.getHadoopUserName());
                         if (Strings.isNullOrEmpty(userToken)) {
@@ -219,6 +215,12 @@ public class MysqlProto {
                         }
                         bdpUserInfo.setUserToken(userToken);
                     }
+                } else {
+                    Preconditions.checkNotNull(bdpUserInfo.getErp(), "erp cannot be null");
+                    Preconditions.checkNotNull(bdpUserInfo.getHadoopUserName(),
+                            "hadoop user name cannot be null");
+                    Preconditions.checkNotNull(bdpUserInfo.getUserToken(),
+                            "hadoop user token cannot be null");
                 }
                 LOG.info("doris username: {}, erp: {}, source: {}, hadoop_user_name: {}",
                         qualifiedUser, bdpUserInfo.getErp(), bdpUserInfo.getSource(), bdpUserInfo.getHadoopUserName());
