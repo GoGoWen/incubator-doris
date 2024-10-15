@@ -1086,12 +1086,12 @@ public class HiveMetaStoreCache {
         private List<String> partitionColumnNames;
         private List<Type> types;
 
-        public FilterPartitionValueCacheKey(String hadoopUserName, String dbName, String tblName, String filer,
+        public FilterPartitionValueCacheKey(String hadoopUserName, String dbName, String tblName, String filter,
                 List<String> partitionColumnNames, List<Type> types) {
             this.hadoopUserName = hadoopUserName;
             this.dbName = dbName;
             this.tblName = tblName;
-            this.filter = filer;
+            this.filter = filter;
             this.partitionColumnNames = partitionColumnNames;
             this.types = types;
         }

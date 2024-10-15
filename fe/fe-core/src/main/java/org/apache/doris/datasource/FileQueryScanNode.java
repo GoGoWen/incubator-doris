@@ -297,7 +297,6 @@ public abstract class FileQueryScanNode extends FileScanNode {
         if (fileFormatType == TFileFormatType.FORMAT_JNI) {
             params.setProperties(locationProperties);
         }
-
         List<String> pathPartitionKeys = getPathPartitionKeys();
         if (isBatchMode()) {
             // File splits are generated lazily, and fetched by backends while scanning.
@@ -360,9 +359,10 @@ public abstract class FileQueryScanNode extends FileScanNode {
         if (ConnectContext.get().getExecutor() != null) {
             ConnectContext.get().getExecutor().getSummaryProfile().setCreateScanRangeFinishTime();
         }
+
         if (LOG.isDebugEnabled()) {
-            LOG.debug("create #{} ScanRangeLocations cost: {} ms",
-                    scanRangeLocations.size(), (System.currentTimeMillis() - start));
+            LOG.debug("create #{} ScanRangeLocations cost: {} ms", scanRangeLocations.size(),
+                    (System.currentTimeMillis() - start));
         }
     }
 

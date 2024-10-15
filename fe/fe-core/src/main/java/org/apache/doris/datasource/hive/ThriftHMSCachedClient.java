@@ -787,7 +787,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
         try (ThriftHMSClient client = getClient()) {
             return client.client.listPartitionsByFilter(dbName, tableName, filter, maxParts);
         } catch (Exception e) {
-            throw new RuntimeException("failed to get num partitions by filter for " + dbName + "." + tableName, e);
+            throw new RuntimeException("failed to list partitions by filter for " + dbName + "." + tableName, e);
         }
     }
 }

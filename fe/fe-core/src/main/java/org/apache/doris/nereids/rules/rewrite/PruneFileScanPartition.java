@@ -109,21 +109,26 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                 .getMetaStoreCache((HMSExternalCatalog) hiveTbl.getCatalog());
         int partitionNum = cache.getPartitionNum(hiveTbl.getDbName(), hiveTbl.getName());
         boolean isPartitionsByFilter = partitionNum > Config.max_partition_num_for_single_hive_table_without_filter;
+        Expression partitionPredicate = null;
         // use listPartitionsByFilter
         if (isPartitionsByFilter) {
             try {
-                Expression partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
+                partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
                         ImmutableSet.copyOf(partitionSlots), ctx);
                 List<String> partitionColumnNames = partitionSlots.stream().map(e -> e.getName())
                         .collect(Collectors.toList());
                 partitionPredicate = PredicateRewriteForPartitionPrune.rewrite(partitionPredicate, ctx);
                 partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
+                String partitionPredicateSql = partitionPredicate.toSql();
+                if (partitionPredicateSql.equalsIgnoreCase("TRUE")) {
+                    partitionPredicateSql = "";
+                }
                 selectedPartitionItems = cache.getPartitionValuesByFilter(hiveTbl.getDbName(), hiveTbl.getName(),
-                        partitionPredicate.toSql(), partitionColumnNames, hiveTbl.getPartitionColumnTypes());
+                        partitionPredicateSql, partitionColumnNames, hiveTbl.getPartitionColumnTypes());
             } catch (Exception e) {
                 // for some case listPartitionsByFilter may not support
-                LOG.warn("get selected partition items by listPartitionsByFilter failed, "
-                        + "use getPartitionValues instead", e);
+                LOG.warn("get selected partition items by listPartitionsByFilter failed, filter sql is "
+                        + partitionPredicate.toSql() + ", use getPartitionValues instead");
                 isPartitionsByFilter = false;
             }
         }
