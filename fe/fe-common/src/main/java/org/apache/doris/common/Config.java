@@ -1985,6 +1985,14 @@ public class Config extends ConfigBase {
     public static long max_replica_count_when_schema_change = 100000;
 
     /**
+     * Max cache num of hive partition count.
+     * Decrease this value if FE's memory is small
+     */
+    @ConfField(description = {"Hive Metastore 表级别分区计数缓存的最大数量。",
+            "Max cache number of partition count at table level in Hive Metastore."})
+    public static long max_hive_partition_count_cache_num = 10000;
+
+    /**
      * Max cache num of hive partition.
      * Decrease this value if FE's memory is small
      */
@@ -1999,6 +2007,10 @@ public class Config extends ConfigBase {
     @ConfField(description = {"External Catalog 中，Database 和 Table 的实例缓存的最大数量。",
             "Max cache number of database and table instance in external catalog."})
     public static long max_meta_object_cache_num = 1000;
+
+    @ConfField(description = {"过滤的Hive分区表缓存的最大数量",
+            "Max cache number of filter hive partition table"})
+    public static long max_filter_hive_partition_table_cache_num = 1000;
 
     @ConfField(description = {"Hive分区表缓存的最大数量",
             "Max cache number of hive partition table"})
@@ -2837,4 +2849,14 @@ public class Config extends ConfigBase {
     public static long[] file_size_range_to_decide_split_size = {
             20 * 1024 * 1024 * 1024L, 40 * 1024 * 1024 * 1024L, 80 * 1024 * 1024 * 1024L, 160 * 1024 * 1024 * 1024L,
             320 * 1024 * 1024 * 1024L};
+
+    @ConfField(mutable = true, description = {"单个hive表不使用谓词下推的最大分区数量",
+            "max partition num for single hive table without filter"})
+    public static int max_partition_num_for_single_hive_table_without_filter = 3000;
+
+
+    @ConfField(mutable = true, description = {"单个hive表能扫描的最大分区数量",
+            "max selected partition num for single hive table"})
+    public static int max_selected_partition_num_for_hive_table = 100000;
+
 }

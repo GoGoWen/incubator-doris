@@ -185,6 +185,12 @@ public class HiveScanNode extends FileQueryScanNode {
             }
             Preconditions.checkNotNull(partitionItems);
             this.selectedPartitionNum = partitionItems.size();
+            if (this.selectedPartitionNum > Config.max_selected_partition_num_for_hive_table) {
+                throw new AnalysisException("the selected partition num: " + this.selectedPartitionNum
+                        + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
+                        + "exceed max selected partition num for single hive table: "
+                        + Config.max_selected_partition_num_for_hive_table);
+            }
 
             // get partitions from cache
             List<List<String>> partitionValuesList = Lists.newArrayListWithCapacity(partitionItems.size());

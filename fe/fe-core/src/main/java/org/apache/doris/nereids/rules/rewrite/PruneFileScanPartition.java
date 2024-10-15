@@ -19,6 +19,7 @@ package org.apache.doris.nereids.rules.rewrite;
 
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.PartitionItem;
+import org.apache.doris.common.Config;
 import org.apache.doris.datasource.ExternalTable;
 import org.apache.doris.datasource.hive.HMSExternalCatalog;
 import org.apache.doris.datasource.hive.HMSExternalTable;
@@ -27,16 +28,23 @@ import org.apache.doris.datasource.hive.HiveMetaStoreCache;
 import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
+import org.apache.doris.nereids.rules.expression.rules.PartitionPruneExpressionExtractor;
 import org.apache.doris.nereids.rules.expression.rules.PartitionPruner;
 import org.apache.doris.nereids.rules.expression.rules.PartitionPruner.PartitionTableType;
+import org.apache.doris.nereids.rules.expression.rules.PredicateRewriteForPartitionFilter;
+import org.apache.doris.nereids.rules.expression.rules.PredicateRewriteForPartitionPrune;
+import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +61,8 @@ import java.util.stream.Collectors;
  * external file ScanNode could do the partition filter by themselves.
  */
 public class PruneFileScanPartition extends OneRewriteRuleFactory {
+
+    private static final Logger LOG = LogManager.getLogger(PruneFileScanPartition.class);
 
     @Override
     public Rule build() {
@@ -97,15 +107,36 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
 
         HiveMetaStoreCache cache = Env.getCurrentEnv().getExtMetaCacheMgr()
                 .getMetaStoreCache((HMSExternalCatalog) hiveTbl.getCatalog());
-        HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValues(
-                hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
-        Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
-        List<Long> prunedPartitions = new ArrayList<>(PartitionPruner.prune(
-                partitionSlots, filter.getPredicate(), idToPartitionItem, ctx, PartitionTableType.HIVE));
-
-        for (Long id : prunedPartitions) {
-            selectedPartitionItems.put(id, idToPartitionItem.get(id));
+        int partitionNum = cache.getPartitionNum(hiveTbl.getDbName(), hiveTbl.getName());
+        boolean isPartitionsByFilter = partitionNum > Config.max_partition_num_for_single_hive_table_without_filter;
+        // use listPartitionsByFilter
+        if (isPartitionsByFilter) {
+            try {
+                Expression partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
+                        ImmutableSet.copyOf(partitionSlots), ctx);
+                List<String> partitionColumnNames = partitionSlots.stream().map(e -> e.getName())
+                        .collect(Collectors.toList());
+                partitionPredicate = PredicateRewriteForPartitionPrune.rewrite(partitionPredicate, ctx);
+                partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
+                selectedPartitionItems = cache.getPartitionValuesByFilter(hiveTbl.getDbName(), hiveTbl.getName(),
+                        partitionPredicate.toSql(), partitionColumnNames, hiveTbl.getPartitionColumnTypes());
+            } catch (Exception e) {
+                // for some case listPartitionsByFilter may not support
+                LOG.warn("get selected partition items by listPartitionsByFilter failed, "
+                        + "use getPartitionValues instead", e);
+                isPartitionsByFilter = false;
+            }
         }
-        return new SelectedPartitions(idToPartitionItem.size(), selectedPartitionItems, true);
+        if (!isPartitionsByFilter) {
+            HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValues(
+                    hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+            Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
+            List<Long> prunedPartitions = new ArrayList<>(PartitionPruner.prune(
+                    partitionSlots, filter.getPredicate(), idToPartitionItem, ctx, PartitionTableType.HIVE));
+            for (Long id : prunedPartitions) {
+                selectedPartitionItems.put(id, idToPartitionItem.get(id));
+            }
+        }
+        return new SelectedPartitions(partitionNum, selectedPartitionItems, true);
     }
 }

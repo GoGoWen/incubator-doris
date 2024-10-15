@@ -40,6 +40,7 @@ import java.util.List;
  */
 public class PredicateRewriteForPartitionPrune
         extends DefaultExpressionRewriter<CascadesContext> {
+
     public static Expression rewrite(Expression expression,
                                      CascadesContext cascadesContext) {
         PredicateRewriteForPartitionPrune rewriter = new PredicateRewriteForPartitionPrune();
