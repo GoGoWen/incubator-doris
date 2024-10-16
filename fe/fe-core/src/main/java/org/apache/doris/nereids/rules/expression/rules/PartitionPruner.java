@@ -166,7 +166,7 @@ public class PartitionPruner extends DefaultExpressionRewriter<Void> {
     private boolean canBePrunedOut(OnePartitionEvaluator evaluator) {
         List<Map<Slot, PartitionSlotInput>> onePartitionInputs = evaluator.getOnePartitionInputs();
         for (Map<Slot, PartitionSlotInput> currentInputs : onePartitionInputs) {
-            // evaluate wether there's possible for this partition to accept this predicate
+            // evaluate whether there's possible for this partition to accept this predicate
             Expression result = evaluator.evaluateWithDefaultPartition(partitionPredicate, currentInputs);
             if (!result.equals(BooleanLiteral.FALSE) && !(result instanceof NullLiteral)) {
                 return false;
