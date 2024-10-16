@@ -73,6 +73,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -659,6 +660,13 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                             .findFirst().orElse(null);
                     if (client != null) {
                         clientPool.remove(bdpAuthContext.getHadoopUserName(), client);
+                        Iterator<Pair<String, Long>> iterator = priorityQueue.iterator();
+                        while (iterator.hasNext()) {
+                            if (iterator.next().first.equals(bdpAuthContext.getHadoopUserName())) {
+                                iterator.remove();
+                                break;
+                            }
+                        }
                         client.client.setMetaConf("BEE_SOURCE", bdpAuthContext.getSource());
                         client.client.setMetaConf("BEE_USER", bdpAuthContext.getErp());
                         return client;
