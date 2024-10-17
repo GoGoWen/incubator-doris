@@ -329,6 +329,17 @@ struct TQueryOptions {
   130: optional bool enable_adaptive_pipeline_task_serial_read_on_limit = true;
   131: optional i32 adaptive_pipeline_task_serial_read_on_limit = 10000;
 
+  132: optional i32 parallel_prepare_threshold = 0;
+  133: optional i32 partition_topn_max_partitions = 1024;
+  134: optional i32 partition_topn_pre_partition_rows = 1000;
+
+  135: optional bool enable_parallel_outfile = false;
+
+  136: optional bool enable_phrase_query_sequential_opt = true;
+  137: optional i64 orc_tiny_stripe_threshold = 8388608;
+  138: optional i64 orc_once_max_read_size = 8388608;
+  139: optional i64 orc_max_merge_distance = 1048576;
+
   // For cloud, to control if the content would be written into file cache
   1000: optional bool disable_file_cache = false
 }
