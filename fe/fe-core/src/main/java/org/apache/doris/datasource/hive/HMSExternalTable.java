@@ -448,6 +448,7 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         // try to use transient_lastDdlTime from hms client
         schemaUpdateTime = MapUtils.isNotEmpty(table.getParameters())
                 && table.getParameters().containsKey(TBL_PROP_TRANSIENT_LAST_DDL_TIME)
+                && table.getPartitionKeys().isEmpty()
                 ? Long.parseLong(table.getParameters().get(TBL_PROP_TRANSIENT_LAST_DDL_TIME)) * 1000
                 // use current timestamp if lastDdlTime does not exist (hive views don't have this prop)
                 : System.currentTimeMillis();
