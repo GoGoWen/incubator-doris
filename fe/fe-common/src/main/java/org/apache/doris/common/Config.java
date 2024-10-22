@@ -2859,4 +2859,8 @@ public class Config extends ConfigBase {
             "max selected partition num for single hive table"})
     public static int max_selected_partition_num_for_hive_table = 100000;
 
+    @ConfField(mutable = true, description = {"单个hive表能扫描的最大数据量",
+            "max scan bytes for single hive table"})
+    public static long max_selected_total_file_size_for_hive_table = 1 * 1024 * 1024 * 1024 * 1024L;
+
 }

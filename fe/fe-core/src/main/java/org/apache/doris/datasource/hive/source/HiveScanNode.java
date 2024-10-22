@@ -316,7 +316,8 @@ public class HiveScanNode extends FileQueryScanNode {
     }
 
     private void getFileSplitByPartitions(HiveMetaStoreCache cache, List<HivePartition> partitions,
-                                          List<Split> allFiles, String bindBrokerName) throws IOException {
+                                          List<Split> allFiles, String bindBrokerName)
+                                          throws IOException, AnalysisException {
         List<FileCacheValue> fileCaches;
         if (hiveTransaction != null) {
             fileCaches = getFileSplitByTransaction(cache, partitions, bindBrokerName);
@@ -337,6 +338,12 @@ public class HiveScanNode extends FileQueryScanNode {
                         totalFileSize += status.getLength();
                     }
                 }
+            }
+            if (totalFileSize > Config.max_selected_total_file_size_for_hive_table) {
+                throw new AnalysisException("the total scan bytes: " + totalFileSize
+                        + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
+                        + "exceed max bytes for single hive table: "
+                        + Config.max_selected_total_file_size_for_hive_table);
             }
             if (totalFileSize <= Config.file_size_range_to_decide_split_size[0]) {
                 fileSplitSize = TINY_SPLIT_FILE_SIZE;
