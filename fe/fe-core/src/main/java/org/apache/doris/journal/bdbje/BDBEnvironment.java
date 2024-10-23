@@ -58,6 +58,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -83,10 +84,15 @@ public class BDBEnvironment {
     private Database epochDB = null;  // used for fencing
     private ReentrantReadWriteLock lock;
     private List<Database> openedDatabases;
+    private static ReentrantLock logWriteLock = new ReentrantLock(true);
 
     public BDBEnvironment() {
         openedDatabases = new ArrayList<Database>();
         this.lock = new ReentrantReadWriteLock(true);
+    }
+
+    public static ReentrantLock getLock() {
+        return logWriteLock;
     }
 
     // The setup() method opens the environment and database

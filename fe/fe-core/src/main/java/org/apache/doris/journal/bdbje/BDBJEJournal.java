@@ -126,8 +126,57 @@ public class BDBJEJournal implements Journal { // CHECKSTYLE IGNORE THIS LINE: B
         }
     }
 
+    // bowen - just for test the bdbje replic preformance, to write just long type data
+    @Override
+    public synchronized long write() throws IOException {
+        // id is the key
+        long id = nextJournalId.getAndIncrement();
+        DatabaseEntry theKey = idToKey(id);
+        DatabaseEntry theData = idToKey(id);
+
+        try {
+            // BDBEnvironment.getLock().lock();
+            // Parameter null means auto commit
+            if (currentJournalDB.put(null, theKey, theData) != OperationStatus.SUCCESS) {
+                return -1;
+            } else {
+                return 0;
+            }
+        } catch (ReplicaWriteException e) {
+            /**
+             * This exception indicates that an update operation or transaction commit
+             * or abort was attempted while in the
+             * {@link ReplicatedEnvironment.State#REPLICA} state. The transaction is marked
+             * as being invalid.
+             * <p>
+             * The exception is the result of either an error in the application logic or
+             * the result of a transition of the node from Master to Replica while a
+             * transaction was in progress.
+             * <p>
+             * The application must abort the current transaction and redirect all
+             * subsequent update operations to the Master.
+             */
+            LOG.error("catch ReplicaWriteException when writing to database, will exit. journal id {}", id, e);
+            String msg = "write bdb failed. will exit. journalId: " + id + ", bdb database Name: "
+                        + currentJournalDB.getDatabaseName();
+            LOG.error(msg);
+            Util.stdoutWithTime(msg);
+            System.exit(-1);
+        } catch (DatabaseException e) {
+            LOG.error("catch an exception when writing to database. sleep and retry. journal id {}", id, e);
+            try {
+                Thread.sleep(5 * 1000);
+            } catch (InterruptedException e1) {
+                LOG.warn("", e1);
+            }
+        } finally {
+            // BDBEnvironment.getLock().unlock();
+        }
+    }
+
     @Override
     public synchronized long write(short op, Writable writable) throws IOException {
+
         JournalEntity entity = new JournalEntity();
         entity.setOpCode(op);
         entity.setData(writable);
@@ -161,6 +210,8 @@ public class BDBJEJournal implements Journal { // CHECKSTYLE IGNORE THIS LINE: B
         int retryTimes = op == OperationType.OP_TIMESTAMP ? Integer.MAX_VALUE : RETRY_TIME;
         for (int i = 0; i < retryTimes; i++) {
             try {
+                BDBEnvironment.getLock().lock();
+
                 // Parameter null means auto commit
                 if (currentJournalDB.put(null, theKey, theData) == OperationStatus.SUCCESS) {
                     writeSucceed = true;
@@ -197,6 +248,8 @@ public class BDBJEJournal implements Journal { // CHECKSTYLE IGNORE THIS LINE: B
                 } catch (InterruptedException e1) {
                     LOG.warn("", e1);
                 }
+            } finally {
+                BDBEnvironment.getLock().unlock();
             }
         }
 
@@ -247,6 +300,7 @@ public class BDBJEJournal implements Journal { // CHECKSTYLE IGNORE THIS LINE: B
 
         Database database = bdbEnvironment.openDatabase(dbName);
         try {
+            BDBEnvironment.getLock().lock();
             // null means perform the operation without transaction protection.
             // READ_COMMITTED guarantees no dirty read.
             if (database.get(null, theKey, theData, LockMode.READ_COMMITTED) == OperationStatus.SUCCESS) {
@@ -265,6 +319,8 @@ public class BDBJEJournal implements Journal { // CHECKSTYLE IGNORE THIS LINE: B
         } catch (Exception e) {
             LOG.warn("catch an exception when get JournalEntity. key:{}", journalId, e);
             return null;
+        } finally {
+            BDBEnvironment.getLock().unlock();
         }
         return ret;
     }

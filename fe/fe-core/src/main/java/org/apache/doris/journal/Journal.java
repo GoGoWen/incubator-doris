@@ -46,6 +46,9 @@ public interface Journal {
     // toKey = -1 means toKey = Long.Max_Value
     public JournalCursor read(long fromKey, long toKey);
 
+    // just for testing
+    public long write() throws IOException;
+
     // Write a journal and sync to disk
     public long write(short op, Writable writable) throws IOException;
 

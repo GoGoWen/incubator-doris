@@ -476,6 +476,7 @@ public class StmtExecutor {
     public void execute() throws Exception {
         UUID uuid = UUID.randomUUID();
         TUniqueId queryId = new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
+        Env.getCurrentEnv().getEditLog().logEditTestPerformance();
         execute(queryId);
     }
 

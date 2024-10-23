@@ -55,6 +55,7 @@ import org.apache.doris.ha.MasterInfo;
 import org.apache.doris.journal.Journal;
 import org.apache.doris.journal.JournalCursor;
 import org.apache.doris.journal.JournalEntity;
+import org.apache.doris.journal.bdbje.BDBEnvironment;
 import org.apache.doris.journal.bdbje.BDBJEJournal;
 import org.apache.doris.journal.bdbje.Timestamp;
 import org.apache.doris.journal.local.LocalJournal;
@@ -1145,6 +1146,35 @@ public class EditLog {
      */
     public void rollEditLog() {
         journal.rollJournal();
+    }
+
+    /**
+     * bowen test for the bdbje performance
+     * @return
+     */
+    public synchronized void logEditTestPerformance() {
+        //stop the replay for testing of bdbje write performance
+        BDBEnvironment.getLock().lock();
+
+        long start2 = System.currentTimeMillis();
+        int run  = 0;
+        int succ = 0;
+        int fail = 0;
+        for (; run < 10000; run++) {
+            try {
+                if (journal.write() == -1) {
+                    fail = fail + 1;
+                } else {
+                    succ = succ + 1;
+                }
+            } catch (IOException e) {
+                fail = fail + 1;
+            }
+        }
+
+        long end2 = System.currentTimeMillis();
+        BDBEnvironment.getLock().unlock();
+        System.out.println("time write 10000 record is:" + (end2 - start2) + ", fail:" + fail + ", succ:" + succ);
     }
 
     /**

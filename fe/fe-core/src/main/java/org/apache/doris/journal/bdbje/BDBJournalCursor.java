@@ -105,6 +105,7 @@ public class BDBJournalCursor implements JournalCursor {
             // READ_COMMITTED guarantees no dirty read.
             int tryTimes = 0;
             while (true) {
+                BDBEnvironment.getLock().lock();
                 OperationStatus operationStatus = database.get(null, theKey, theData, LockMode.READ_COMMITTED);
                 if (operationStatus == OperationStatus.SUCCESS) {
                     // Recreate the data String.
@@ -116,7 +117,8 @@ public class BDBJournalCursor implements JournalCursor {
                         entity.setDataSize(retData.length);
                     } catch (Exception e) {
                         LOG.error("fail to read journal entity key={}, will exit", currentKey, e);
-                        System.exit(-1);
+                        // just for testing, once read a non doris JournalEntity, just put the empty entity
+                        // System.exit(-1);
                     }
                     currentKey++;
                     return Pair.of(key, entity);
@@ -148,6 +150,8 @@ public class BDBJournalCursor implements JournalCursor {
         } catch (Exception e) {
             LOG.warn("Catch an exception when get next JournalEntity. key:{}", currentKey, e);
             return null;
+        } finally {
+            BDBEnvironment.getLock().unlock();
         }
     }
 
