@@ -51,7 +51,7 @@ public class AESUtil {
     private static Map<String, SecretKeySpec> serviceToSecretKeyMap = Maps.newHashMap();
 
     public static byte[] decodeBase64(String key) {
-        return Base64.getUrlDecoder().decode(key);
+        return Base64.getDecoder().decode(key);
     }
 
     public static void init(String propFile) throws IOException {
@@ -101,8 +101,8 @@ public class AESUtil {
             decryptCipher.init(Cipher.DECRYPT_MODE, getSecretKey(serviceName));
             localDecryptCipherMap.put(serviceName, decryptCipher);
         }
-        byte[] decryptedBytes = decryptCipher.doFinal(Base64.getUrlDecoder().decode(
-                encryptedText.replace(" ", "+")));
+        byte[] decryptedBytes = decryptCipher.doFinal(Base64.getDecoder().decode(
+                encryptedText.replace(" ", "+").replace("%2F", "/")));
         TDeserializer deserializer = new TDeserializer(new TCompactProtocol.Factory());
         TBDPUserInfo userInfo = new TBDPUserInfo();
         deserializer.deserialize(userInfo, decryptedBytes);
