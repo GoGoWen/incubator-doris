@@ -2854,13 +2854,16 @@ public class Config extends ConfigBase {
             "max partition num for single hive table without filter"})
     public static int max_partition_num_for_single_hive_table_without_filter = 3000;
 
-
     @ConfField(mutable = true, description = {"单个hive表能扫描的最大分区数量",
             "max selected partition num for single hive table"})
     public static int max_selected_partition_num_for_hive_table = 100000;
+
 
     @ConfField(mutable = true, description = {"单个hive表能扫描的最大数据量",
             "max scan bytes for single hive table"})
     public static long max_selected_total_file_size_for_hive_table = 1 * 1024 * 1024 * 1024 * 1024L;
 
+    @ConfField(mutable = true, description = {"是否用原来的语句继续尝试执行假如转换的sql分析失败",
+            "whether should try execute the original statement if execute converted statement failed"})
+    public static boolean should_try_with_origin_sql = false;
 }
