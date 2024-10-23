@@ -45,6 +45,7 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPart
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.cache.CacheAnalyzer;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
 import org.apache.doris.thrift.TFileAttributes;
@@ -231,6 +232,14 @@ public class HiveScanNode extends FileQueryScanNode {
             getFileSplitByPartitions(cache, prunedPartitions, allFiles, bindBrokerName);
             if (ConnectContext.get().getExecutor() != null) {
                 ConnectContext.get().getExecutor().getSummaryProfile().setGetPartitionFilesFinishTime();
+            }
+            if (!hmsTable.getPartitionColumns().isEmpty() && CacheAnalyzer.canUseCache(
+                    ConnectContext.get().getSessionVariable())) {
+                for (HivePartition partition : prunedPartitions) {
+                    if (hmsTable.getPartitionUpdateTime() < partition.getLastModifiedTime()) {
+                        hmsTable.setPartitionUpdateTime(partition.getLastModifiedTime());
+                    }
+                }
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("get #{} files for table: {}.{}, cost: {} ms",

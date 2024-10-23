@@ -154,6 +154,8 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
     // record the event update time when enable hms event listener
     protected volatile long eventUpdateTime;
 
+    protected volatile long partitionUpdateTime = 0L;
+
     public enum DLAType {
         UNKNOWN, HIVE, HUDI, ICEBERG
     }
@@ -448,7 +450,6 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         // try to use transient_lastDdlTime from hms client
         schemaUpdateTime = MapUtils.isNotEmpty(table.getParameters())
                 && table.getParameters().containsKey(TBL_PROP_TRANSIENT_LAST_DDL_TIME)
-                && table.getPartitionKeys().isEmpty()
                 ? Long.parseLong(table.getParameters().get(TBL_PROP_TRANSIENT_LAST_DDL_TIME)) * 1000
                 // use current timestamp if lastDdlTime does not exist (hive views don't have this prop)
                 : System.currentTimeMillis();
@@ -668,11 +669,19 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         this.eventUpdateTime = updateTime;
     }
 
+    public long getPartitionUpdateTime() {
+        return partitionUpdateTime;
+    }
+
+    public void setPartitionUpdateTime(long partitionUpdateTime) {
+        this.partitionUpdateTime = partitionUpdateTime;
+    }
+
     @Override
     // get the max value of `schemaUpdateTime` and `eventUpdateTime`
     // eventUpdateTime will be refreshed after processing events with hms event listener enabled
     public long getUpdateTime() {
-        return Math.max(this.schemaUpdateTime, this.eventUpdateTime);
+        return Math.max(Math.max(this.schemaUpdateTime, this.eventUpdateTime), this.partitionUpdateTime);
     }
 
     @Override
