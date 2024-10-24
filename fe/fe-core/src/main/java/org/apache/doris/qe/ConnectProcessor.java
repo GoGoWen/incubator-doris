@@ -373,50 +373,37 @@ public abstract class ConnectProcessor {
                 }
 
                 try {
-                    try {
-                        executor.execute();
-                        if (connectType.equals(ConnectType.MYSQL)) {
-                            if (i != stmts.size() - 1) {
-                                ctx.getState().serverStatus |= MysqlServerStatusFlag.SERVER_MORE_RESULTS_EXISTS;
-                                if (ctx.getState().getStateType() != MysqlStateType.ERR) {
-                                    // here, doris do different with mysql.
-                                    // when client not request CLIENT_MULTI_STATEMENTS, mysql treat all query as
-                                    // single statement. Doris treat it with multi statement, but only return
-                                    // the last statement result.
-                                    if (getConnectContext().getMysqlChannel().clientMultiStatements()) {
-                                        finalizeCommand();
-                                    }
+                    executor.execute();
+                    if (connectType.equals(ConnectType.MYSQL)) {
+                        if (i != stmts.size() - 1) {
+                            ctx.getState().serverStatus |= MysqlServerStatusFlag.SERVER_MORE_RESULTS_EXISTS;
+                            if (ctx.getState().getStateType() != MysqlStateType.ERR) {
+                                // here, doris do different with mysql.
+                                // when client not request CLIENT_MULTI_STATEMENTS, mysql treat all query as
+                                // single statement. Doris treat it with multi statement, but only return
+                                // the last statement result.
+                                if (getConnectContext().getMysqlChannel().clientMultiStatements()) {
+                                    finalizeCommand();
                                 }
                             }
-                        } else if (connectType.equals(ConnectType.ARROW_FLIGHT_SQL)) {
-                            if (!ctx.isReturnResultFromLocal()) {
-                                returnResultFromRemoteExecutor.add(executor);
-                            }
-                            Preconditions.checkState(ctx.getFlightSqlChannel().resultNum() <= 1);
-                            if (ctx.getFlightSqlChannel().resultNum() == 1 && i != stmts.size() - 1) {
-                                String errMsg = "Only be one stmt that returns the result and it is at the end. "
-                                        + "stmts.size(): " + stmts.size();
-                                LOG.warn(errMsg);
-                                ctx.getState().setError(ErrorCode.ERR_ARROW_FLIGHT_SQL_MUST_ONLY_RESULT_STMT, errMsg);
-                                ctx.getState().setErrType(QueryState.ErrType.OTHER_ERR);
-                                break;
-                            }
                         }
-                    } catch (Exception e) {
-                        if (e instanceof AnalysisException && Config.should_try_with_origin_sql
-                                && !ctx.sessionVariable.getSqlDialect().equals("doris")) {
-                            ctx.getState().setError(e.getMessage());
-                            ctx.getState().setErrType(ErrType.ANALYSIS_ERR);
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("analyze converted stmt failed", e);
-                            }
-                        } else {
-                            throw e;
+                    } else if (connectType.equals(ConnectType.ARROW_FLIGHT_SQL)) {
+                        if (!ctx.isReturnResultFromLocal()) {
+                            returnResultFromRemoteExecutor.add(executor);
+                        }
+                        Preconditions.checkState(ctx.getFlightSqlChannel().resultNum() <= 1);
+                        if (ctx.getFlightSqlChannel().resultNum() == 1 && i != stmts.size() - 1) {
+                            String errMsg = "Only be one stmt that returns the result and it is at the end. "
+                                    + "stmts.size(): " + stmts.size();
+                            LOG.warn(errMsg);
+                            ctx.getState().setError(ErrorCode.ERR_ARROW_FLIGHT_SQL_MUST_ONLY_RESULT_STMT, errMsg);
+                            ctx.getState().setErrType(QueryState.ErrType.OTHER_ERR);
+                            break;
                         }
                     }
                     // The following code is hideous, but due to the syntax differences between Presto and Doris,
                     // this is the best way I can think of to make the SQL compatible with both Presto and Doris.
-                    if (ctx.getState().getStateType() == MysqlStateType.ERR
+                    if (Config.should_try_with_origin_sql && ctx.getState().getStateType() == MysqlStateType.ERR
                             && ctx.getState().getErrType().equals(ErrType.ANALYSIS_ERR)
                             && connectType.equals(ConnectType.MYSQL)
                             && !ctx.sessionVariable.getSqlDialect().equals("doris")
