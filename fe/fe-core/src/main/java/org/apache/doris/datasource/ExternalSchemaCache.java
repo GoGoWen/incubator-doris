@@ -20,6 +20,7 @@ package org.apache.doris.datasource;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.common.CacheFactory;
 import org.apache.doris.common.Config;
+import org.apache.doris.datasource.hive.HMSExternalCatalog;
 import org.apache.doris.metric.GaugeMetric;
 import org.apache.doris.metric.Metric;
 import org.apache.doris.metric.MetricLabel;
@@ -77,7 +78,9 @@ public class ExternalSchemaCache {
 
     private Optional<SchemaCacheValue> loadSchema(SchemaCacheKey key) {
         // reload sync if connect_context is null
-        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        }
         Optional<SchemaCacheValue> schema = catalog.getSchema(key.dbName, key.tblName);
         if (LOG.isDebugEnabled()) {
             LOG.debug("load schema for {} in catalog {}", key, catalog.getName());
@@ -86,14 +89,21 @@ public class ExternalSchemaCache {
     }
 
     public Optional<SchemaCacheValue> getSchemaValue(String dbName, String tblName) {
-        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        SchemaCacheKey key = new SchemaCacheKey(BDPAuthContext.get().getHadoopUserName(), dbName, tblName);
-        return schemaCache.get(key);
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            SchemaCacheKey key = new SchemaCacheKey(BDPAuthContext.get().getHadoopUserName(), dbName, tblName);
+            return schemaCache.get(key);
+        } else {
+            return schemaCache.get(new SchemaCacheKey("", dbName, tblName));
+        }
     }
 
     public void addSchemaForTest(String dbName, String tblName, ImmutableList<Column> schema) {
-        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        SchemaCacheKey key = new SchemaCacheKey(BDPAuthContext.get().getHadoopUserName(), dbName, tblName);
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        }
+        SchemaCacheKey key = new SchemaCacheKey(catalog instanceof HMSExternalCatalog
+                ? BDPAuthContext.get().getHadoopUserName() : "", dbName, tblName);
         schemaCache.put(key, Optional.of(new SchemaCacheValue(schema)));
     }
 
