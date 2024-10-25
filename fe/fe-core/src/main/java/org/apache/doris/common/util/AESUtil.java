@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -91,13 +90,16 @@ public class AESUtil {
         }
     }
 
-    public static void initServicePublicKeyCertificateFromUrl(String baseUrl) {
+    public static void initServicePublicKeyCertificateFromUrl(String secretKeyUrl) {
         HttpURLConnection connection = null;
         try {
-            String fullUrl = SECRET_KEY_URL + "?token=" + URLEncoder.encode(SECRET_KEY_TOKEN, "UTF-8");
-            URL serviceUrl = new URL(fullUrl);
+            URL serviceUrl = new URL(secretKeyUrl);
             connection = (HttpURLConnection) serviceUrl.openConnection();
             connection.setRequestMethod("GET");
+            connection.setRequestProperty("Authorization", "Bearer " + SECRET_KEY_TOKEN);
+
+            LOG.info("secretKeyUrl: {}", secretKeyUrl);
+            LOG.info("SECRET_KEY_TOKEN: {}", SECRET_KEY_TOKEN);
 
             int responseCode = connection.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
@@ -105,14 +107,14 @@ public class AESUtil {
                     Properties properties = new Properties();
                     properties.load(in);
                     initServicePublicKeyCertificate(properties);
-                    LOG.info("Init secret key certificate from url: {} successfully", SECRET_KEY_URL);
+                    LOG.info("Init secret key certificate from url: {} successfully", secretKeyUrl);
                 }
             } else {
                 LOG.warn("Failed to load secret key certificate from url: {}. Response Code: {}",
-                        SECRET_KEY_URL, responseCode);
+                        secretKeyUrl, responseCode);
             }
         } catch (IOException e) {
-            LOG.warn("Failed to load secret key certificate from url: {}", SECRET_KEY_URL, e);
+            LOG.warn("Failed to load secret key certificate from url: {}", secretKeyUrl, e);
         } finally {
             if (connection != null) {
                 connection.disconnect();
