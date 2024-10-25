@@ -98,9 +98,6 @@ public class AESUtil {
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Authorization", "Bearer " + SECRET_KEY_TOKEN);
 
-            LOG.info("secretKeyUrl: {}", secretKeyUrl);
-            LOG.info("SECRET_KEY_TOKEN: {}", SECRET_KEY_TOKEN);
-
             int responseCode = connection.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 try (InputStream in = connection.getInputStream()) {
