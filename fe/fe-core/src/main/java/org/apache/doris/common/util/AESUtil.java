@@ -28,6 +28,10 @@ import org.apache.thrift.protocol.TCompactProtocol;
 
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -46,6 +50,10 @@ public class AESUtil {
 
     public static final String KEY_ALGORITHM = "AES";
 
+    private static String SECRET_KEY_URL = "";
+
+    private static String SECRET_KEY_TOKEN = "";
+
     private static ThreadLocal<Map<String, Cipher>> decryptCipherMap = new ThreadLocal<>();
 
     private static Map<String, SecretKeySpec> serviceToSecretKeyMap = Maps.newHashMap();
@@ -57,6 +65,9 @@ public class AESUtil {
     public static void init(String propFile) throws IOException {
         Properties props = new Properties();
         FileReader reader = null;
+        SECRET_KEY_URL = System.getenv("SECRET_KEY_URL");
+        SECRET_KEY_TOKEN = System.getenv("SECRET_KEY_TOKEN");
+
         try {
             reader = new FileReader(propFile);
             props.load(reader);
@@ -68,6 +79,7 @@ public class AESUtil {
             }
         }
         initServicePublicKeyCertificate(props);
+        initServicePublicKeyCertificateFromUrl(SECRET_KEY_URL);
     }
 
     public static void initServicePublicKeyCertificate(Properties properties) {
@@ -79,10 +91,46 @@ public class AESUtil {
         }
     }
 
+    public static void initServicePublicKeyCertificateFromUrl(String baseUrl) {
+        HttpURLConnection connection = null;
+        try {
+            String fullUrl = SECRET_KEY_URL + "?token=" + URLEncoder.encode(SECRET_KEY_TOKEN, "UTF-8");
+            URL serviceUrl = new URL(fullUrl);
+            connection = (HttpURLConnection) serviceUrl.openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                try (InputStream in = connection.getInputStream()) {
+                    Properties properties = new Properties();
+                    properties.load(in);
+                    initServicePublicKeyCertificate(properties);
+                    LOG.info("Init secret key certificate from url: {} successfully", SECRET_KEY_URL);
+                }
+            } else {
+                LOG.warn("Failed to load secret key certificate from url: {}. Response Code: {}",
+                        SECRET_KEY_URL, responseCode);
+            }
+        } catch (IOException e) {
+            LOG.warn("Failed to load secret key certificate from url: {}", SECRET_KEY_URL, e);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
     public static SecretKeySpec getSecretKey(String serviceName)  throws NoSuchAlgorithmException {
         SecretKeySpec secretKey = serviceToSecretKeyMap.get(serviceName);
         if (secretKey == null) {
-            throw new NoSuchAlgorithmException("unable to get secret key certificate for " + serviceName);
+            LOG.info("Secret key for service '{}' not found locally. "
+                    +
+                    "Attempting to fetch from remote store.", serviceName);
+            initServicePublicKeyCertificateFromUrl(SECRET_KEY_URL);
+            secretKey = serviceToSecretKeyMap.get(serviceName);
+            if (secretKey == null) {
+                throw new NoSuchAlgorithmException("unable to get secret key certificate for " + serviceName);
+            }
         }
         return secretKey;
     }

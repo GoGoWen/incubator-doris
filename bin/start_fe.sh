@@ -260,6 +260,15 @@ if [ ! -z $iam_token_env ]; then
    eval 'export "$iam_token_env"'
 fi
 
+secret_key_url_env=$(grep SECRET_KEY_URL $DORIS_HOME/conf/fe.conf || echo "SECRET_KEY_URL=http://api.easy-olap.jd.com/v1/query/getCipherKey")
+if [ ! -z "$secret_key_url_env" ]; then
+   eval 'export "$secret_key_url_env"'
+fi
+
+secret_key_token_env=$(grep SECRET_KEY_TOKEN $DORIS_HOME/conf/fe.conf || true)
+if [ ! -z $secret_key_token_env ]; then
+   eval 'export "$secret_key_token_env"'
+fi
 
 # make sure the doris-fe.jar is at first order, so that some classed
 # with same qualified name can be loaded priority from doris-fe.jar
