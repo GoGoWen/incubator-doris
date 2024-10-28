@@ -177,7 +177,7 @@ public abstract class JdbcClient {
             conn = dataSource.getConnection();
         } catch (Exception e) {
             String errorMessage = String.format("Can not connect to jdbc due to error: %s, Catalog name: %s",
-                    e.getMessage(), this.getCatalogName());
+                    e.getMessage().replace("%", "%%"), this.getCatalogName());
             throw new JdbcClientException(errorMessage, e);
         } finally {
             Thread.currentThread().setContextClassLoader(oldClassLoader);
