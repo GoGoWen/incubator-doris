@@ -122,9 +122,8 @@ public class AESUtil {
     public static SecretKeySpec getSecretKey(String serviceName)  throws NoSuchAlgorithmException {
         SecretKeySpec secretKey = serviceToSecretKeyMap.get(serviceName);
         if (secretKey == null) {
-            LOG.info("Secret key for service '{}' not found locally. "
-                    +
-                    "Attempting to fetch from remote store.", serviceName);
+            LOG.info("Secret key for service '{}' not found locally. Attempting to fetch from remote store.",
+                    serviceName);
             initServicePublicKeyCertificateFromUrl(SECRET_KEY_URL);
             secretKey = serviceToSecretKeyMap.get(serviceName);
             if (secretKey == null) {
