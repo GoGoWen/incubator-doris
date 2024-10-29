@@ -729,6 +729,12 @@ bool OrcReader::_init_search_argument(
     if (predicates.empty()) {
         return false;
     }
+
+    if (_is_hive1_orc_or_use_idx) {
+        for (OrcPredicate& predicate : predicates) {
+            predicate.col_name = _col_name_to_file_col_name[predicate.col_name];
+        }
+    }
     std::unique_ptr<orc::SearchArgumentBuilder> builder = orc::SearchArgumentFactory::newBuilder();
     if (build_search_argument(predicates, 0, builder)) {
         std::unique_ptr<orc::SearchArgument> sargs = builder->build();
@@ -907,7 +913,6 @@ Status OrcReader::set_fill_columns(
             auto orc_inner_reader = orcInputStreamPtr->get_inner_reader();
             orc_file_reader = std::make_shared<io::RangeCacheFileReader>(_profile, orc_inner_reader,
                                                                      range_finder);
-            _lazy_read_ctx.can_lazy_read = false;
         }
 
         if (!_lazy_read_ctx.can_lazy_read) {
