@@ -445,7 +445,12 @@ public abstract class ConnectProcessor {
                             true);
                     // execute failed, skip remaining stmts
                     if (ctx.getState().getStateType() == MysqlStateType.ERR) {
-                        throw new Exception(ctx.getState().getErrorMessage());
+                        if (!("doris").equals(ctx.sessionVariable.getSqlDialect())
+                                && Config.sql_fallback_catalog.equals(ctx.getSessionVariable().getSqlDialect())) {
+                            throw new Exception(ctx.getState().getErrorMessage());
+                        } else {
+                            break;
+                        }
                     }
                 } catch (Throwable throwable) {
                     handleQueryException(throwable, auditStmt, executor.getParsedStmt(),
