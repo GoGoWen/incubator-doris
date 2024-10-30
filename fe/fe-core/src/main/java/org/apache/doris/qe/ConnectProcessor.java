@@ -448,9 +448,8 @@ public abstract class ConnectProcessor {
                         if (!("doris").equals(ctx.sessionVariable.getSqlDialect())
                                 && Config.sql_fallback_catalog.equals(ctx.getSessionVariable().getSqlDialect())) {
                             throw new Exception(ctx.getState().getErrorMessage());
-                        } else {
-                            break;
                         }
+                        break;
                     }
                 } catch (Throwable throwable) {
                     handleQueryException(throwable, auditStmt, executor.getParsedStmt(),
