@@ -445,7 +445,7 @@ public abstract class ConnectProcessor {
                             true);
                     // execute failed, skip remaining stmts
                     if (ctx.getState().getStateType() == MysqlStateType.ERR) {
-                        break;
+                        throw new Exception(ctx.getState().getErrorMessage());
                     }
                 } catch (Throwable throwable) {
                     handleQueryException(throwable, auditStmt, executor.getParsedStmt(),
