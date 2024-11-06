@@ -54,6 +54,7 @@ import org.apache.doris.datasource.test.TestExternalDatabase;
 import org.apache.doris.fs.remote.dfs.DFSFileSystem;
 import org.apache.doris.persist.gson.GsonPostProcessable;
 import org.apache.doris.persist.gson.GsonUtils;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.MasterCatalogExecutor;
 import org.apache.doris.transaction.TransactionManager;
@@ -244,8 +245,8 @@ public abstract class ExternalCatalog
                             OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60L),
                             Config.max_meta_object_cache_num,
                             ignored -> getFilteredDatabaseNames(),
-                            dbName -> Optional.ofNullable(
-                                    buildDbForInit(dbName, Util.genIdByName(name, dbName), logType)),
+                            key -> Optional.ofNullable(
+                                    buildDbForInit(key.second, Util.genIdByName(name, key.second), logType)),
                             (key, value, cause) -> value.ifPresent(v -> v.setUnInitialized(invalidCacheInInit)));
                 }
                 setLastUpdateTime(System.currentTimeMillis());
@@ -519,7 +520,13 @@ public abstract class ExternalCatalog
         if (useMetaCache.get()) {
             // must use full qualified name to generate id.
             // otherwise, if 2 catalogs have the same db name, the id will be the same.
-            return metaCache.getMetaObj(realDbName, Util.genIdByName(getQualifiedName(realDbName))).orElse(null);
+            String hadoopUserName = "";
+            if (this instanceof HMSExternalCatalog) {
+                Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+                hadoopUserName = BDPAuthContext.get().getHadoopUserName();
+            }
+            return metaCache.getMetaObj(hadoopUserName, realDbName,
+                    Util.genIdByName(getQualifiedName(realDbName))).orElse(null);
         } else {
             if (dbNameToId.containsKey(realDbName)) {
                 return idToDb.get(dbNameToId.get(realDbName));
@@ -539,7 +546,12 @@ public abstract class ExternalCatalog
         }
 
         if (useMetaCache.get()) {
-            return metaCache.getMetaObjById(dbId).orElse(null);
+            String hadoopUserName = "";
+            if (this instanceof HMSExternalCatalog) {
+                Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+                hadoopUserName = BDPAuthContext.get().getHadoopUserName();
+            }
+            return metaCache.getMetaObjById(hadoopUserName, dbId).orElse(null);
         } else {
             return idToDb.get(dbId);
         }
@@ -616,7 +628,8 @@ public abstract class ExternalCatalog
         Map<String, Long> tmpDbNameToId = Maps.newConcurrentMap();
         Map<Long,  ExternalDatabase<? extends ExternalTable>> tmpIdToDb = Maps.newConcurrentMap();
         for (int i = 0; i < log.getRefreshCount(); i++) {
-            Optional<ExternalDatabase<? extends ExternalTable>> db = getDbForReplay(log.getRefreshDbIds().get(i));
+            Optional<ExternalDatabase<? extends ExternalTable>> db = getDbForReplay("",
+                    log.getRefreshDbIds().get(i));
             // Should not return null.
             // Because replyInitCatalog can only be called when `use_meta_cache` is false.
             // And if `use_meta_cache` is false, getDbForReplay() will not return null
@@ -643,12 +656,12 @@ public abstract class ExternalCatalog
         initialized = true;
     }
 
-    public Optional<ExternalDatabase<? extends ExternalTable>> getDbForReplay(long dbId) {
+    public Optional<ExternalDatabase<? extends ExternalTable>> getDbForReplay(String hadoopUsername, long dbId) {
         if (useMetaCache.get()) {
             if (!isInitialized()) {
                 return Optional.empty();
             }
-            return metaCache.getMetaObjById(dbId);
+            return metaCache.getMetaObjById(hadoopUsername == null ? "" : hadoopUsername, dbId);
         } else {
             return Optional.ofNullable(idToDb.get(dbId));
         }

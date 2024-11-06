@@ -18,6 +18,7 @@
 package org.apache.doris.datasource.metacache;
 
 import org.apache.doris.common.CacheFactory;
+import org.apache.doris.common.Pair;
 
 import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.LoadingCache;
@@ -34,7 +35,7 @@ import java.util.concurrent.ExecutorService;
 public class MetaCache<T> {
     private LoadingCache<String, List<String>> namesCache;
     private Map<Long, String> idToName = Maps.newConcurrentMap();
-    private LoadingCache<String, Optional<T>> metaObjCache;
+    private LoadingCache<Pair<String, String>, Optional<T>> metaObjCache;
 
     private String name;
 
@@ -44,8 +45,8 @@ public class MetaCache<T> {
             OptionalLong refreshAfterWriteSec,
             long maxSize,
             CacheLoader<String, List<String>> namesCacheLoader,
-            CacheLoader<String, Optional<T>> metaObjCacheLoader,
-            RemovalListener<String, Optional<T>> removalListener) {
+            CacheLoader<Pair<String, String>, Optional<T>> metaObjCacheLoader,
+            RemovalListener<Pair<String, String>, Optional<T>> removalListener) {
         this.name = name;
 
         // ATTN:
@@ -70,29 +71,29 @@ public class MetaCache<T> {
         metaObjCache = objCacheFactory.buildCache(metaObjCacheLoader, removalListener, executor);
     }
 
-    public List<String> listNames() {
-        return namesCache.get("");
+    public List<String> listNames(String hadoopUserName) {
+        return namesCache.get(hadoopUserName);
     }
 
-    public Optional<T> getMetaObj(String name, long id) {
-        Optional<T> val = metaObjCache.getIfPresent(name);
+    public Optional<T> getMetaObj(String hadoopUserName, String name, long id) {
+        Optional<T> val = metaObjCache.getIfPresent(Pair.of(hadoopUserName, name));
         if (val == null) {
             synchronized (metaObjCache) {
-                val = metaObjCache.get(name);
+                val = metaObjCache.get(Pair.of(hadoopUserName, name));
                 idToName.put(id, name);
             }
         }
         return val;
     }
 
-    public Optional<T> getMetaObjById(long id) {
+    public Optional<T> getMetaObjById(String hadoopUserName, long id) {
         String name = idToName.get(id);
-        return name == null ? Optional.empty() : getMetaObj(name, id);
+        return name == null ? Optional.empty() : getMetaObj(hadoopUserName, name, id);
     }
 
-    public void updateCache(String objName, T obj, long id) {
-        metaObjCache.put(objName, Optional.of(obj));
-        namesCache.asMap().compute("", (k, v) -> {
+    public void updateCache(String hadoopUserName, String objName, T obj, long id) {
+        metaObjCache.put(Pair.of(hadoopUserName, objName), Optional.of(obj));
+        namesCache.asMap().compute(hadoopUserName, (k, v) -> {
             if (v == null) {
                 return Lists.newArrayList(objName);
             } else {
@@ -103,8 +104,8 @@ public class MetaCache<T> {
         idToName.put(id, objName);
     }
 
-    public void invalidate(String objName, long id) {
-        namesCache.asMap().compute("", (k, v) -> {
+    public void invalidate(String hadoopUserName, String objName, long id) {
+        namesCache.asMap().compute(hadoopUserName, (k, v) -> {
             if (v == null) {
                 return Lists.newArrayList();
             } else {
@@ -112,7 +113,7 @@ public class MetaCache<T> {
                 return v;
             }
         });
-        metaObjCache.invalidate(objName);
+        metaObjCache.invalidate(Pair.of(hadoopUserName, objName));
         idToName.remove(id);
     }
 

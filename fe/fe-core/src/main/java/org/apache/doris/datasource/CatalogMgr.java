@@ -588,7 +588,7 @@ public class CatalogMgr implements Writable, GsonPostProcessable {
         if (catalog == null) {
             return;
         }
-        Optional<ExternalDatabase<? extends ExternalTable>> db = catalog.getDbForReplay(log.getDbId());
+        Optional<ExternalDatabase<? extends ExternalTable>> db = catalog.getDbForReplay("", log.getDbId());
         if (!db.isPresent()) {
             return;
         }

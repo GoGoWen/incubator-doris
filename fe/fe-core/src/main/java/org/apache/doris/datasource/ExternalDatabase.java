@@ -30,6 +30,7 @@ import org.apache.doris.common.io.Text;
 import org.apache.doris.common.io.Writable;
 import org.apache.doris.common.lock.MonitoredReentrantReadWriteLock;
 import org.apache.doris.common.util.Util;
+import org.apache.doris.datasource.hive.HMSExternalDatabase;
 import org.apache.doris.datasource.infoschema.ExternalInfoSchemaDatabase;
 import org.apache.doris.datasource.infoschema.ExternalInfoSchemaTable;
 import org.apache.doris.datasource.infoschema.ExternalMysqlDatabase;
@@ -37,6 +38,7 @@ import org.apache.doris.datasource.infoschema.ExternalMysqlTable;
 import org.apache.doris.datasource.metacache.MetaCache;
 import org.apache.doris.persist.gson.GsonPostProcessable;
 import org.apache.doris.persist.gson.GsonUtils;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.MasterCatalogExecutor;
 
@@ -147,9 +149,9 @@ public abstract class ExternalDatabase<T extends ExternalTable>
                             OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60L),
                             Config.max_meta_object_cache_num,
                             ignored -> listTableNames(),
-                            tableName -> Optional.ofNullable(
-                                    buildTableForInit(tableName,
-                                            Util.genIdByName(extCatalog.getName(), name, tableName), extCatalog)),
+                            key -> Optional.ofNullable(
+                                    buildTableForInit(key.second,
+                                            Util.genIdByName(extCatalog.getName(), name, key.second), extCatalog)),
                             (key, value, cause) -> value.ifPresent(ExternalTable::unsetObjectCreated));
                 }
                 setLastUpdateTime(System.currentTimeMillis());
@@ -176,7 +178,7 @@ public abstract class ExternalDatabase<T extends ExternalTable>
         Map<String, Long> tmpTableNameToId = Maps.newConcurrentMap();
         Map<Long, T> tmpIdToTbl = Maps.newConcurrentMap();
         for (int i = 0; i < log.getRefreshCount(); i++) {
-            Optional<T> table = getTableForReplay(log.getRefreshTableIds().get(i));
+            Optional<T> table = getTableForReplay("", log.getRefreshTableIds().get(i));
             // When upgrade cluster with this pr: https://github.com/apache/doris/pull/27666
             // Maybe there are some create table events will be skipped
             // if the cluster has any hms catalog(s) with hms event listener enabled.
@@ -246,12 +248,12 @@ public abstract class ExternalDatabase<T extends ExternalTable>
 
     protected abstract T buildTableForInit(String tableName, long tblId, ExternalCatalog catalog);
 
-    public Optional<T> getTableForReplay(long tableId) {
+    public Optional<T> getTableForReplay(String hadoopUsername, long tableId) {
         if (extCatalog.getUseMetaCache().get()) {
             if (!isInitialized()) {
                 return Optional.empty();
             }
-            return metaCache.getMetaObjById(tableId);
+            return metaCache.getMetaObjById(hadoopUsername == null ? "" : hadoopUsername, tableId);
         } else {
             return Optional.ofNullable(idToTbl.get(tableId));
         }
@@ -378,7 +380,13 @@ public abstract class ExternalDatabase<T extends ExternalTable>
         if (extCatalog.getUseMetaCache().get()) {
             // must use full qualified name to generate id.
             // otherwise, if 2 databases have the same table name, the id will be the same.
-            return metaCache.getMetaObj(tableName, Util.genIdByName(getQualifiedName(tableName))).orElse(null);
+            String hadoopUserName = "";
+            if (this instanceof HMSExternalDatabase) {
+                Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+                hadoopUserName = BDPAuthContext.get().getHadoopUserName();
+            }
+            return metaCache.getMetaObj(hadoopUserName, tableName,
+                    Util.genIdByName(getQualifiedName(tableName))).orElse(null);
         } else {
             if (!tableNameToId.containsKey(tableName)) {
                 return null;
@@ -391,7 +399,16 @@ public abstract class ExternalDatabase<T extends ExternalTable>
     public T getTableNullable(long tableId) {
         makeSureInitialized();
         if (extCatalog.getUseMetaCache().get()) {
-            return metaCache.getMetaObjById(tableId).orElse(null);
+            return metaCache.getMetaObjById("", tableId).orElse(null);
+        } else {
+            return idToTbl.get(tableId);
+        }
+    }
+
+    public T getTableNullable(String hadoopUsername, long tableId) {
+        makeSureInitialized();
+        if (extCatalog.getUseMetaCache().get()) {
+            return metaCache.getMetaObjById(hadoopUsername, tableId).orElse(null);
         } else {
             return idToTbl.get(tableId);
         }
@@ -458,7 +475,12 @@ public abstract class ExternalDatabase<T extends ExternalTable>
 
         if (extCatalog.getUseMetaCache().get()) {
             if (isInitialized()) {
-                metaCache.invalidate(tableName, Util.genIdByName(getQualifiedName(tableName)));
+                String hadoopUsername = "";
+                if (this instanceof HMSExternalDatabase) {
+                    Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+                    hadoopUsername = BDPAuthContext.get().getHadoopUserName();
+                }
+                metaCache.invalidate(hadoopUsername, tableName, Util.genIdByName(getQualifiedName(tableName)));
             }
         } else {
             Long tableId = tableNameToId.remove(tableName);
@@ -489,7 +511,13 @@ public abstract class ExternalDatabase<T extends ExternalTable>
         }
         if (extCatalog.getUseMetaCache().get()) {
             if (isInitialized()) {
-                metaCache.updateCache(tableName, (T) tableIf, Util.genIdByName(getQualifiedName(tableName)));
+                String hadoopUsername = "";
+                if (this instanceof HMSExternalDatabase) {
+                    Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+                    hadoopUsername = BDPAuthContext.get().getHadoopUserName();
+                }
+                metaCache.updateCache(hadoopUsername, tableName,
+                        (T) tableIf, Util.genIdByName(getQualifiedName(tableName)));
             }
         } else {
             if (!tableNameToId.containsKey(tableName)) {

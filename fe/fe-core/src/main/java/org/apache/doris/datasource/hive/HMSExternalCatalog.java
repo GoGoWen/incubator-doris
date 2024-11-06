@@ -42,9 +42,11 @@ import org.apache.doris.fs.remote.dfs.DFSFileSystem;
 import org.apache.doris.nereids.exceptions.AnalysisException;
 import org.apache.doris.nereids.trees.expressions.functions.table.PartitionValues;
 import org.apache.doris.nereids.trees.expressions.functions.table.TableValuedFunction;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.transaction.TransactionManagerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -225,7 +227,9 @@ public class HMSExternalCatalog extends ExternalCatalog {
         }
         if (useMetaCache.get()) {
             if (isInitialized()) {
-                metaCache.invalidate(dbName, Util.genIdByName(getQualifiedName(dbName)));
+                Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+                String hadoopUsername = BDPAuthContext.get().getHadoopUserName();
+                metaCache.invalidate(hadoopUsername, dbName, Util.genIdByName(getQualifiedName(dbName)));
             }
         } else {
             Long dbId = dbNameToId.remove(dbName);
@@ -246,7 +250,9 @@ public class HMSExternalCatalog extends ExternalCatalog {
         ExternalDatabase<? extends ExternalTable> db = buildDbForInit(dbName, dbId, logType);
         if (useMetaCache.get()) {
             if (isInitialized()) {
-                metaCache.updateCache(dbName, db, Util.genIdByName(getQualifiedName(dbName)));
+                Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+                String hadoopUsername = BDPAuthContext.get().getHadoopUserName();
+                metaCache.updateCache(hadoopUsername, dbName, db, Util.genIdByName(getQualifiedName(dbName)));
             }
         } else {
             dbNameToId.put(dbName, dbId);

@@ -31,10 +31,13 @@ import org.apache.doris.datasource.ExternalDatabase;
 import org.apache.doris.datasource.ExternalObjectLog;
 import org.apache.doris.datasource.ExternalTable;
 import org.apache.doris.datasource.InternalCatalog;
+import org.apache.doris.datasource.hive.HMSExternalDatabase;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.persist.OperationType;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.DdlExecutor;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -100,16 +103,21 @@ public class RefreshManager {
         log.setCatalogId(catalog.getId());
         log.setDbId(db.getId());
         log.setInvalidCache(stmt.isInvalidCache());
+        if (db instanceof HMSExternalDatabase) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            String hadoopUsername = BDPAuthContext.get().getHadoopUserName();
+            log.setHadoopUserName(hadoopUsername);
+        }
         Env.getCurrentEnv().getEditLog().logRefreshExternalDb(log);
     }
 
     public void replayRefreshDb(ExternalObjectLog log) {
-        refreshDbInternal(log.getCatalogId(), log.getDbId(), log.isInvalidCache());
+        refreshDbInternal(log.getHadoopUserName(), log.getCatalogId(), log.getDbId(), log.isInvalidCache());
     }
 
-    private void refreshDbInternal(long catalogId, long dbId, boolean invalidCache) {
+    private void refreshDbInternal(String hadoopUsername, long catalogId, long dbId, boolean invalidCache) {
         ExternalCatalog catalog = (ExternalCatalog) Env.getCurrentEnv().getCatalogMgr().getCatalog(catalogId);
-        Optional<ExternalDatabase<? extends ExternalTable>> db = catalog.getDbForReplay(dbId);
+        Optional<ExternalDatabase<? extends ExternalTable>> db = catalog.getDbForReplay(hadoopUsername, dbId);
         // Database may not exist if 'use_meta_cache' is true.
         // Because each FE fetch the meta data independently.
         db.ifPresent(e -> {
@@ -160,6 +168,11 @@ public class RefreshManager {
         log.setCatalogId(catalog.getId());
         log.setDbId(db.getId());
         log.setTableId(table.getId());
+        if (db instanceof HMSExternalDatabase) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            String hadoopUsername = BDPAuthContext.get().getHadoopUserName();
+            log.setHadoopUserName(hadoopUsername);
+        }
         Env.getCurrentEnv().getEditLog().logRefreshExternalTable(log);
     }
 
@@ -169,13 +182,14 @@ public class RefreshManager {
             LOG.warn("failed to find catalog replaying refresh table {}", log.getCatalogId());
             return;
         }
-        Optional<ExternalDatabase<? extends ExternalTable>> db = catalog.getDbForReplay(log.getDbId());
+        Optional<ExternalDatabase<? extends ExternalTable>> db = catalog.getDbForReplay(log.getHadoopUserName(),
+                log.getDbId());
         // See comment in refreshDbInternal for why db and table may be null.
         if (!db.isPresent()) {
             LOG.warn("failed to find db replaying refresh table {}", log.getDbId());
             return;
         }
-        Optional<? extends ExternalTable> table = db.get().getTableForReplay(log.getTableId());
+        Optional<? extends ExternalTable> table = db.get().getTableForReplay(log.getHadoopUserName(), log.getTableId());
         if (!table.isPresent()) {
             LOG.warn("failed to find table replaying refresh table {}", log.getTableId());
             return;
