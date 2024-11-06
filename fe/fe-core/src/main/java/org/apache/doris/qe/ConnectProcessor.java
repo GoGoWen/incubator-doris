@@ -208,6 +208,10 @@ public abstract class ConnectProcessor {
         String dialect = ctx.getSessionVariable().getSqlDialect();
         try {
             executeQuery(mysqlCommand, originStmt);
+            // try to query by fallback catalog
+            if (ctx.getState().getStateType() == MysqlStateType.ERR && dialect.equals(fallbackCatalog)) {
+                handleQueryFallback(mysqlCommand, forwardToFallbackCatalog(originStmt, fallbackCatalog));
+            }
         } catch (ConnectionException exception) {
             throw exception;
         } catch (Exception ignored) {
@@ -445,10 +449,6 @@ public abstract class ConnectProcessor {
                             true);
                     // execute failed, skip remaining stmts
                     if (ctx.getState().getStateType() == MysqlStateType.ERR) {
-                        if (!("doris").equals(ctx.sessionVariable.getSqlDialect())
-                                && Config.sql_fallback_catalog.equals(ctx.getSessionVariable().getSqlDialect())) {
-                            throw new Exception(ctx.getState().getErrorMessage());
-                        }
                         break;
                     }
                 } catch (Throwable throwable) {
