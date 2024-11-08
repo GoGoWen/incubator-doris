@@ -409,11 +409,11 @@ public abstract class ConnectProcessor {
                             && connectType.equals(ConnectType.MYSQL)
                             && !ctx.sessionVariable.getSqlDialect().equals("doris")
                             && !convertedStmt.equals(originStmt)) {
-                        LOG.warn("execute convert stmt failed, now try original stmt, {}", originStmt);
                         if (Pattern.compile(".*NoSuchObjectException.*"
                                 ).matcher(ctx.getState().getErrorMessage()).find()) {
                             break;
                         }
+                        LOG.warn("execute convert stmt failed, now try original stmt, {}", originStmt);
                         ctx.getState().reset();
                         if (i > 0) {
                             ctx.resetReturnRows();
