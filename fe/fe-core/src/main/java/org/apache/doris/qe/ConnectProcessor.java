@@ -410,8 +410,8 @@ public abstract class ConnectProcessor {
                             && !ctx.sessionVariable.getSqlDialect().equals("doris")
                             && !convertedStmt.equals(originStmt)) {
                         LOG.warn("execute convert stmt failed, now try original stmt, {}", originStmt);
-                        if (Pattern.compile("failed to get.*from hms client.*NoSuchObjectException.*table not "
-                                + "found").matcher(ctx.getState().getErrorMessage()).find()) {
+                        if (Pattern.compile(".*NoSuchObjectException.*"
+                                ).matcher(ctx.getState().getErrorMessage()).find()) {
                             break;
                         }
                         ctx.getState().reset();
