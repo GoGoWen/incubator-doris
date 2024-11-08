@@ -93,6 +93,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 /**
@@ -412,6 +413,10 @@ public abstract class ConnectProcessor {
                             && connectType.equals(ConnectType.MYSQL)
                             && !ctx.sessionVariable.getSqlDialect().equals("doris")
                             && !convertedStmt.equals(originStmt)) {
+                        if (Pattern.compile(".*NoSuchObjectException.*"
+                                ).matcher(ctx.getState().getErrorMessage()).find()) {
+                            break;
+                        }
                         LOG.warn("execute convert stmt failed, now try original stmt, {}", originStmt);
                         ctx.getState().reset();
                         if (i > 0) {
