@@ -680,6 +680,13 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 conf.set("BEE_USER", bdpAuthContext.getErp());
                 client = new ThriftHMSClient(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(),
                         hiveConf);
+                if (bdpAuthContext.getUserType() != null && bdpAuthContext.getUserType().equalsIgnoreCase(
+                        "dev_personal")) {
+                    Preconditions.checkState(bdpAuthContext.getBusinessLine() != null,
+                            "bdp business info cannot be null");
+                    client.client.setMetaConf("USER_TYPE", bdpAuthContext.getUserType());
+                    client.client.setMetaConf("BUSINESS_LINE", bdpAuthContext.getBusinessLine());
+                }
                 return client;
             } catch (Exception e) {
                 LOG.warn("failed to get hive client", e);

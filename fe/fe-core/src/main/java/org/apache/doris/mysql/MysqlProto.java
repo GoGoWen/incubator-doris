@@ -248,6 +248,12 @@ public class MysqlProto {
             if (bdpUserInfo.isSetDb()) {
                 dbName = bdpUserInfo.getDb();
             }
+            if (bdpUserInfo.isSetUserType() && bdpUserInfo.getUserType().equalsIgnoreCase("dev_personal")) {
+                Preconditions.checkState(bdpUserInfo.getBusinessLine() != null,
+                        "bdp business info cannot be null");
+                bdpAuthContext.setUserType(bdpUserInfo.getUserType());
+                bdpAuthContext.setBusinessLine(bdpUserInfo.getBusinessLine());
+            }
         } else {
             if (Config.enable_no_iam_mode) {
                 String erp = System.getenv("BEE_USER");

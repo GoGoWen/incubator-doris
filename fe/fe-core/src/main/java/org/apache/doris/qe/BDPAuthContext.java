@@ -32,6 +32,10 @@ public class BDPAuthContext {
 
     private String userToken = null;
 
+    private String userType = null;
+
+    private String businessLine = null;
+
     private volatile boolean erpChanged = false;
 
     public void setErpChanged(boolean erpChanged) {
@@ -72,6 +76,14 @@ public class BDPAuthContext {
         this.userToken = userToken;
     }
 
+    public void setUserType(String userType) {
+        this.userType = userType;
+    }
+
+    public void setBusinessLine(String businessLine) {
+        this.businessLine = businessLine;
+    }
+
     public void setThreadLocalInfo() {
         threadLocalInfo.set(this);
     }
@@ -98,6 +110,14 @@ public class BDPAuthContext {
 
     public String getUserToken() {
         return userToken;
+    }
+
+    public String getUserType() {
+        return userType;
+    }
+
+    public String getBusinessLine() {
+        return businessLine;
     }
 
     public String toString() {

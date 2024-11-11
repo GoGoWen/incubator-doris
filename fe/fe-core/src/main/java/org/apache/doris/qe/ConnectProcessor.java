@@ -841,6 +841,13 @@ public abstract class ConnectProcessor {
             TBDPAuthContext tbdpAuthContext = request.getBdpAuthContext();
             BDPAuthContext bdpAuthContext = new BDPAuthContext(tbdpAuthContext.getErp(), tbdpAuthContext.getSource(),
                     tbdpAuthContext.getHadoopUserName(), tbdpAuthContext.getUserToken());
+            if (tbdpAuthContext.getUserType() != null && tbdpAuthContext.getUserType().equalsIgnoreCase(
+                    "dev_personal")) {
+                Preconditions.checkState(tbdpAuthContext.getBusinessLine() != null,
+                        "bdp business info cannot be null");
+                bdpAuthContext.setUserType(tbdpAuthContext.getUserType());
+                bdpAuthContext.setBusinessLine(tbdpAuthContext.getBusinessLine());
+            }
             ctx.setBdpAuthContext(bdpAuthContext);
             bdpAuthContext.setThreadLocalInfo();
         }
