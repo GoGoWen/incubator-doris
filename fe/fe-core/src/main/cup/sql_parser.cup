@@ -54,6 +54,7 @@ import org.apache.doris.common.Version;
 import org.apache.doris.mysql.MysqlPassword;
 import org.apache.doris.load.loadv2.LoadTask;
 import org.apache.doris.policy.PolicyTypeEnum;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.resource.workloadschedpolicy.WorkloadConditionMeta;
 import org.apache.doris.resource.workloadschedpolicy.WorkloadActionMeta;
 
@@ -6486,7 +6487,11 @@ order_by_element ::=
   expr:e opt_order_param:o opt_nulls_order_param:n
   {:
     if (n == null) {
-      RESULT = new OrderByElement(e, o, o);
+      if (ConnectContext.get() != null && ConnectContext.get().getSessionVariable().getSqlDialect().equals("presto")) {
+        RESULT = new OrderByElement(e, o, false);
+      } else {
+        RESULT = new OrderByElement(e, o, o);
+      }
     } else {
       RESULT = new OrderByElement(e, o, n);
     }
