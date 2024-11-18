@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "common/logging.h"
 #include "exec/decompressor.h"
 #include "olap/utils.h"
 #include "orc/Exceptions.hh"
@@ -197,7 +198,7 @@ Status LzopDecompressor::decompress(uint8_t* input, size_t input_len, size_t* in
     *decompressed_len = uncompressed_size;
     *input_bytes_read += ptr - block_start;
 
-    LOG(INFO) << "finished decompress lzo block."
+    VLOG_DEBUG << "finished decompress lzo block."
               << " compressed_size: " << compressed_size
               << " decompressed_len: " << *decompressed_len
               << " input_bytes_read: " << *input_bytes_read
@@ -362,7 +363,7 @@ Status LzopDecompressor::parse_header_info(uint8_t* input, size_t input_len,
     *input_bytes_read = _header_info.header_size;
 
     _is_header_loaded = true;
-    LOG(INFO) << debug_info();
+    VLOG_DEBUG << debug_info();
 
     return Status::OK();
 }

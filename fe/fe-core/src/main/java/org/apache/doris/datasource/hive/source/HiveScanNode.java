@@ -463,7 +463,12 @@ public class HiveScanNode extends FileQueryScanNode {
         } else if (hiveFormat.equals(HiveFileFormat.ORC.getDesc())) {
             return TFileFormatType.FORMAT_ORC;
         } else if (hiveFormat.equals(HiveFileFormat.TEXT_FILE.getDesc())) {
-            return TFileFormatType.FORMAT_CSV_PLAIN;
+            String serDeLib = hmsTable.getRemoteTable().getSd().getSerdeInfo().getSerializationLib();
+            if (serDeLib.equals("org.apache.hive.hcatalog.data.JsonSerDe")) {
+                return TFileFormatType.FORMAT_JSON;
+            } else {
+                return TFileFormatType.FORMAT_CSV_PLAIN;
+            }
         } else if (hiveFormat.equals(HiveFileFormat.SEQUENCE_FILE.getDesc())) {
             return TFileFormatType.FORMAT_SEQUENCE;
         } else if (hiveFormat.equals(HiveFileFormat.RCFILE.getDesc())) {
@@ -487,7 +492,22 @@ public class HiveScanNode extends FileQueryScanNode {
     @Override
     protected TFileAttributes getFileAttributes() throws UserException {
         TFileTextScanRangeParams textParams = new TFileTextScanRangeParams();
+        String serDeLib = hmsTable.getRemoteTable().getSd().getSerdeInfo().getSerializationLib();
+        if (serDeLib.equals("org.apache.hive.hcatalog.data.JsonSerDe")) {
+            TFileAttributes fileAttributes = new TFileAttributes();
+            textParams.setColumnSeparator("\t");
+            textParams.setLineDelimiter("\n");
+            fileAttributes.setTextParams(textParams);
 
+            fileAttributes.setJsonpaths("");
+            fileAttributes.setJsonRoot("");
+            fileAttributes.setNumAsString(true);
+            fileAttributes.setFuzzyParse(false);
+            fileAttributes.setReadJsonByLine(true);
+            fileAttributes.setStripOuterArray(false);
+            fileAttributes.setHeaderType("");
+            return fileAttributes;
+        }
         // 1. set column separator
         Optional<String> fieldDelim = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
                 PROP_FIELD_DELIMITER);

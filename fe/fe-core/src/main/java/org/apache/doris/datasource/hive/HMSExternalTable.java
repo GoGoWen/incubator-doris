@@ -445,12 +445,12 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
 
     @Override
     public Optional<SchemaCacheValue> initSchemaAndUpdateTime() {
-        org.apache.hadoop.hive.metastore.api.Table table = ((HMSExternalCatalog) catalog).getClient()
-                .getTable(dbName, name);
+        unsetObjectCreated();
+        makeSureInitialized();
         // try to use transient_lastDdlTime from hms client
-        schemaUpdateTime = MapUtils.isNotEmpty(table.getParameters())
-                && table.getParameters().containsKey(TBL_PROP_TRANSIENT_LAST_DDL_TIME)
-                ? Long.parseLong(table.getParameters().get(TBL_PROP_TRANSIENT_LAST_DDL_TIME)) * 1000
+        schemaUpdateTime = MapUtils.isNotEmpty(remoteTable.getParameters())
+                && remoteTable.getParameters().containsKey(TBL_PROP_TRANSIENT_LAST_DDL_TIME)
+                ? Long.parseLong(remoteTable.getParameters().get(TBL_PROP_TRANSIENT_LAST_DDL_TIME)) * 1000
                 // use current timestamp if lastDdlTime does not exist (hive views don't have this prop)
                 : System.currentTimeMillis();
         return initSchema();
@@ -476,7 +476,8 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         } else {
             columns = getHiveSchema();
         }
-        List<Column> partitionColumns = initPartitionColumns(columns);
+        List<Column> partitionColumns = initPartitionColumns();
+        columns.addAll(partitionColumns);
         return Optional.of(new HMSSchemaCacheValue(columns, partitionColumns));
     }
 
@@ -496,16 +497,13 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
     }
 
     private List<Column> getHiveSchema() {
-        HMSCachedClient client = ((HMSExternalCatalog) catalog).getClient();
-        List<FieldSchema> schema = client.getSchema(dbName, name);
-        Map<String, String> colDefaultValues = client.getDefaultColumnValues(dbName, name);
+        List<FieldSchema> schema = remoteTable.getSd().getCols();
         List<Column> columns = Lists.newArrayListWithCapacity(schema.size());
         for (FieldSchema field : schema) {
             String fieldName = field.getName().toLowerCase(Locale.ROOT);
-            String defaultValue = colDefaultValues.getOrDefault(fieldName, null);
             columns.add(new Column(fieldName,
                     HiveMetaStoreClientHelper.hiveTypeToDorisType(field.getType()), true, null,
-                    true, defaultValue, field.getComment(), true, -1));
+                    true, null, field.getComment(), true, -1));
         }
         return columns;
     }
@@ -523,25 +521,18 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         return rowCount;
     }
 
-    private List<Column> initPartitionColumns(List<Column> schema) {
-        List<String> partitionKeys = remoteTable.getPartitionKeys().stream().map(FieldSchema::getName)
-                .collect(Collectors.toList());
+    private List<Column> initPartitionColumns() {
+        List<FieldSchema> partitionKeys = remoteTable.getPartitionKeys();
         List<Column> partitionColumns = Lists.newArrayListWithCapacity(partitionKeys.size());
-        for (String partitionKey : partitionKeys) {
+        for (FieldSchema field : partitionKeys) {
             // Do not use "getColumn()", which will cause dead loop
-            for (Column column : schema) {
-                if (partitionKey.equalsIgnoreCase(column.getName())) {
-                    // For partition column, if it is string type, change it to varchar(65535)
-                    // to be same as doris managed table.
-                    // This is to avoid some unexpected behavior such as different partition pruning result
-                    // between doris managed table and external table.
-                    if (column.getType().getPrimitiveType() == PrimitiveType.STRING) {
-                        column.setType(ScalarType.createVarcharType(ScalarType.MAX_VARCHAR_LENGTH));
-                    }
-                    partitionColumns.add(column);
-                    break;
-                }
+            String fieldName = field.getName().toLowerCase(Locale.ROOT);
+            Type type = HiveMetaStoreClientHelper.hiveTypeToDorisType(field.getType());
+            if (type.getPrimitiveType() == PrimitiveType.STRING) {
+                type = ScalarType.createVarcharType(ScalarType.MAX_VARCHAR_LENGTH);
             }
+            partitionColumns.add(new Column(fieldName, type, true, null,
+                    true, null, field.getComment(), true, -1));
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("get {} partition columns for table: {}", partitionColumns.size(), name);
