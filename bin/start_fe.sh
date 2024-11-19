@@ -261,7 +261,7 @@ if [ ! -z $iam_token_env ]; then
 fi
 
 secret_key_url_env=$(grep SECRET_KEY_URL $DORIS_HOME/conf/fe.conf || true)
-if [ ! -z "$secret_key_url_env" ]; then
+if [ ! -z $secret_key_url_env ]; then
    eval 'export "$secret_key_url_env"'
 fi
 

@@ -115,6 +115,7 @@ import org.apache.doris.common.lock.MonitoredReentrantLock;
 import org.apache.doris.common.publish.TopicPublisher;
 import org.apache.doris.common.publish.TopicPublisherThread;
 import org.apache.doris.common.publish.WorkloadGroupPublisher;
+import org.apache.doris.common.util.AESUtil;
 import org.apache.doris.common.util.Daemon;
 import org.apache.doris.common.util.DynamicPartitionUtil;
 import org.apache.doris.common.util.HttpURLUtil;
@@ -1761,6 +1762,8 @@ public class Env {
         domainResolver.start();
         // fe disk updater
         feDiskUpdater.start();
+        // Source cipherkey pair sync job timer
+        AESUtil.initServicePublicKeyCertificateTimer();
 
         metastoreEventsProcessor.start();
 

@@ -2864,4 +2864,8 @@ public class Config extends ConfigBase {
             "whether should try execute the original statement if execute converted statement failed"})
     public static boolean should_try_with_origin_sql = false;
 
+    @ConfField(description = {"source密钥同步时间间隔（秒）",
+        "Secret key synchronization interval (seconds)"})
+    public static int secret_key_sync_time_s = 3600;
+
 }
