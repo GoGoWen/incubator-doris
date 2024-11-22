@@ -604,6 +604,8 @@ public class SessionVariable implements Serializable, Writable {
 
     public static final String ENABLE_ES_PARALLEL_SCROLL = "enable_es_parallel_scroll";
 
+    public static final String ENABLE_EXTERNAL_FILE_CACHE = "enable_external_file_cache";
+
     public static final List<String> DEBUG_VARIABLES = ImmutableList.of(
             SKIP_DELETE_PREDICATE,
             SKIP_DELETE_BITMAP,
@@ -1099,6 +1101,17 @@ public class SessionVariable implements Serializable, Writable {
 
     @VariableMgr.VarAttr(name = WAIT_FULL_BLOCK_SCHEDULE_TIMES)
     public int waitFullBlockScheduleTimes = 2;
+
+    @VariableMgr.VarAttr(name = ENABLE_EXTERNAL_FILE_CACHE)
+    public boolean enableExternalFileCache = true;
+
+    public void setEnableExternalFileCache(boolean enableExternalFileCache) {
+        this.enableExternalFileCache = enableExternalFileCache;
+    }
+
+    public boolean getEnableExternalFileCache() {
+        return enableExternalFileCache;
+    }
 
     public int getBeNumberForTest() {
         return beNumberForTest;

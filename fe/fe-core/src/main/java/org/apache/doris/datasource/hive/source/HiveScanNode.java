@@ -331,8 +331,9 @@ public class HiveScanNode extends FileQueryScanNode {
         if (hiveTransaction != null) {
             fileCaches = getFileSplitByTransaction(cache, partitions, bindBrokerName);
         } else {
-            boolean withCache = Config.max_external_file_cache_num > 0;
-            fileCaches = cache.getFilesByPartitions(partitions, withCache, withCache, bindBrokerName);
+            boolean withCache = Config.max_external_file_cache_num > 0 && (ConnectContext.get() == null
+                    || ConnectContext.get().getSessionVariable().getEnableExternalFileCache());
+            fileCaches = cache.getFilesByPartitions(partitions, withCache, !withCache, bindBrokerName);
         }
         if (tableSample != null) {
             List<HiveMetaStoreCache.HiveFileStatus> hiveFileStatuses = selectFiles(fileCaches);
