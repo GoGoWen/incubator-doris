@@ -17,11 +17,9 @@
 
 package org.apache.doris.hudi;
 
-import org.apache.doris.common.security.authentication.AuthenticationConfig;
-import org.apache.doris.common.security.authentication.HadoopUGI;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import sun.management.VMManagement;
 
@@ -33,6 +31,7 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.security.PrivilegedAction;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -84,8 +83,11 @@ public class Utils {
         }
     }
 
-    public static HoodieTableMetaClient getMetaClient(Configuration conf, String basePath) {
-        return HadoopUGI.ugiDoAs(AuthenticationConfig.getKerberosConfig(conf), () -> HoodieTableMetaClient.builder()
+    public static HoodieTableMetaClient getMetaClient(String hadoopUserName, String hadoopUserToken,
+            Configuration conf, String basePath) {
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(hadoopUserName, null,
+                hadoopUserToken);
+        return ugi.doAs((PrivilegedAction<HoodieTableMetaClient>) () -> HoodieTableMetaClient.builder()
                 .setConf(conf).setBasePath(basePath).build());
     }
 }

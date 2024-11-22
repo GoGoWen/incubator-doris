@@ -17,9 +17,8 @@
 
 package org.apache.doris.datasource.hudi.source;
 
-import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
-
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hudi.common.config.SerializableConfiguration;
 import org.apache.hudi.common.data.HoodieAccumulator;
 import org.apache.hudi.common.data.HoodieAtomicLongAccumulator;
@@ -41,6 +40,7 @@ import org.apache.hudi.common.util.collection.ImmutablePair;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.exception.HoodieException;
 
+import java.security.PrivilegedAction;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -56,12 +56,16 @@ import java.util.stream.Stream;
  */
 public final class HudiLocalEngineContext extends HoodieEngineContext {
 
-    public HudiLocalEngineContext(Configuration conf) {
-        this(conf, new LocalTaskContextSupplier());
+    private UserGroupInformation ugi = null;
+
+    public HudiLocalEngineContext(Configuration conf, UserGroupInformation ugi) {
+        this(conf, new LocalTaskContextSupplier(), ugi);
     }
 
-    public HudiLocalEngineContext(Configuration conf, TaskContextSupplier taskContextSupplier) {
+    public HudiLocalEngineContext(Configuration conf, TaskContextSupplier taskContextSupplier,
+            UserGroupInformation ugi) {
         super(new SerializableConfiguration(conf), taskContextSupplier);
+        this.ugi = ugi;
     }
 
     @Override
@@ -83,7 +87,13 @@ public final class HudiLocalEngineContext extends HoodieEngineContext {
     public <I, O> List<O> map(List<I> data, SerializableFunction<I, O> func, int parallelism) {
         return data.stream().parallel().map(v1 -> {
             try {
-                return HiveMetaStoreClientHelper.ugiDoAs(getHadoopConf().get(), () -> func.apply(v1));
+                return ugi.doAs((PrivilegedAction<O>) () -> {
+                    try {
+                        return func.apply(v1);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
             } catch (Exception e) {
                 throw new HoodieException("Error occurs when executing map", e);
             }

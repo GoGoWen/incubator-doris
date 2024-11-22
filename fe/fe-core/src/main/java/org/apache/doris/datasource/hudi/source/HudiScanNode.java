@@ -36,6 +36,7 @@ import org.apache.doris.datasource.hive.source.HiveScanNode;
 import org.apache.doris.datasource.hudi.HudiUtils;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
@@ -45,11 +46,13 @@ import org.apache.doris.thrift.TFileRangeDesc;
 import org.apache.doris.thrift.THudiFileDesc;
 import org.apache.doris.thrift.TTableFormatFileDesc;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.avro.Schema;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.BaseFile;
@@ -66,6 +69,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -356,8 +360,10 @@ public class HudiScanNode extends HiveScanNode {
             });
         } else {
             fileSystemView.getLatestMergedFileSlicesBeforeOrOn(partitionName, queryInstant)
-                    .forEach(fileSlice -> splits.add(
-                            generateHudiSplit(fileSlice, partition.getPartitionValues(), queryInstant)));
+                    .forEach(fileSlice -> {
+                        splits.add(
+                                generateHudiSplit(fileSlice, partition.getPartitionValues(), queryInstant));
+                    });
         }
     }
 
@@ -390,9 +396,18 @@ public class HudiScanNode extends HiveScanNode {
             return getIncrementalSplits();
         }
         if (!partitionInit) {
-            prunedPartitions = HiveMetaStoreClientHelper.ugiDoAs(
-                    HiveMetaStoreClientHelper.getConfiguration(hmsTable),
-                    () -> getPrunedPartitions(hudiClient, snapshotTimestamp));
+            BDPAuthContext bdpAuthContext = BDPAuthContext.get();
+            Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
+            UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
+                    null, bdpAuthContext.getUserToken());
+            prunedPartitions = ugi.doAs(
+                    (PrivilegedAction<List<HivePartition>>) () -> {
+                        try {
+                            return getPrunedPartitions(hudiClient, snapshotTimestamp);
+                        } catch (AnalysisException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
             partitionInit = true;
         }
         List<Split> splits = Collections.synchronizedList(new ArrayList<>());
@@ -452,9 +467,18 @@ public class HudiScanNode extends HiveScanNode {
         }
         if (!partitionInit) {
             // Non partition table will get one dummy partition
-            prunedPartitions = HiveMetaStoreClientHelper.ugiDoAs(
-                    HiveMetaStoreClientHelper.getConfiguration(hmsTable),
-                    () -> getPrunedPartitions(hudiClient, snapshotTimestamp));
+            BDPAuthContext bdpAuthContext = BDPAuthContext.get();
+            Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
+            UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
+                    null, bdpAuthContext.getUserToken());
+            prunedPartitions = ugi.doAs(
+                    (PrivilegedAction<List<HivePartition>>) () -> {
+                        try {
+                            return getPrunedPartitions(hudiClient, snapshotTimestamp);
+                        } catch (AnalysisException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
             partitionInit = true;
         }
         int numPartitions = ConnectContext.get().getSessionVariable().getNumPartitionsInBatchMode();

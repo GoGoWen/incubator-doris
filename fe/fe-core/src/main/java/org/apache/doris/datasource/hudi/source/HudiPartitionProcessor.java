@@ -17,6 +17,10 @@
 
 package org.apache.doris.datasource.hudi.source;
 
+import org.apache.doris.qe.BDPAuthContext;
+
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
@@ -47,9 +51,12 @@ public abstract class HudiPartitionProcessor {
         HoodieMetadataConfig metadataConfig = HoodieMetadataConfig.newBuilder()
                 .enable(HoodieTableMetadataUtil.isFilesPartitionAvailable(tableMetaClient))
                 .build();
-
+        BDPAuthContext bdpAuthContext = BDPAuthContext.get();
+        Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
+                null, bdpAuthContext.getUserToken());
         HoodieTableMetadata newTableMetadata = HoodieTableMetadata.create(
-                new HudiLocalEngineContext(tableMetaClient.getHadoopConf()), metadataConfig,
+                new HudiLocalEngineContext(tableMetaClient.getHadoopConf(), ugi), metadataConfig,
                 tableMetaClient.getBasePathV2().toString(), true);
 
         return newTableMetadata.getAllPartitionPaths();

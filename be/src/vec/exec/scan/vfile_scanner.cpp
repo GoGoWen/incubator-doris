@@ -781,7 +781,6 @@ Status VFileScanner::_get_next_reader() {
             if (range.table_format_params.table_format_type == "hudi" &&
                 range.table_format_params.hudi_params.delta_logs.empty()) {
                 // fall back to native reader if there is no log file
-                format_type = TFileFormatType::FORMAT_PARQUET;
             } else if (range.table_format_params.table_format_type == "paimon" &&
                        !range.table_format_params.paimon_params.__isset.paimon_split) {
                 // use native reader

@@ -81,7 +81,8 @@ class MORSnapshotSplitReader(override val split: HoodieSplit) extends BaseSplitR
     val partitionedBaseFile = if (split.dataFilePath.isEmpty) {
       None
     } else {
-      Some(PartitionedFile(getPartitionColumnsAsInternalRow(), SparkPath.fromPathString(split.dataFilePath), 0, split.dataFileLength))
+      Some(PartitionedFile(getPartitionColumnsAsInternalRow(), SparkPath.fromPathString(split.dataFilePath),
+        0, split.dataFileLength))
     }
     HoodieMergeOnReadFileSplit(partitionedBaseFile, logFiles)
   }
@@ -100,7 +101,6 @@ class MORSnapshotSplitReader(override val split: HoodieSplit) extends BaseSplitR
                                       optionalFilters: Seq[Filter] = Seq.empty): HoodieMergeOnReadBaseFileReaders = {
     val (partitionSchema, dataSchema, requiredDataSchema) =
       tryPrunePartitionColumns(tableSchema, requiredSchema)
-
     val fullSchemaReader = createBaseFileReader(
       spark = sqlContext.sparkSession,
       partitionSchema = partitionSchema,

@@ -469,15 +469,15 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
     public Optional<SchemaCacheValue> initSchema() {
         makeSureInitialized();
         List<Column> columns;
+        List<Column> partitionColumns = initPartitionColumns();
         if (dlaType.equals(DLAType.ICEBERG)) {
             columns = getIcebergSchema();
         } else if (dlaType.equals(DLAType.HUDI)) {
             columns = getHudiSchema();
         } else {
             columns = getHiveSchema();
+            columns.addAll(partitionColumns);
         }
-        List<Column> partitionColumns = initPartitionColumns();
-        columns.addAll(partitionColumns);
         return Optional.of(new HMSSchemaCacheValue(columns, partitionColumns));
     }
 

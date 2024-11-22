@@ -74,6 +74,8 @@ class HoodieSplit(private val params: jutil.Map[String, String]) {
   val queryId: String = params.remove("query_id")
   val basePath: String = params.remove("base_path")
   val dataFilePath: String = params.remove("data_file_path")
+  val hadoopUserName: String = params.remove("HADOOP_USER_NAME");
+  val hadoopUserToken: String = params.remove("HADOOP_USER_TOKEN");
   val dataFileLength: Long = params.remove("data_file_length").toLong
   val deltaFilePaths: Array[String] = {
     val deltas = params.remove("delta_file_paths")
@@ -636,7 +638,8 @@ object BaseSplitReader {
       override def load(split: HoodieSplit): HoodieTableInformation = {
         // create mock spark session
         val sparkSession = SparkSession.builder().createMockSession(split)
-        val metaClient = Utils.getMetaClient(split.hadoopConf, split.basePath)
+        val metaClient = Utils.getMetaClient(split.hadoopUserName, split.hadoopUserToken, split.hadoopConf,
+          split.basePath)
         // NOTE: We're including compaction here since it's not considering a "commit" operation
         val timeline = metaClient.getCommitsAndCompactionTimeline.filterCompletedInstants
 

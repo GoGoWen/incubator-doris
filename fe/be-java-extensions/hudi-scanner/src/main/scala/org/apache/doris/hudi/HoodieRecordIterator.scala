@@ -93,7 +93,6 @@ class HoodieMORRecordIterator(config: Configuration,
                               endTimestamp: String = null) extends Iterator[InternalRow] with Closeable {
   protected val maxCompactionMemoryInBytes: Long = config.getLongBytes(
     "hoodie.compaction.memory", 512 * 1024 * 1024)
-
   protected val recordIterator: Iterator[InternalRow] = {
     val iter = fileSplit match {
       case dataFileOnlySplit if dataFileOnlySplit.logFiles.isEmpty =>
