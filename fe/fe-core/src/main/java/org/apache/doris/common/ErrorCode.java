@@ -1289,7 +1289,25 @@ public enum ErrorCode {
     ERR_NOT_FOUND_FUNCTION(9067, new byte[]{'4', '2', '0', '0', '0'},
             "Not found function: %s which has arity: %d, candidate function is: %s"),
     ERR_FUNCTION_IS_AMBIGUOUS(9068, new byte[]{'4', '2', '0', '0', '0'},
-            "Function: %s is ambigious with candidate: %s");
+            "Function: %s is ambigious with candidate: %s"),
+    ERR_NO_SUCH_OBJECT(9069, new byte[]{'4', '2', '0', '0', '0'},
+        "failed to get table %"),
+    ERR_TABLE_DOES_NOT_EXIST_IN_DATABASE(9070, new byte[]{'4', '2', '0', '0', '0'},
+        "Table %s does not exist in database"),
+    ERR_TABLE_PARTITIONS_TABLE_NOT_FOUND(9071, new byte[]{'4', '2', '0', '0', '0'},
+        "failed to get table %s"),
+    ERR_ONLY_SUPPORT_CSV_DATA_IN_UTF8_CODEC(9072, new byte[]{'4', '2', '0', '0', '0'},
+        "Only support csv data in utf8 codec"),
+    ERR_PLEASE_CHECK_YOUR_SQL(9073, new byte[]{'4', '2', '0', '0', '0'},
+        "Sql parser can't convert the result to array, please check your sql"),
+    ERR_IS_NOT_ALLOWED_IN_DESCRIBE_STMT_ALL(9074, new byte[]{'4', '2', '0', '0', '0'},
+        "External catalog 'hive' is not allowed in 'DescribeStmt ALL'"),
+    ERR_FAILED_TO_CREATE_ORC_ROW_READER(9075, new byte[]{'4', '2', '0', '0', '0'},
+        "Failed to create orc row reader"),
+    ERR_PARSE_EXCEPTION(9076, new byte[]{'4', '2', '0', '0', '0'},
+        "ParseException"),
+    ERR_MetaException(9077, new byte[]{'4', '2', '0', '0', '0'},
+        "failed to get table %s");
 
     // This is error code
     private final int code;

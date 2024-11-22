@@ -107,6 +107,33 @@ public class ErrorCodeMapper {
         errorMap.put(Pattern.compile("Unmatched string literal"), ErrorCode.ERR_UMATCHED_STRING_LITERAL);
         errorMap.put(Pattern.compile("Incomplete escape sequence"), ErrorCode.ERR_ILLEGAL_STATE_EXCEPTION);
         errorMap.put(Pattern.compile("user cancel"), ErrorCode.ERR_USER_CANCELED);
+        errorMap.put(Pattern.compile("timeout when waiting for send fragments rpc"),
+                ErrorCode.ERR_SEND_FRAGMENTS_FAILED);
+        errorMap.put(Pattern.compile("Process memory not enough"),
+                ErrorCode.ERR_PROCESS_MEMORY_NOT_ENOUGH_CANCEL_QUERY);
+        errorMap.put(Pattern.compile("Query may be timeout or be cancelled"),
+                ErrorCode.ERR_USER_CANCELED);
+        errorMap.put(Pattern.compile("query timeout"), ErrorCode.ERR_EXECUTE_TIMEOUT);
+        errorMap.put(Pattern.compile("Allocator sys memory check failed"),
+                ErrorCode.ERR_CREATE_EXPR_MEM_ALLOC_FAILED);
+        errorMap.put(Pattern.compile("Table .* does not exist in database"),
+                ErrorCode.ERR_TABLE_DOES_NOT_EXIST_IN_DATABASE);
+        errorMap.put(Pattern.compile("failed to get table .*NoSuchObjectException.*\\$partitions table not found"),
+                ErrorCode.ERR_TABLE_PARTITIONS_TABLE_NOT_FOUND);
+        errorMap.put(Pattern.compile("failed to get table.*NoSuchObjectException.*table not found"),
+                ErrorCode.ERR_NO_SUCH_OBJECT);
+        errorMap.put(Pattern.compile("Only support csv data in utf8 codec"),
+                ErrorCode.ERR_ONLY_SUPPORT_CSV_DATA_IN_UTF8_CODEC);
+        errorMap.put(Pattern.compile("please check your sql"),
+                ErrorCode.ERR_PLEASE_CHECK_YOUR_SQL);
+        errorMap.put(Pattern.compile("External catalog .* is not allowed in 'DescribeStmt ALL'"),
+                ErrorCode.ERR_IS_NOT_ALLOWED_IN_DESCRIBE_STMT_ALL);
+        errorMap.put(Pattern.compile("Failed to create orc row reader"),
+                ErrorCode.ERR_FAILED_TO_CREATE_ORC_ROW_READER);
+        errorMap.put(Pattern.compile("ParseException"),
+                ErrorCode.ERR_PARSE_EXCEPTION);
+        errorMap.put(Pattern.compile("failed to get table.*MetaException.*权限"),
+                ErrorCode.ERR_MetaException);
     }
 
     public static ErrorCode getErrorCode(String errorMessage) {
