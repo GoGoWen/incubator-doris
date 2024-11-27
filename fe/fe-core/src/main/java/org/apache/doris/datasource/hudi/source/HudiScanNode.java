@@ -493,7 +493,7 @@ public class HudiScanNode extends HiveScanNode {
     private HudiSplit generateHudiSplit(FileSlice fileSlice, List<String> partitionValues, String queryInstant) {
         Optional<HoodieBaseFile> baseFile = fileSlice.getBaseFile().toJavaOptional();
         String filePath = baseFile.map(BaseFile::getPath).orElse("");
-        long fileSize = baseFile.map(BaseFile::getFileSize).orElse(0L);
+        long fileSize = baseFile.map(BaseFile::getFileSize).orElse(-1L);
         fileSlice.getPartitionPath();
 
         List<String> logs = fileSlice.getLogFiles().map(HoodieLogFile::getPath)
