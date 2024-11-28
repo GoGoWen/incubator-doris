@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.regex.Pattern;
 
 /**
  * External catalog for hive metastore compatible data sources.
@@ -70,6 +71,9 @@ public class HMSExternalCatalog extends ExternalCatalog {
     public static final String FILE_META_CACHE_TTL_SECOND = "file.meta.cache.ttl-second";
     // broker name for file split and query scan.
     public static final String BIND_BROKER_NAME = "broker.name";
+
+    // to check if a database name contains a dot (.)
+    public static final String DB_NAME_PATTERN = "^[A-Za-z][A-Za-z0-9_]*$";
 
     // -1 means file cache no ttl set
     public static final int FILE_META_CACHE_NO_TTL = -1;
@@ -258,6 +262,23 @@ public class HMSExternalCatalog extends ExternalCatalog {
             dbNameToId.put(dbName, dbId);
             idToDb.put(dbId, db);
         }
+    }
+
+    @Override
+    protected ExternalDatabase<? extends ExternalTable> buildDbForInit(String dbName,
+            long dbId, InitCatalogLog.Type logType) {
+        ExternalDatabase<? extends ExternalTable> externalDatabase = super.buildDbForInit(dbName, dbId, logType);
+        if (externalDatabase == null) {
+            if (!Pattern.matches(DB_NAME_PATTERN, dbName)) {
+                LOG.warn("HMSExternalCatalog buildDbForInit find hive database name is invalid {}", dbName);
+                return null;
+            }
+
+            // warn and create a new instance of HMSExternalDatabase when superclass method returns null
+            LOG.warn("HMSExternalCatalog database does not exist: {}. It may be a virtual database.", dbName);
+            return new HMSExternalDatabase(this, dbId, dbName);
+        }
+        return externalDatabase;
     }
 
     @Override
