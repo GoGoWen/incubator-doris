@@ -68,6 +68,8 @@ public class SetExecutor {
                 ErrorReport.reportDdlException(ErrorCode.ERR_INVALID_OPERATION_FOR_IAM, var.getVariable());
             }
             ConnectContext.get().getBdpAuthContext().setErpChanged(true);
+            ConnectContext.get().getBdpAuthContext().setUserType(null);
+            ConnectContext.get().getBdpAuthContext().setBusinessLine(null);
             LOG.info("succeed to set erp, " + ConnectContext.get().getBdpAuthContext().toString());
         } else if (var.getVariable().equalsIgnoreCase("hadoop_user_name")) {
             if (ConnectContext.get().getBdpAuthContext() != null
@@ -88,7 +90,19 @@ public class SetExecutor {
             } else {
                 ErrorReport.reportDdlException(ErrorCode.ERR_INVALID_OPERATION_FOR_IAM, var.getVariable());
             }
-
+        } else if (var.getVariable().equalsIgnoreCase("businessline")) {
+            if (ConnectContext.get().getBdpAuthContext() != null
+                    && IAMUtil.isSourceInWhitelist(ConnectContext.get().getBdpAuthContext().getSource())) {
+                if (!ConnectContext.get().getBdpAuthContext().isErpChanged()) {
+                    ErrorReport.reportDdlException(ErrorCode.ERR_INVALID_OPERATION_FOR_IAM, var.getVariable());
+                }
+                String businessLineName = var.getValue().getStringValue();
+                ConnectContext.get().getBdpAuthContext().setBusinessLine(businessLineName);
+                ConnectContext.get().getBdpAuthContext().setUserType("dev_personal");
+                LOG.info("succeed to set businessline, " + ConnectContext.get().getBdpAuthContext().toString());
+            } else {
+                ErrorReport.reportDdlException(ErrorCode.ERR_INVALID_OPERATION_FOR_IAM, var.getVariable());
+            }
         } else {
             VariableMgr.setVar(ctx.getSessionVariable(), var);
         }
