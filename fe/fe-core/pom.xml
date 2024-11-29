@@ -679,16 +679,10 @@ under the License.
             <artifactId>avro</artifactId>
         </dependency>
 
-        <!-- https://mvnrepository.com/artifact/org.apache.hudi/hudi-common -->
-        <dependency>
-            <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-common</artifactId>
-        </dependency>
-
         <!-- https://mvnrepository.com/artifact/org.apache.hudi/hudi-hadoop-mr -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-hadoop-mr</artifactId>
+            <artifactId>hudi-hadoop-mr-bundle</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.parquet</groupId>

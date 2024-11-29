@@ -25,12 +25,12 @@ import org.apache.doris.catalog.StructType;
 import org.apache.doris.catalog.Type;
 
 import com.google.common.base.Preconditions;
-import org.apache.avro.LogicalType;
-import org.apache.avro.LogicalTypes;
-import org.apache.avro.Schema;
-import org.apache.avro.Schema.Field;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
+import org.apache.hudi.org.apache.avro.LogicalType;
+import org.apache.hudi.org.apache.avro.LogicalTypes;
+import org.apache.hudi.org.apache.avro.Schema;
+import org.apache.hudi.org.apache.avro.Schema.Field;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;

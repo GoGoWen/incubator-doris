@@ -319,8 +319,8 @@ under the License.
         <avro.version>1.11.4</avro.version>
         <arrow.version>17.0.0</arrow.version>
         <!-- hudi -->
-        <hudi.version>0.14.1</hudi.version>
-        <parquet.version>1.13.1</parquet.version>
+        <hudi.version>JD.0.13.1-TEST-SNAPSHOT</hudi.version>
+        <parquet.version>1.12.3</parquet.version>
         <commons-collections.version>3.2.2</commons-collections.version>
         <commons-compress.version>1.22</commons-compress.version>
         <scala.version>2.12.10</scala.version>
@@ -1314,30 +1314,6 @@ under the License.
                 <artifactId>avro-ipc</artifactId>
                 <version>${avro.version}</version>
             </dependency>
-            <!-- https://mvnrepository.com/artifact/org.apache.hudi/hudi-common -->
-            <dependency>
-                <groupId>org.apache.hudi</groupId>
-                <artifactId>hudi-common</artifactId>
-                <version>${hudi.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <artifactId>commons-httpclient</artifactId>
-                        <groupId>commons-httpclient</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <artifactId>netty-all</artifactId>
-                        <groupId>io.netty</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <artifactId>log4j</artifactId>
-                        <groupId>log4j</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.apache.hive</groupId>
-                        <artifactId>hive-storage-api</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
             <dependency>
                 <groupId>org.aspectj</groupId>
                 <artifactId>aspectjweaver</artifactId>
@@ -1352,7 +1328,7 @@ under the License.
             <!-- https://mvnrepository.com/artifact/org.apache.hudi/hudi-hadoop-mr -->
             <dependency>
                 <groupId>org.apache.hudi</groupId>
-                <artifactId>hudi-hadoop-mr</artifactId>
+                <artifactId>hudi-hadoop-mr-bundle</artifactId>
                 <version>${hudi.version}</version>
             </dependency>
             <dependency>

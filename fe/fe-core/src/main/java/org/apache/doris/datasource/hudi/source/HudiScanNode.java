@@ -49,7 +49,6 @@ import org.apache.doris.thrift.TTableFormatFileDesc;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import org.apache.avro.Schema;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -65,6 +64,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.org.apache.avro.Schema;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -344,7 +344,7 @@ public class HudiScanNode extends HiveScanNode {
             globPath = String.format("%s/%s/*", hudiClient.getBasePathV2().toString(), partitionName);
         }
         List<FileStatus> statuses = FSUtils.getGlobStatusExcludingMetaFolder(
-                hudiClient.getRawFs(), new Path(globPath));
+                hudiClient.getRawFs(new Path(globPath)), new Path(globPath));
         HoodieTableFileSystemView fileSystemView = new HoodieTableFileSystemView(hudiClient,
                 timeline, statuses.toArray(new FileStatus[0]));
 

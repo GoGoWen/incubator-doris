@@ -75,12 +75,12 @@ under the License.
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-spark-client</artifactId>
-            <version>${hudi.version}</version>
+            <version>0.14.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-spark-common_${scala.binary.version}</artifactId>
-            <version>${hudi.version}</version>
+            <version>0.14.1</version>
             <exclusions>
                 <exclusion>
                     <groupId>commons-logging</groupId>
@@ -110,12 +110,12 @@ under the License.
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-spark3-common</artifactId>
-            <version>${hudi.version}</version>
+            <version>0.14.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>${hudi-spark.version}_${scala.binary.version}</artifactId>
-            <version>${hudi.version}</version>
+            <version>0.14.1</version>
             <exclusions>
                 <exclusion>
                     <artifactId>json4s-ast_2.11</artifactId>
