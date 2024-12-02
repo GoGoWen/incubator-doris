@@ -117,14 +117,14 @@ public class COWIncrementalRelation implements IncrementalRelation {
             });
             if (HoodieTimeline.METADATA_BOOTSTRAP_INSTANT_TS.equals(commit.getTimestamp())) {
                 metadata.getFileIdAndFullPaths(commit.getTimestamp(), HoodieStorageStrategyFactory.getInstant(
-                        metaClient, true)).forEach((k, v) -> {
+                        metaClient)).forEach((k, v) -> {
                             if (!(replacedFile.containsKey(k) && v.startsWith(replacedFile.get(k)))) {
                                 metaBootstrapFileIdToFullPath.put(k, v);
                             }
                         });
             } else {
                 metadata.getFileIdAndFullPaths(commit.getTimestamp(), HoodieStorageStrategyFactory.getInstant(
-                        metaClient, true)).forEach((k, v) -> {
+                        metaClient)).forEach((k, v) -> {
                             if (!(replacedFile.containsKey(k) && v.startsWith(replacedFile.get(k)))) {
                                 regularFileIdToFullPath.put(k, v);
                             }

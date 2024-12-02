@@ -93,7 +93,7 @@ public class MORIncrementalRelation implements IncrementalRelation {
         commitsMetadata = getCommitsMetadata();
         affectedFilesInCommits = HoodieInputFormatUtils.listAffectedFilesForCommits(configuration,
                 new Path(metaClient.getBasePath()), commitsMetadata,
-                HoodieStorageStrategyFactory.getInstant(metaClient, true));
+                HoodieStorageStrategyFactory.getInstant(metaClient));
         fullTableScan = shouldFullTableScan();
         globPattern = optParams.getOrDefault("hoodie.datasource.read.incr.path.glob", "");
 

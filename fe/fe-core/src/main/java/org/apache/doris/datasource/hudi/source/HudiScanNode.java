@@ -50,6 +50,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hudi.avro.HoodieAvroUtils;
@@ -58,12 +59,15 @@ import org.apache.hudi.common.model.BaseFile;
 import org.apache.hudi.common.model.FileSlice;
 import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieLogFile;
+import org.apache.hudi.common.storage.HoodieStorageStrategy;
+import org.apache.hudi.common.storage.HoodieStorageStrategyFactory;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.org.apache.avro.Schema;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -117,6 +121,7 @@ public class HudiScanNode extends HiveScanNode {
     private boolean incrementalRead = false;
     private TableScanParams scanParams;
     private IncrementalRelation incrementalRelation;
+    private HoodieStorageStrategy storageStrategy;
 
     /**
      * External file scan node for Query Hudi table
@@ -169,6 +174,7 @@ public class HudiScanNode extends HiveScanNode {
         basePath = hmsTable.getRemoteTable().getSd().getLocation();
         inputFormat = hmsTable.getRemoteTable().getSd().getInputFormat();
         serdeLib = hmsTable.getRemoteTable().getSd().getSerdeInfo().getSerializationLib();
+        storageStrategy = HoodieStorageStrategyFactory.getInstant(hudiClient);
         columnNames = new ArrayList<>();
         columnTypes = new ArrayList<>();
         TableSchemaResolver schemaUtil = new TableSchemaResolver(hudiClient);
@@ -333,20 +339,35 @@ public class HudiScanNode extends HiveScanNode {
     }
 
     private void getPartitionSplits(HivePartition partition, List<Split> splits) throws IOException {
-        String globPath;
         String partitionName;
         if (partition.isDummyPartition()) {
             partitionName = "";
-            globPath = hudiClient.getBasePathV2().toString() + "/*";
         } else {
             partitionName = FSUtils.getRelativePartitionPath(hudiClient.getBasePathV2(),
                     new Path(partition.getPath()));
-            globPath = String.format("%s/%s/*", hudiClient.getBasePathV2().toString(), partitionName);
         }
-        List<FileStatus> statuses = FSUtils.getGlobStatusExcludingMetaFolder(
-                hudiClient.getRawFs(new Path(globPath)), new Path(globPath));
+        String relativePath = storageStrategy.getRelativePath(new Path(partition.getPath()));
+        List<FileStatus> statuses =  new ArrayList<>();
+        BDPAuthContext bdpAuthContext = BDPAuthContext.get();
+        Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
+                null, bdpAuthContext.getUserToken());
+        storageStrategy.getAllLocations(relativePath, true).forEach(path -> {
+            try {
+                FileSystem innerFs = ugi.doAs((PrivilegedAction<FileSystem>) () -> {
+                    try {
+                        return path.getFileSystem(hudiClient.getHadoopConf());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                statuses.addAll(Arrays.stream(innerFs.listStatus(path)).collect(Collectors.toList()));
+            } catch (IOException e) {
+                throw new HoodieIOException("hudi get filesystem error", e);
+            }
+        });
         HoodieTableFileSystemView fileSystemView = new HoodieTableFileSystemView(hudiClient,
-                timeline, statuses.toArray(new FileStatus[0]));
+                timeline, statuses.toArray(new FileStatus[0]), storageStrategy);
 
         if (isCowOrRoTable) {
             fileSystemView.getLatestBaseFilesBeforeOrOn(partitionName, queryInstant).forEach(baseFile -> {
