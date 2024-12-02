@@ -1282,8 +1282,8 @@ public class HiveMetaStoreCache {
 
         @Override
         public String toString() {
-            return "FileCacheKey{" + "hadoopUserName='" + hadoopUserName + '\'' + "userToken='" + userToken + '\'' +
-                ", location='" + location + '\'' + ", inputFormat='" + inputFormat + '\'' + '}';
+            return "FileCacheKey{" + "hadoopUserName='" + hadoopUserName + '\'' + "userToken='" + userToken + '\''
+                + ", location='" + location + '\'' + ", inputFormat='" + inputFormat + '\'' + '}';
         }
     }
 
