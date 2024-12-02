@@ -320,7 +320,7 @@ under the License.
         <arrow.version>17.0.0</arrow.version>
         <!-- hudi -->
         <hudi.version>JD.0.13.1-TEST-SNAPSHOT</hudi.version>
-        <parquet.version>1.12.3</parquet.version>
+        <parquet.version>1.13.1</parquet.version>
         <commons-collections.version>3.2.2</commons-collections.version>
         <commons-compress.version>1.22</commons-compress.version>
         <scala.version>2.12.10</scala.version>
