@@ -432,7 +432,8 @@ public class HiveMetaStoreCache {
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
         for (Partition partition : partitions) {
             StorageDescriptor sd = partition.getSd();
-            ret.put(new PartitionCacheKey(bdpAuthContext.getHadoopUserName(), dbName, tblName, partition.getValues()),
+            ret.put(new PartitionCacheKey(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(), dbName,
+                    tblName, partition.getValues()),
                     new HivePartition(dbName, tblName, false,
                             sd.getInputFormat(), sd.getLocation(), partition.getValues(), partition.getParameters()));
         }
@@ -449,6 +450,7 @@ public class HiveMetaStoreCache {
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
         RemoteFileSystem fs = Env.getCurrentEnv().getExtMetaCacheMgr().getFsCache().getRemoteFileSystem(
                 new FileSystemCache.FileSystemCacheKey(bdpAuthContext.getHadoopUserName(),
+                        bdpAuthContext.getUserToken(),
                         LocationPath.getFSIdentity(location, bindBrokerName),
                         catalog.getCatalogProperty().getProperties(),
                         bindBrokerName, jobConf));
@@ -610,9 +612,10 @@ public class HiveMetaStoreCache {
             Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
             List<FileCacheKey> keys = partitions.stream().map(p -> p.isDummyPartition()
                             ? FileCacheKey.createDummyCacheKey(bdpAuthContext.getHadoopUserName(),
-                            p.getDbName(), p.getTblName(), p.getPath(), p.getInputFormat(), bindBrokerName)
-                            : new FileCacheKey(bdpAuthContext.getHadoopUserName(), p.getPath(), p.getInputFormat(),
-                            p.getPartitionValues(), bindBrokerName))
+                            bdpAuthContext.getUserToken(), p.getDbName(), p.getTblName(), p.getPath(),
+                            p.getInputFormat(), bindBrokerName)
+                            : new FileCacheKey(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(),
+                            p.getPath(), p.getInputFormat(), p.getPartitionValues(), bindBrokerName))
                             .collect(Collectors.toList());
             if (withCache) {
                 fileLists = new ArrayList<>(fileCacheRef.get().getAll(keys).values());
@@ -646,8 +649,8 @@ public class HiveMetaStoreCache {
 
     public HivePartition getHivePartition(String dbName, String name, List<String> partitionValues) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        return partitionCache.get(new PartitionCacheKey(BDPAuthContext.get().getHadoopUserName(), dbName, name,
-                partitionValues));
+        return partitionCache.get(new PartitionCacheKey(BDPAuthContext.get().getHadoopUserName(),
+                BDPAuthContext.get().getUserToken(), dbName, name, partitionValues));
     }
 
     public List<HivePartition> getAllPartitionsWithCache(String dbName, String name,
@@ -666,7 +669,8 @@ public class HiveMetaStoreCache {
         BDPAuthContext bdpAuthContext = BDPAuthContext.get();
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
         List<PartitionCacheKey> keys = partitionValuesList.stream()
-                .map(p -> new PartitionCacheKey(bdpAuthContext.getHadoopUserName(), dbName, name, p))
+                .map(p -> new PartitionCacheKey(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(),
+                    dbName, name, p))
                 .collect(Collectors.toList());
 
         List<HivePartition> partitions;
@@ -954,6 +958,7 @@ public class HiveMetaStoreCache {
                     String acidVersionPath = new Path(baseOrDeltaPath, "_orc_acid_version").toUri().toString();
                     RemoteFileSystem fs = Env.getCurrentEnv().getExtMetaCacheMgr().getFsCache().getRemoteFileSystem(
                             new FileSystemCache.FileSystemCacheKey(bdpAuthContext.getHadoopUserName(),
+                                    bdpAuthContext.getUserToken(),
                                     LocationPath.getFSIdentity(baseOrDeltaPath.toUri().toString(),
                                             bindBrokerName),
                                             catalog.getCatalogProperty().getProperties(),
@@ -979,6 +984,7 @@ public class HiveMetaStoreCache {
                     String location = delta.getPath().toString();
                     RemoteFileSystem fs = Env.getCurrentEnv().getExtMetaCacheMgr().getFsCache().getRemoteFileSystem(
                             new FileSystemCache.FileSystemCacheKey(bdpAuthContext.getHadoopUserName(),
+                                    bdpAuthContext.getUserToken(),
                                     LocationPath.getFSIdentity(location, bindBrokerName),
                                             catalog.getCatalogProperty().getProperties(), bindBrokerName, jobConf));
                     List<RemoteFile> remoteFiles = new ArrayList<>();
@@ -1007,6 +1013,7 @@ public class HiveMetaStoreCache {
                     String location = directory.getBaseDirectory().toString();
                     RemoteFileSystem fs = Env.getCurrentEnv().getExtMetaCacheMgr().getFsCache().getRemoteFileSystem(
                             new FileSystemCache.FileSystemCacheKey(bdpAuthContext.getHadoopUserName(),
+                                    bdpAuthContext.getUserToken(),
                                     LocationPath.getFSIdentity(location, bindBrokerName),
                                             catalog.getCatalogProperty().getProperties(), bindBrokerName, jobConf));
                     List<RemoteFile> remoteFiles = new ArrayList<>();
@@ -1169,12 +1176,15 @@ public class HiveMetaStoreCache {
     @Data
     public static class PartitionCacheKey {
         private String hadoopUserName;
+        private String userToken;
         private String dbName;
         private String tblName;
         private List<String> values;
 
-        public PartitionCacheKey(String hadoopUserName, String dbName, String tblName, List<String> values) {
+        public PartitionCacheKey(String hadoopUserName, String userToken, String dbName, String tblName,
+                                 List<String> values) {
             this.hadoopUserName = hadoopUserName;
+            this.userToken = userToken;
             this.dbName = dbName;
             this.tblName = tblName;
             this.values = values;
@@ -1189,6 +1199,7 @@ public class HiveMetaStoreCache {
                 return false;
             }
             return hadoopUserName.equals(((PartitionCacheKey) obj).hadoopUserName)
+                    && userToken.equals(((PartitionCacheKey) obj).userToken)
                     && dbName.equals(((PartitionCacheKey) obj).dbName)
                     && tblName.equals(((PartitionCacheKey) obj).tblName)
                     && Objects.equals(values, ((PartitionCacheKey) obj).values);
@@ -1196,12 +1207,12 @@ public class HiveMetaStoreCache {
 
         @Override
         public int hashCode() {
-            return Objects.hash(hadoopUserName, dbName, tblName, values);
+            return Objects.hash(hadoopUserName, userToken, dbName, tblName, values);
         }
 
         @Override
         public String toString() {
-            return "PartitionCacheKey{" + "hadoopUserName='" + hadoopUserName + '\''
+            return "PartitionCacheKey{" + "hadoopUserName='" + hadoopUserName + '\'' + "userToken='" + userToken + '\''
                     + "dbName='" + dbName + '\'' + ", tblName='" + tblName + '\'' + ", values="
                     + values + '}';
         }
@@ -1210,6 +1221,7 @@ public class HiveMetaStoreCache {
     @Data
     public static class FileCacheKey {
         private String hadoopUserName;
+        private String userToken;
         private String dummyKey;
         private String location;
         // not in key
@@ -1221,19 +1233,22 @@ public class HiveMetaStoreCache {
         // partitionValues would be ["part1", "part2"]
         protected List<String> partitionValues;
 
-        public FileCacheKey(String hadoopUserName, String location, String inputFormat, List<String> partitionValues,
+        public FileCacheKey(String hadoopUserName, String userToken, String location, String inputFormat,
+                                                       List<String> partitionValues,
                 String bindBrokerName) {
             this.hadoopUserName = hadoopUserName;
+            this.userToken = userToken;
             this.location = location;
             this.inputFormat = inputFormat;
             this.partitionValues = partitionValues == null ? Lists.newArrayList() : partitionValues;
             this.bindBrokerName = bindBrokerName;
         }
 
-        public static FileCacheKey createDummyCacheKey(String hadoopUserName, String dbName, String tblName,
-                                                       String location, String inputFormat, String bindBrokerName) {
-            FileCacheKey fileCacheKey = new FileCacheKey(hadoopUserName, location, inputFormat, null,
-                    bindBrokerName);
+        public static FileCacheKey createDummyCacheKey(String hadoopUserName, String userToken, String dbName,
+                                                       String tblName, String location, String inputFormat,
+                                                       String bindBrokerName) {
+            FileCacheKey fileCacheKey = new FileCacheKey(hadoopUserName, userToken, location, inputFormat,
+                    null, bindBrokerName);
             fileCacheKey.dummyKey = dbName + "." + tblName;
             return fileCacheKey;
         }
@@ -1248,9 +1263,11 @@ public class HiveMetaStoreCache {
             }
             if (dummyKey != null) {
                 return hadoopUserName.equals(((FileCacheKey) obj).hadoopUserName)
+                    && userToken.equals(((FileCacheKey) obj).userToken)
                     && dummyKey.equals(((FileCacheKey) obj).dummyKey);
             }
             return hadoopUserName.equals(((FileCacheKey) obj).hadoopUserName)
+                && userToken.equals(((FileCacheKey) obj).userToken)
                 && location.equals(((FileCacheKey) obj).location)
                 && Objects.equals(partitionValues, ((FileCacheKey) obj).partitionValues);
         }
@@ -1258,15 +1275,15 @@ public class HiveMetaStoreCache {
         @Override
         public int hashCode() {
             if (dummyKey != null) {
-                return Objects.hash(hadoopUserName, dummyKey);
+                return Objects.hash(hadoopUserName, userToken, dummyKey);
             }
-            return Objects.hash(hadoopUserName, location, partitionValues);
+            return Objects.hash(hadoopUserName, userToken, location, partitionValues);
         }
 
         @Override
         public String toString() {
-            return "FileCacheKey{" + "hadoopUserName='" + hadoopUserName + '\'' + ", location='" + location
-                    + '\'' + ", inputFormat='" + inputFormat + '\'' + '}';
+            return "FileCacheKey{" + "hadoopUserName='" + hadoopUserName + '\'' + "userToken='" + userToken + '\'' +
+                ", location='" + location + '\'' + ", inputFormat='" + inputFormat + '\'' + '}';
         }
     }
 

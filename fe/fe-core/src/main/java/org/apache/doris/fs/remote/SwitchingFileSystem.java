@@ -124,7 +124,7 @@ public class SwitchingFileSystem implements FileSystem {
 
     public FileSystem fileSystem(String location) {
         return extMetaCacheMgr.getFsCache().getRemoteFileSystem(
-                new FileSystemCache.FileSystemCacheKey("",
+                new FileSystemCache.FileSystemCacheKey("", "",
                         LocationPath.getFSIdentity(location,
                                 bindBrokerName), properties, bindBrokerName));
     }
