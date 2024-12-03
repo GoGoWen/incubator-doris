@@ -54,6 +54,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 public final class MetricRepo {
@@ -77,6 +78,8 @@ public final class MetricRepo {
     public static LongCounterMetric COUNTER_QUERY_HIVE_TABLE;
     public static AutoMappedMetric<LongCounterMetric> USER_COUNTER_QUERY_ALL;
     public static AutoMappedMetric<LongCounterMetric> USER_COUNTER_QUERY_ERR;
+    public static AutoMappedMetric<GaugeMetricImpl<Integer>> USER_GAUGE_CONNECTION_NUM;
+
     public static Histogram HISTO_QUERY_LATENCY;
     public static AutoMappedMetric<Histogram> USER_HISTO_QUERY_LATENCY;
     public static AutoMappedMetric<GaugeMetricImpl<Long>> USER_GAUGE_QUERY_INSTANCE_NUM;
@@ -315,6 +318,19 @@ public final class MetricRepo {
             userCountQueryErr.addLabel(new MetricLabel("user", name));
             DORIS_METRIC_REGISTER.addMetrics(userCountQueryErr);
             return userCountQueryErr;
+        });
+        USER_GAUGE_CONNECTION_NUM = new AutoMappedMetric<>(userName -> {
+            GaugeMetricImpl<Integer> userConnectionNum = new GaugeMetricImpl<Integer>("user_connection_total",
+                    MetricUnit.CONNECTIONS, "total connections for user") {
+                @Override
+                public Integer getValue() {
+                    return ExecuteEnv.getInstance().getScheduler().getConnectionByUser().getOrDefault(userName,
+                            new AtomicInteger(0)).intValue();
+                }
+            };
+            userConnectionNum.addLabel(new MetricLabel("user", userName));
+            DORIS_METRIC_REGISTER.addMetrics(userConnectionNum);
+            return userConnectionNum;
         });
         HISTO_QUERY_LATENCY = METRIC_REGISTER.histogram(
                 MetricRegistry.name("query", "latency", "ms"));
