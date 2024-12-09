@@ -45,12 +45,18 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
+/**
+ * HudiCachedPartitionProcessor is a partition cache implementation that reads Hudi data.
+ */
 public class HudiCachedPartitionProcessor extends HudiPartitionProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(HudiCachedPartitionProcessor.class);
     private final long catalogId;
     private final Executor executor;
     private final LoadingCache<TablePartitionKey, TablePartitionValues> partitionCache;
 
+    /**
+     * HudiCachedPartitionProcessor is a partition cache implementation that reads Hudi data.
+     */
     public HudiCachedPartitionProcessor(long catalogId, ExecutorService executor) {
         this.catalogId = catalogId;
         this.executor = executor;
@@ -82,6 +88,9 @@ public class HudiCachedPartitionProcessor extends HudiPartitionProcessor {
                 .forEach(partitionCache::invalidate);
     }
 
+    /**
+     * getSnapshotPartitionValues is a snapahot implementation that reads Hudi data.
+     */
     public TablePartitionValues getSnapshotPartitionValues(HMSExternalTable table,
             HoodieTableMetaClient tableMetaClient, String timestamp, boolean useHiveSyncPartition) {
         Preconditions.checkState(catalogId == table.getCatalog().getId());
@@ -107,6 +116,9 @@ public class HudiCachedPartitionProcessor extends HudiPartitionProcessor {
         return partitionValues;
     }
 
+    /**
+     * getPartitionValues is a implementation that reads Hudi data.
+     */
     public TablePartitionValues getPartitionValues(HMSExternalTable table, HoodieTableMetaClient tableMetaClient,
                                                    boolean useHiveSyncPartition)
             throws CacheException {

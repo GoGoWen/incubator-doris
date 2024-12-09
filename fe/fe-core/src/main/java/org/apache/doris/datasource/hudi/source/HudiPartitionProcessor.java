@@ -31,6 +31,7 @@ import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 
 import java.io.IOException;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -60,7 +61,13 @@ public abstract class HudiPartitionProcessor {
                 new HudiLocalEngineContext(tableMetaClient.getHadoopConf(), ugi), metadataConfig,
                 tableMetaClient.getBasePathV2().toString(), FileSystemViewStorageConfig.SPILLABLE_DIR.defaultValue());
 
-        return newTableMetadata.getAllPartitionPaths();
+        return ugi.doAs((PrivilegedAction<List<String>>) () -> {
+            try {
+                return newTableMetadata.getAllPartitionPaths();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     public List<String> getPartitionNamesBeforeOrEquals(HoodieTimeline timeline, String timestamp) {

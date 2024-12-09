@@ -94,7 +94,7 @@ public final class HudiLocalEngineContext extends HoodieEngineContext {
                     }
                 });
             } catch (Exception e) {
-                throw new HoodieException("Error occurs when executing map", e);
+                throw new HoodieException("Error occurs when in class HudiLocalEngineContext executing map:", e);
             }
         }).collect(Collectors.toList());
     }
@@ -139,8 +139,19 @@ public final class HudiLocalEngineContext extends HoodieEngineContext {
 
     @Override
     public <I, O> List<O> flatMap(List<I> data, SerializableFunction<I, Stream<O>> func, int parallelism) {
-        return
-            data.stream().parallel().flatMap(FunctionWrapper.throwingFlatMapWrapper(func)).collect(Collectors.toList());
+        return data.stream().parallel().flatMap(v1 -> {
+            try {
+                return ugi.doAs((PrivilegedAction<Stream<O>>) () -> {
+                    try {
+                        return func.apply(v1);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            } catch (Exception e) {
+                throw new HoodieException("Error occurs when in class HudiLocalEngineContext executing flatMap:", e);
+            }
+        }).collect(Collectors.toList());
     }
 
     @Override
