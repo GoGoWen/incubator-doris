@@ -51,6 +51,7 @@ import org.apache.doris.nereids.trees.plans.physical.PhysicalDistribute;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalHiveTableSink;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.util.MemoTestUtils;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.utframe.TestWithFeService;
 
 import mockit.Mock;
@@ -189,6 +190,8 @@ public class HiveDDLAndDMLPlanTest extends TestWithFeService {
         Env.getCurrentEnv().createDb(createDbStmt);
         // checkout ifNotExists
         Env.getCurrentEnv().createDb(createDbStmt);
+        BDPAuthContext bdpAuthContext = new BDPAuthContext("test", "test", "olap", "xxxxxxxxxxxxxx");
+        bdpAuthContext.setThreadLocalInfo();
         useDatabase(mockedDbName);
 
         // un-partitioned table

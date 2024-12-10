@@ -18,8 +18,6 @@
 package org.apache.doris.common.util;
 
 import mockit.Expectations;
-import mockit.Mock;
-import mockit.MockUp;
 import mockit.Mocked;
 import mockit.Verifications;
 import org.junit.Assert;
@@ -177,15 +175,10 @@ public class AESUtilTest {
 
     @Test
     public void testGetSecretKey() throws Exception {
-        new MockUp<AESUtil>() {
-            @Mock
-            void initServicePublicKeyCertificateFromUrl(String baseUrl) {
-                Properties props = new Properties();
-                props.setProperty("testService1", "testKey123testKey123");
-                props.setProperty("newService", "newKey456newKey456");
-                AESUtil.initServicePublicKeyCertificate(props);
-            }
-        };
+        Properties props = new Properties();
+        props.setProperty("testService1", "testKey123testKey123");
+        props.setProperty("newService", "newKey456newKey456");
+        AESUtil.initServicePublicKeyCertificate(props);
 
         // Test that we can get the secret key for testService1
         SecretKeySpec secretKey = AESUtil.getSecretKey("testService1");
