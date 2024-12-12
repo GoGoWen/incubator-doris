@@ -71,6 +71,9 @@ public class InternalSchema {
         AUDIT_SCHEMA.add(new ColumnDef("time", TypeDef.createDatetimeV2(3), true));
         AUDIT_SCHEMA.add(new ColumnDef("client_ip", TypeDef.createVarchar(128), true));
         AUDIT_SCHEMA.add(new ColumnDef("user", TypeDef.createVarchar(128), true));
+        AUDIT_SCHEMA.add(new ColumnDef("source", TypeDef.createVarchar(128), true));
+        AUDIT_SCHEMA.add(new ColumnDef("hadoop_user_name", TypeDef.createVarchar(128), true));
+        AUDIT_SCHEMA.add(new ColumnDef("erp", TypeDef.createVarchar(128), true));
         AUDIT_SCHEMA.add(new ColumnDef("catalog", TypeDef.createVarchar(128), true));
         AUDIT_SCHEMA.add(new ColumnDef("db", TypeDef.createVarchar(128), true));
         AUDIT_SCHEMA.add(new ColumnDef("state", TypeDef.createVarchar(128), true));

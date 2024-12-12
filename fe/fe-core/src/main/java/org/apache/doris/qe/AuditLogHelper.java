@@ -59,13 +59,18 @@ public class AuditLogHelper {
         long endTime = System.currentTimeMillis();
         long elapseMs = endTime - ctx.getStartTime();
         CatalogIf catalog = ctx.getCurrentCatalog();
-
+        String source = ctx.getBdpAuthContext() == null ? "" : ctx.getBdpAuthContext().getSource();
+        String hadoopUserName = ctx.getBdpAuthContext() == null ? "" : ctx.getBdpAuthContext().getHadoopUserName();
+        String erp = ctx.getBdpAuthContext() == null ? "" : ctx.getBdpAuthContext().getErp();
         AuditEventBuilder auditEventBuilder = ctx.getAuditEventBuilder();
         auditEventBuilder.reset();
         auditEventBuilder
                 .setTimestamp(ctx.getStartTime())
                 .setClientIp(ctx.getClientIP())
                 .setUser(ClusterNamespace.getNameFromFullName(ctx.getQualifiedUser()))
+                .setSource(source == null ? "" : source)
+                .setHadoopUserName(hadoopUserName == null ? "" : hadoopUserName)
+                .setErp(erp == null ? "" : erp)
                 .setSqlHash(ctx.getSqlHash())
                 .setEventType(EventType.AFTER_QUERY)
                 .setCtl(catalog == null ? InternalCatalog.INTERNAL_CATALOG_NAME : catalog.getName())

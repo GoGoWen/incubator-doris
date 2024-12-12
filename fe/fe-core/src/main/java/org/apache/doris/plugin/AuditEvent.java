@@ -56,6 +56,12 @@ public class AuditEvent {
     public String clientIp = "";
     @AuditField(value = "User")
     public String user = "";
+    @AuditField(value = "Source")
+    public String source = "";
+    @AuditField(value = "HadoopUserName")
+    public String hadoopUserName = "";
+    @AuditField(value = "Erp")
+    public String erp = "";
     @AuditField(value = "Ctl")
     public String ctl = "";
     @AuditField(value = "Db")
@@ -136,6 +142,21 @@ public class AuditEvent {
 
         public AuditEventBuilder setUser(String user) {
             auditEvent.user = user;
+            return this;
+        }
+
+        public AuditEventBuilder setSource(String source) {
+            auditEvent.source = source;
+            return this;
+        }
+
+        public AuditEventBuilder setHadoopUserName(String hadoopUserName) {
+            auditEvent.hadoopUserName = hadoopUserName;
+            return this;
+        }
+
+        public AuditEventBuilder setErp(String erp) {
+            auditEvent.erp = erp;
             return this;
         }
 

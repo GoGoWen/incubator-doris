@@ -132,7 +132,7 @@ public final class GlobalVariable {
     public static long auditPluginMaxBatchInternalSec = 60;
 
     @VariableMgr.VarAttr(name = AUDIT_PLUGIN_MAX_SQL_LENGTH, flag = VariableMgr.GLOBAL)
-    public static int auditPluginMaxSqlLength = 4096;
+    public static int auditPluginMaxSqlLength = 409600;
 
     @VariableMgr.VarAttr(name = AUDIT_PLUGIN_LOAD_TIMEOUT, flag = VariableMgr.GLOBAL)
     public static int auditPluginLoadTimeoutS = 600;

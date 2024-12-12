@@ -152,6 +152,9 @@ public class AuditLoader extends Plugin implements AuditPlugin {
         logBuffer.append(TimeUtils.longToTimeStringWithms(event.timestamp)).append("\t");
         logBuffer.append(event.clientIp).append("\t");
         logBuffer.append(event.user).append("\t");
+        logBuffer.append(event.source).append("\t");
+        logBuffer.append(event.hadoopUserName).append("\t");
+        logBuffer.append(event.erp).append("\t");
         logBuffer.append(event.ctl).append("\t");
         logBuffer.append(event.db).append("\t");
         logBuffer.append(event.state).append("\t");

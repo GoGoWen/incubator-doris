@@ -19,7 +19,7 @@ package org.apache.doris.plugin.audit;
 
 import org.apache.doris.common.Config;
 import org.apache.doris.catalog.Env;
-import org.apache.doris.plugin.audit.AuditEvent;
+import org.apache.doris.plugin.AuditEvent;
 import org.apache.doris.plugin.AuditPlugin;
 import org.apache.doris.plugin.Plugin;
 import org.apache.doris.plugin.PluginContext;
@@ -163,6 +163,9 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
         logBuffer.append(longToTimeString(event.timestamp)).append("\t");
         logBuffer.append(event.clientIp).append("\t");
         logBuffer.append(event.user).append("\t");
+        logBuffer.append(event.source).append("\t");
+        logBuffer.append(event.hadoopUserName).append("\t");
+        logBuffer.append(event.erp).append("\t");
         logBuffer.append(event.db).append("\t");
         logBuffer.append(event.state).append("\t");
         logBuffer.append(event.errorCode).append("\t");
