@@ -26,6 +26,7 @@ under the License.
     <name>Java UDF Demo</name>
     <url>https://doris.apache.org/</url>
     <properties>
+        <presto.version>330</presto.version>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
     </properties>
@@ -43,10 +44,11 @@ under the License.
                 </exclusion>
             </exclusions>
         </dependency>
+
     </dependencies>
 
     <build>
-        <finalName>java-udf-demo</finalName>
+        <finalName>java-udf</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
