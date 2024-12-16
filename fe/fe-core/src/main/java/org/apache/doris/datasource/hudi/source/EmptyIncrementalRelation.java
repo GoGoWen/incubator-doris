@@ -73,4 +73,9 @@ public class EmptyIncrementalRelation implements IncrementalRelation {
     public String getEndTs() {
         return EMPTY_TS;
     }
+
+    @Override
+    public boolean isQueryWithoutCacheLayer() {
+        return false;
+    }
 }

@@ -41,4 +41,6 @@ public interface IncrementalRelation {
     String getStartTs();
 
     String getEndTs();
+
+    boolean isQueryWithoutCacheLayer();
 }

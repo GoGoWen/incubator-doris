@@ -60,6 +60,7 @@ public class MORIncrementalRelation implements IncrementalRelation {
     private final boolean includeStartTime;
     private final String startTs;
     private final String endTs;
+    private final boolean queryWithoutCacheLayer;
 
 
     public MORIncrementalRelation(Map<String, String> optParams, Configuration configuration,
@@ -85,7 +86,8 @@ public class MORIncrementalRelation implements IncrementalRelation {
         }
         endTimestamp = optParams.getOrDefault("hoodie.datasource.read.end.instanttime",
                 timeline.lastInstant().get().getTimestamp());
-
+        queryWithoutCacheLayer = Boolean.valueOf(optParams.getOrDefault("hoodie.query.without.cache.layer.enabled",
+                "false"));
         startInstantArchived = timeline.isBeforeTimelineStarts(startTimestamp);
         endInstantArchived = timeline.isBeforeTimelineStarts(endTimestamp);
 
@@ -93,7 +95,7 @@ public class MORIncrementalRelation implements IncrementalRelation {
         commitsMetadata = getCommitsMetadata();
         affectedFilesInCommits = HoodieInputFormatUtils.listAffectedFilesForCommits(configuration,
                 new Path(metaClient.getBasePath()), commitsMetadata,
-                HoodieStorageStrategyFactory.getInstant(metaClient));
+                HoodieStorageStrategyFactory.getInstant(metaClient, queryWithoutCacheLayer));
         fullTableScan = shouldFullTableScan();
         globPattern = optParams.getOrDefault("hoodie.datasource.read.incr.path.glob", "");
 
@@ -168,6 +170,11 @@ public class MORIncrementalRelation implements IncrementalRelation {
     @Override
     public String getEndTs() {
         return endTs;
+    }
+
+    @Override
+    public boolean isQueryWithoutCacheLayer() {
+        return queryWithoutCacheLayer;
     }
 
     @Override

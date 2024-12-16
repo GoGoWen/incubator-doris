@@ -174,7 +174,14 @@ public class HudiScanNode extends HiveScanNode {
         basePath = hmsTable.getRemoteTable().getSd().getLocation();
         inputFormat = hmsTable.getRemoteTable().getSd().getInputFormat();
         serdeLib = hmsTable.getRemoteTable().getSd().getSerdeInfo().getSerializationLib();
-        storageStrategy = HoodieStorageStrategyFactory.getInstant(hudiClient);
+        boolean queryWithoutCacheLayer = false;
+        Map<String, String> storageDescriptorParameters =
+                hmsTable.getRemoteTable().getSd().getSerdeInfo().getParameters();
+        if (storageDescriptorParameters != null) {
+            queryWithoutCacheLayer = Boolean.valueOf(storageDescriptorParameters.getOrDefault(
+                    "hoodie.query.without.cache.layer.enabled", "false"));
+        }
+        storageStrategy = HoodieStorageStrategyFactory.getInstant(hudiClient, queryWithoutCacheLayer);
         columnNames = new ArrayList<>();
         columnTypes = new ArrayList<>();
         TableSchemaResolver schemaUtil = new TableSchemaResolver(hudiClient);

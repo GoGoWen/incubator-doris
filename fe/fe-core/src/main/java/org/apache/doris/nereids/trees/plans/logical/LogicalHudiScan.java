@@ -190,6 +190,14 @@ public class LogicalHudiScan extends LogicalFileScan {
             if (scanParams.getParams().containsKey("endTime")) {
                 optParams.put("hoodie.datasource.read.end.instanttime", scanParams.getParams().get("endTime"));
             }
+            Map<String, String> storageDescriptorParameters =
+                    table.getRemoteTable().getSd().getSerdeInfo().getParameters();
+            if (storageDescriptorParameters != null) {
+                if (storageDescriptorParameters.containsKey("hoodie.query.without.cache.layer.enabled")) {
+                    optParams.put("hoodie.query.without.cache.layer.enabled",
+                            storageDescriptorParameters.get("hoodie.query.without.cache.layer.enabled"));
+                }
+            }
             scanParams.getParams().forEach((k, v) -> {
                 if (k.startsWith("hoodie.")) {
                     optParams.put(k, v);

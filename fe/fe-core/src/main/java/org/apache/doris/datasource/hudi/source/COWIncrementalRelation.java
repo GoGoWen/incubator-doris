@@ -61,6 +61,7 @@ public class COWIncrementalRelation implements IncrementalRelation {
     private final boolean includeStartTime;
     private final String startTs;
     private final String endTs;
+    private final boolean queryWithoutCacheLayer;
 
     public COWIncrementalRelation(Map<String, String> optParams, Configuration configuration,
             HoodieTableMetaClient metaClient)
@@ -87,7 +88,8 @@ public class COWIncrementalRelation implements IncrementalRelation {
                 lastInstant.getTimestamp());
         startInstantArchived = commitTimeline.isBeforeTimelineStarts(startInstantTime);
         endInstantArchived = commitTimeline.isBeforeTimelineStarts(endInstantTime);
-
+        queryWithoutCacheLayer = Boolean.valueOf(optParams.getOrDefault("hoodie.query.without.cache.layer.enabled",
+                "false"));
         HoodieTimeline commitsTimelineToReturn;
         commitsTimelineToReturn = commitTimeline.findInstantsInRange(startInstantTime, lastInstant.getTimestamp());
 
@@ -117,14 +119,14 @@ public class COWIncrementalRelation implements IncrementalRelation {
             });
             if (HoodieTimeline.METADATA_BOOTSTRAP_INSTANT_TS.equals(commit.getTimestamp())) {
                 metadata.getFileIdAndFullPaths(commit.getTimestamp(), HoodieStorageStrategyFactory.getInstant(
-                        metaClient)).forEach((k, v) -> {
+                        metaClient, queryWithoutCacheLayer)).forEach((k, v) -> {
                             if (!(replacedFile.containsKey(k) && v.startsWith(replacedFile.get(k)))) {
                                 metaBootstrapFileIdToFullPath.put(k, v);
                             }
                         });
             } else {
                 metadata.getFileIdAndFullPaths(commit.getTimestamp(), HoodieStorageStrategyFactory.getInstant(
-                        metaClient)).forEach((k, v) -> {
+                        metaClient, queryWithoutCacheLayer)).forEach((k, v) -> {
                             if (!(replacedFile.containsKey(k) && v.startsWith(replacedFile.get(k)))) {
                                 regularFileIdToFullPath.put(k, v);
                             }
@@ -243,5 +245,10 @@ public class COWIncrementalRelation implements IncrementalRelation {
     @Override
     public String getEndTs() {
         return endTs;
+    }
+
+    @Override
+    public boolean isQueryWithoutCacheLayer() {
+        return queryWithoutCacheLayer;
     }
 }
