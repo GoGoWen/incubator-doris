@@ -36,11 +36,11 @@ import org.apache.doris.nereids.types.IntegerType;
 import org.apache.doris.nereids.types.LargeIntType;
 import org.apache.doris.nereids.types.SmallIntType;
 import org.apache.doris.nereids.types.TinyIntType;
+import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.SessionVariable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import org.apache.doris.qe.ConnectContext;
-import org.apache.doris.qe.SessionVariable;
 
 import java.util.List;
 import java.util.Optional;
@@ -92,17 +92,17 @@ public class Sum extends NullableAggregateFunction
         DataType argType = child().getDataType();
         if (argType.isStringType()) {
             Boolean isPrestoDialect = Optional.ofNullable(ConnectContext.get())
-                .map(ConnectContext::getSessionVariable)
-                .map(SessionVariable::getSqlDialect)
-                .map("presto"::equals)
-                .orElse(false);
+                    .map(ConnectContext::getSessionVariable)
+                    .map(SessionVariable::getSqlDialect)
+                    .map("presto"::equals)
+                    .orElse(false);
             if (isPrestoDialect) {
                 return;
             }
         }
 
         if ((!argType.isNumericType() && !argType.isBooleanType() && !argType.isNullType())
-            || argType.isOnlyMetricType()) {
+                || argType.isOnlyMetricType()) {
             throw new AnalysisException("sum requires a numeric or boolean parameter: " + this.toSql());
         }
     }
