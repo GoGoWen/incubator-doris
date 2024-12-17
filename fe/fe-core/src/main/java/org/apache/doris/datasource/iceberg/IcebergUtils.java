@@ -46,7 +46,6 @@ import org.apache.doris.common.UserException;
 import org.apache.doris.common.info.SimpleTableInfo;
 import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.datasource.ExternalCatalog;
-import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
 import org.apache.doris.nereids.exceptions.NotSupportedException;
 import org.apache.doris.thrift.TExprOpcode;
 
@@ -570,18 +569,16 @@ public class IcebergUtils {
      * Get iceberg schema from catalog and convert them to doris schema
      */
     public static List<Column> getSchema(ExternalCatalog catalog, String dbName, String name) {
-        return HiveMetaStoreClientHelper.ugiDoAs(catalog.getConfiguration(), () -> {
-            org.apache.iceberg.Table icebergTable = getIcebergTable(catalog, dbName, name);
-            Schema schema = icebergTable.schema();
-            List<Types.NestedField> columns = schema.columns();
-            List<Column> tmpSchema = Lists.newArrayListWithCapacity(columns.size());
-            for (Types.NestedField field : columns) {
-                tmpSchema.add(new Column(field.name().toLowerCase(Locale.ROOT),
-                        IcebergUtils.icebergTypeToDorisType(field.type()), true, null, true, field.doc(), true,
-                        schema.caseInsensitiveFindField(field.name()).fieldId()));
-            }
-            return tmpSchema;
-        });
+        org.apache.iceberg.Table icebergTable = getIcebergTable(catalog, dbName, name);
+        Schema schema = icebergTable.schema();
+        List<Types.NestedField> columns = schema.columns();
+        List<Column> tmpSchema = Lists.newArrayListWithCapacity(columns.size());
+        for (Types.NestedField field : columns) {
+            tmpSchema.add(new Column(field.name().toLowerCase(Locale.ROOT), IcebergUtils.icebergTypeToDorisType(
+                    field.type()), true, null, true, field.doc(), true,
+                    schema.caseInsensitiveFindField(field.name()).fieldId()));
+        }
+        return tmpSchema;
     }
 
 

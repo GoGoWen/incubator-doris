@@ -24,12 +24,13 @@ import org.apache.doris.common.UserException;
 import org.apache.doris.datasource.CatalogIf;
 import org.apache.doris.datasource.ExternalMetaCacheMgr;
 import org.apache.doris.datasource.hive.HMSExternalCatalog;
-import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
 import org.apache.doris.datasource.property.constants.HMSProperties;
 import org.apache.doris.fs.remote.dfs.DFSFileSystem;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.thrift.TIcebergMetadataParams;
 
 import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -40,7 +41,6 @@ import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.hive.HiveCatalog;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
@@ -78,13 +78,23 @@ public class IcebergMetadataCache {
         if (catalog == null) {
             throw new UserException("The specified catalog does not exist:" + params.getCatalog());
         }
+        String hadoopUserName = "";
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            hadoopUserName = BDPAuthContext.get().getHadoopUserName();
+        }
         IcebergMetadataCacheKey key =
-                IcebergMetadataCacheKey.of(catalog, params.getDatabase(), params.getTable());
+                IcebergMetadataCacheKey.of(hadoopUserName, catalog, params.getDatabase(), params.getTable());
         return snapshotListCache.get(key);
     }
 
     public Table getIcebergTable(CatalogIf catalog, String dbName, String tbName) {
-        IcebergMetadataCacheKey key = IcebergMetadataCacheKey.of(catalog, dbName, tbName);
+        String hadoopUserName = "";
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            hadoopUserName = BDPAuthContext.get().getHadoopUserName();
+        }
+        IcebergMetadataCacheKey key = IcebergMetadataCacheKey.of(hadoopUserName, catalog, dbName, tbName);
         return tableCache.get(key);
     }
 
@@ -98,7 +108,12 @@ public class IcebergMetadataCache {
     }
 
     public Table getRemoteTable(CatalogIf catalog, String dbName, String tbName) {
-        IcebergMetadataCacheKey key = IcebergMetadataCacheKey.of(catalog, dbName, tbName);
+        String hadoopUserName = "";
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            hadoopUserName = BDPAuthContext.get().getHadoopUserName();
+        }
+        IcebergMetadataCacheKey key = IcebergMetadataCacheKey.of(hadoopUserName, catalog, dbName, tbName);
         return loadTable(key);
     }
 
@@ -124,8 +139,7 @@ public class IcebergMetadataCache {
         } else {
             throw new RuntimeException("Only support 'hms' and 'iceberg' type for iceberg table");
         }
-        Table icebergTable = HiveMetaStoreClientHelper.ugiDoAs(key.catalog.getId(),
-                () -> icebergCatalog.loadTable(TableIdentifier.of(key.dbName, key.tableName)));
+        Table icebergTable = icebergCatalog.loadTable(TableIdentifier.of(key.dbName, key.tableName));
         initIcebergTableFileIO(icebergTable, key.catalog.getProperties());
         return icebergTable;
     }
@@ -184,7 +198,7 @@ public class IcebergMetadataCache {
         for (Map.Entry<String, String> entry : hdfsConf.entrySet()) {
             conf.set(entry.getKey(), entry.getValue());
         }
-        HiveCatalog hiveCatalog = new HiveCatalog();
+        HiveIcebergCatalog hiveCatalog = new HiveIcebergCatalog();
         hiveCatalog.setConf(conf);
 
         if (props.containsKey(HMSExternalCatalog.BIND_BROKER_NAME)) {
@@ -215,18 +229,20 @@ public class IcebergMetadataCache {
     }
 
     static class IcebergMetadataCacheKey {
+        String hadoopUserName;
         CatalogIf catalog;
         String dbName;
         String tableName;
 
-        public IcebergMetadataCacheKey(CatalogIf catalog, String dbName, String tableName) {
+        public IcebergMetadataCacheKey(String hadoopUserName, CatalogIf catalog, String dbName, String tableName) {
+            this.hadoopUserName = hadoopUserName;
             this.catalog = catalog;
             this.dbName = dbName;
             this.tableName = tableName;
         }
 
-        static IcebergMetadataCacheKey of(CatalogIf catalog, String dbName, String tableName) {
-            return new IcebergMetadataCacheKey(catalog, dbName, tableName);
+        static IcebergMetadataCacheKey of(String hadoopUserName, CatalogIf catalog, String dbName, String tableName) {
+            return new IcebergMetadataCacheKey(hadoopUserName, catalog, dbName, tableName);
         }
 
         @Override
@@ -238,14 +254,14 @@ public class IcebergMetadataCache {
                 return false;
             }
             IcebergMetadataCacheKey that = (IcebergMetadataCacheKey) o;
-            return catalog.getId() == that.catalog.getId()
+            return Objects.equals(hadoopUserName, that.hadoopUserName) && catalog.getId() == that.catalog.getId()
                     && Objects.equals(dbName, that.dbName)
                     && Objects.equals(tableName, that.tableName);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(catalog.getId(), dbName, tableName);
+            return Objects.hash(hadoopUserName, catalog.getId(), dbName, tableName);
         }
     }
 
