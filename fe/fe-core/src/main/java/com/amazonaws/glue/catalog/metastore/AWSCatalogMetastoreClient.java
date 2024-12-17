@@ -1232,6 +1232,12 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
   }
 
   @Override
+  public org.apache.hadoop.hive.metastore.api.Partition getPartitionFromView(String s, String s1, String s2)
+          throws MetaException, UnknownTableException, NoSuchObjectException, TException {
+    throw new MetaException("Unsupported function call");
+  }
+
+  @Override
   public org.apache.hadoop.hive.metastore.api.Partition getPartition(String catalogName, String dbName, String tblName, List<String> values) throws NoSuchObjectException, MetaException, TException {
     return glueMetastoreClientDelegate.getPartition(dbName, tblName, values);
   }
@@ -1303,6 +1309,13 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
   }
 
   @Override
+  public org.apache.hadoop.hive.metastore.api.Partition getPartitionWithAuthInfoFromView(String s, String s1,
+          List<String> list, String s2, List<String> list1)
+          throws MetaException, UnknownTableException, NoSuchObjectException, TException {
+    throw new MetaException("Unsupported function call");
+  }
+
+  @Override
   public List<org.apache.hadoop.hive.metastore.api.Partition> getPartitionsByNames(
           String databaseName, String tableName, List<String> partitionNames)
           throws NoSuchObjectException, MetaException, TException {
@@ -1320,6 +1333,12 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
   }
 
   @Override
+  public List<org.apache.hadoop.hive.metastore.api.Partition> getPartitionsByNamesFromView(String s, String s1,
+          List<String> list) throws NoSuchObjectException, MetaException, TException {
+    throw new MetaException("Unsupported function call");
+  }
+
+  @Override
   public List<FieldSchema> getSchema(String db, String tableName) throws MetaException, TException, UnknownTableException,
           UnknownDBException {
     return glueMetastoreClientDelegate.getSchema(db, tableName);
@@ -1334,6 +1353,11 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
   public Table getTable(String dbName, String tableName)
           throws MetaException, TException, NoSuchObjectException {
     return glueMetastoreClientDelegate.getTable(dbName, tableName);
+  }
+
+  @Override
+  public Table getTableFromView(String s, String s1) throws MetaException, TException, NoSuchObjectException {
+    throw new MetaException("Unsupported function call");
   }
 
   @Override
@@ -1572,6 +1596,17 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
   }
 
   @Override
+  public List<String> listPartitionNamesFromView(String s, String s1, short i) throws MetaException, TException {
+    throw new MetaException("Unsupported function call");
+  }
+
+  @Override
+  public List<String> listPartitionNamesFromView(String s, String s1, List<String> list, short i)
+          throws MetaException, TException, NoSuchObjectException {
+    throw new MetaException("Unsupported function call");
+  }
+
+  @Override
   public int getNumPartitionsByFilter(String dbName, String tableName, String filter)
           throws MetaException, NoSuchObjectException, TException {
     return glueMetastoreClientDelegate.getNumPartitionsByFilter(dbName, tableName, filter);
@@ -1609,6 +1644,12 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
   public List<org.apache.hadoop.hive.metastore.api.Partition> listPartitions(String dbName, String tblName, short max)
           throws NoSuchObjectException, MetaException, TException {
     return glueMetastoreClientDelegate.getPartitions(dbName, tblName, null, max);
+  }
+
+  @Override
+  public List<org.apache.hadoop.hive.metastore.api.Partition> listPartitionsFromView(String s, String s1, short i)
+          throws NoSuchObjectException, MetaException, TException {
+    throw new MetaException("Unsupported function call");
   }
 
   @Override
@@ -1674,6 +1715,12 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
   }
 
   @Override
+  public boolean listPartitionsByExprFromView(String s, String s1, byte[] bytes, String s2, short i,
+          List<org.apache.hadoop.hive.metastore.api.Partition> list) throws TException {
+    return false;
+  }
+
+  @Override
   public List<org.apache.hadoop.hive.metastore.api.Partition> listPartitionsByFilter(
           String databaseName,
           String tableName,
@@ -1696,6 +1743,12 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
           String filter,
           int max) throws MetaException, NoSuchObjectException, TException {
     return listPartitionsByFilter(databaseName, tableName, filter, (short) max);
+  }
+
+  @Override
+  public List<org.apache.hadoop.hive.metastore.api.Partition> listPartitionsByFilterFromView(String s, String s1,
+          String s2, short i) throws MetaException, NoSuchObjectException, TException {
+    throw new MetaException("Unsupported function call");
   }
 
   @Override
@@ -1765,6 +1818,13 @@ public class AWSCatalogMetastoreClient implements IMetaStoreClient {
           String user,
           List<String> groups) throws MetaException, TException, NoSuchObjectException {
     return listPartitionsWithAuthInfo(database, table, partVals, (short) maxParts, user, groups);
+  }
+
+  @Override
+  public List<org.apache.hadoop.hive.metastore.api.Partition> listPartitionsWithAuthInfoFromView(String s, String s1,
+          List<String> list, short i, String s2, List<String> list1)
+          throws MetaException, TException, NoSuchObjectException {
+    throw new MetaException("Unsupported function call");
   }
 
   @Override

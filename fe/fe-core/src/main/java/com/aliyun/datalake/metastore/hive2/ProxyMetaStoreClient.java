@@ -1123,6 +1123,12 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
     }
 
     @Override
+    public Partition getPartitionFromView(String s, String s1, String s2)
+            throws MetaException, UnknownTableException, NoSuchObjectException, TException {
+        throw new MetaException("Unsupported function call");
+    }
+
+    @Override
     public Partition getPartition(String catalogId, String dbName, String tblName, List<String> values) throws NoSuchObjectException, MetaException, TException {
         return call(this.readWriteClient, client -> client.getPartition(catalogId, dbName, tblName, values), "getPartition", catalogId, dbName, tblName, values);
     }
@@ -1182,6 +1188,12 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
     }
 
     @Override
+    public Partition getPartitionWithAuthInfoFromView(String s, String s1, List<String> list, String s2,
+            List<String> list1) throws MetaException, UnknownTableException, NoSuchObjectException, TException {
+        throw new MetaException("Unsupported function call");
+    }
+
+    @Override
     public List<Partition> getPartitionsByNames(
             String databaseName,
             String tableName,
@@ -1201,6 +1213,12 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
     }
 
     @Override
+    public List<Partition> getPartitionsByNamesFromView(String s, String s1, List<String> list)
+            throws NoSuchObjectException, MetaException, TException {
+        throw new MetaException("Unsupported function call");
+    }
+
+    @Override
     public List<FieldSchema> getSchema(String db, String tableName) throws TException {
         return call(this.readWriteClient, client -> client.getSchema(db, tableName), "getSchema", db, tableName);
     }
@@ -1214,6 +1232,11 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
     public Table getTable(String dbName, String tableName)
             throws MetaException, TException, NoSuchObjectException {
         return call(this.readWriteClient, client -> client.getTable(dbName, tableName), "getTable", dbName, tableName);
+    }
+
+    @Override
+    public Table getTableFromView(String s, String s1) throws MetaException, TException, NoSuchObjectException {
+        throw new MetaException("Unsupported function call");
     }
 
     @Override
@@ -1420,6 +1443,17 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
     }
 
     @Override
+    public List<String> listPartitionNamesFromView(String s, String s1, short i) throws MetaException, TException {
+        throw new MetaException("Unsupported function call");
+    }
+
+    @Override
+    public List<String> listPartitionNamesFromView(String s, String s1, List<String> list, short i)
+            throws MetaException, TException, NoSuchObjectException {
+        throw new MetaException("Unsupported function call");
+    }
+
+    @Override
     public int getNumPartitionsByFilter(
             String dbName,
             String tableName,
@@ -1485,6 +1519,12 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
     }
 
     @Override
+    public List<Partition> listPartitionsFromView(String s, String s1, short i)
+            throws NoSuchObjectException, MetaException, TException {
+        return null;
+    }
+
+    @Override
     public List<Partition> listPartitions(String catalogId, String dbName, String tblName, int max) throws NoSuchObjectException, MetaException, TException {
         return call(this.readWriteClient, client -> client.listPartitions(catalogId, dbName, tblName, max), "listPartitions", catalogId, dbName, tblName, max);
     }
@@ -1530,6 +1570,12 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
     }
 
     @Override
+    public boolean listPartitionsByExprFromView(String s, String s1, byte[] bytes, String s2, short i,
+            List<Partition> list) throws TException {
+        return false;
+    }
+
+    @Override
     public List<Partition> listPartitionsByFilter(
             String databaseName,
             String tableName,
@@ -1548,6 +1594,12 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
             int max
     ) throws MetaException, NoSuchObjectException, TException {
         return call(this.readWriteClient, client -> client.listPartitionsByFilter(catalogId, databaseName, tableName, filter, max), "listPartitionsByFilter", catalogId, databaseName, tableName, filter, max);
+    }
+
+    @Override
+    public List<Partition> listPartitionsByFilterFromView(String s, String s1, String s2, short i)
+            throws MetaException, NoSuchObjectException, TException {
+        return null;
     }
 
     @Override
@@ -1588,6 +1640,12 @@ public class ProxyMetaStoreClient implements IMetaStoreClient {
     @Override
     public List<Partition> listPartitionsWithAuthInfo(String catalogId, String database, String table, List<String> partVals, int maxParts, String user, List<String> groups) throws MetaException, TException, NoSuchObjectException {
         return call(this.readWriteClient, client -> client.listPartitionsWithAuthInfo(catalogId, database, table, partVals, maxParts, user, groups), "listPartitionsWithAuthInfo", catalogId, database, table, partVals, maxParts, user, groups);
+    }
+
+    @Override
+    public List<Partition> listPartitionsWithAuthInfoFromView(String s, String s1, List<String> list, short i,
+            String s2, List<String> list1) throws MetaException, TException, NoSuchObjectException {
+        return null;
     }
 
     @Override
