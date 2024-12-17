@@ -13,6 +13,7 @@ import static org.apache.doris.udf.util.DateUtils.getIntDayOfWeek;
 public class NextDay {
 
     /**
+     * next_day(varchar, varchar)
      * SELECT next_day('2015-01-14', 'TU');
      * @param inputTimestamp
      * @param dayOfWeek

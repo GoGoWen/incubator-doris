@@ -14,6 +14,7 @@ import java.util.Locale;
 public class ToDate extends UDF {
 
     /**
+     * to_date(varchar)
      * select select to_date('2023-10-05 14:30:45');
      * @param inputTimestamp
      * @return
@@ -25,6 +26,7 @@ public class ToDate extends UDF {
     }
 
     /**
+     * to_date(timestamp(p))
      * SELECT to_date(cast('2024-12-12 03:04:05.321' as DATETIME));
      * select to_date(cast('2024-07-09 09:20:14.000000' as DATETIME));
      * @param timestamp

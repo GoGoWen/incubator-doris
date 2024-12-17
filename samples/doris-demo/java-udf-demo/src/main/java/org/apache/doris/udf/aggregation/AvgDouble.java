@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 
 /**
  * avg_double
+ * avg_double(double)
  * select t.name, avg_double(t.age) as avg_age from (select '2' as name, 2 as age union all select '2' as name, 1 as age ) t group by t.name;
  */
 public class AvgDouble {

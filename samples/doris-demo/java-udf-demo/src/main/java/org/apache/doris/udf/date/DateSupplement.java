@@ -13,13 +13,10 @@ import java.time.format.DateTimeParseException;
 public class DateSupplement extends UDF {
 
     /**
-     * select date_supplement(5);
+     * date_supplement(varchar)
      * select date_supplement('2023-10-05');
      * select date_supplement('2023-10-05 14:30:45');
      * select date_supplement('invalid-date');
-     * select date_supplement('');
-     * select date_supplement('1');
-     * select date_supplement('asdasdjsada');
      * @param inputDate
      * @return
      */

@@ -12,6 +12,7 @@ import java.util.Date;
 public class Trunc extends UDF {
 
     /**
+     * trunc(varchar, varchar)
      * SELECT trunc('2015-03-17', 'MM');
      * @param inputTimestamp
      * @param fmtInput
