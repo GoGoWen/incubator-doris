@@ -20,9 +20,12 @@ package org.apache.doris.nereids.trees.expressions.functions.agg;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.functions.AlwaysNullable;
 import org.apache.doris.nereids.trees.expressions.functions.PropagateNullable;
+import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.SessionVariable;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * nullable aggregate function
@@ -73,6 +76,14 @@ public abstract class NullableAggregateFunction extends AggregateFunction implem
     }
 
     public abstract NullableAggregateFunction withAlwaysNullable(boolean alwaysNullable);
+
+    public Boolean isPrestoDialect() {
+        return Optional.ofNullable(ConnectContext.get())
+            .map(ConnectContext::getSessionVariable)
+            .map(SessionVariable::getSqlDialect)
+            .map("presto"::equals)
+            .orElse(false);
+    }
 
     @Override
     public boolean equals(Object o) {

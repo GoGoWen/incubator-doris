@@ -556,6 +556,10 @@ public abstract class DataType {
         return this instanceof VarcharType;
     }
 
+    public boolean isCharacterType() {
+        return this instanceof CharacterType;
+    }
+
     public boolean isStringType() {
         return this instanceof StringType;
     }

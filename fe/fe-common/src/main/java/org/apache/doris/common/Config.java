@@ -2868,4 +2868,7 @@ public class Config extends ConfigBase {
         "Secret key synchronization interval (seconds)"})
     public static int secret_key_sync_time_s = 3600;
 
+    @ConfField(mutable = true, description = {"聚合函数支持将字符参数转换为数字类型",
+        "aggregate function supports casting character parameters to numeric types"})
+    public static boolean support_character_cast_for_numeric_agg_function = false;
 }
