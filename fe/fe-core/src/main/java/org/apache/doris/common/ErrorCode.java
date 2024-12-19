@@ -1041,6 +1041,12 @@ public enum ErrorCode {
 
     ERR_INVALID_OPERATION_FOR_IAM(4000, new byte[]{'4', '2', '0', '0', '0'},
             "Invalid operation for user to set iam info such as %s"),
+    ERR_INVALID_OPERATION_FOR_CALL_IAM_ERROR(4001, new byte[]{'4', '2', '0', '0', '0'},
+            "Invalid operation for call iam api error, set iam info %s"),
+    ERR_INVALID_OPERATION_FOR_ERP_NO_CHANGED(4002, new byte[]{'4', '2', '0', '0', '0'},
+            "Invalid operation for user erp has no changed, set iam info %s"),
+    ERR_INVALID_OPERATION_FOR_SOURCE_NOT_IN_WHITELIST(4003, new byte[]{'4', '2', '0', '0', '0'},
+            "Invalid operation for source not in whitelist, set iam info %s"),
     // Following is Palo's error code, which start from 5000
     ERR_NOT_OLAP_TABLE(5000, new byte[] {'H', 'Y', '0', '0', '0'}, "Table '%s' is not a OLAP table"),
     ERR_WRONG_PROC_PATH(5001, new byte[] {'H', 'Y', '0', '0', '0'}, "Proc path '%s' doesn't exist"),
