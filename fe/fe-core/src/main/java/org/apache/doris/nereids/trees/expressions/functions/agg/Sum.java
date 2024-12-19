@@ -18,7 +18,6 @@
 package org.apache.doris.nereids.trees.expressions.functions.agg;
 
 import org.apache.doris.catalog.FunctionSignature;
-import org.apache.doris.common.Config;
 import org.apache.doris.nereids.exceptions.AnalysisException;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.functions.ComputePrecisionForSum;
@@ -88,7 +87,7 @@ public class Sum extends NullableAggregateFunction
     @Override
     public void checkLegalityBeforeTypeCoercion() {
         DataType argType = child().getDataType();
-        if (Config.support_character_cast_for_numeric_agg_function && argType.isCharacterType() && isPrestoDialect()) {
+        if (argType.isCharacterType() && supportCharacterCastForNumeric()) {
             return;
         }
 
@@ -127,9 +126,7 @@ public class Sum extends NullableAggregateFunction
         if (getArgument(0).getDataType() instanceof FloatType) {
             return FunctionSignature.ret(DoubleType.INSTANCE).args(FloatType.INSTANCE);
         }
-        if (Config.support_character_cast_for_numeric_agg_function
-                 && getArgument(0).getDataType().isCharacterType()
-                 && isPrestoDialect()) {
+        if (getArgument(0).getDataType().isCharacterType() && supportCharacterCastForNumeric()) {
             return FunctionSignature.ret(DoubleType.INSTANCE).args(DoubleType.INSTANCE);
         }
         return ExplicitlyCastableSignature.super.searchSignature(signatures);

@@ -21,7 +21,6 @@ import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.functions.AlwaysNullable;
 import org.apache.doris.nereids.trees.expressions.functions.PropagateNullable;
 import org.apache.doris.qe.ConnectContext;
-import org.apache.doris.qe.SessionVariable;
 
 import java.util.List;
 import java.util.Objects;
@@ -77,11 +76,9 @@ public abstract class NullableAggregateFunction extends AggregateFunction implem
 
     public abstract NullableAggregateFunction withAlwaysNullable(boolean alwaysNullable);
 
-    public Boolean isPrestoDialect() {
+    public boolean supportCharacterCastForNumeric() {
         return Optional.ofNullable(ConnectContext.get())
-            .map(ConnectContext::getSessionVariable)
-            .map(SessionVariable::getSqlDialect)
-            .map("presto"::equals)
+            .map(ConnectContext::supportCharacterCastForNumeric)
             .orElse(false);
     }
 

@@ -19,7 +19,6 @@ package org.apache.doris.nereids.trees.expressions.functions.agg;
 
 import org.apache.doris.catalog.FunctionSignature;
 import org.apache.doris.catalog.ScalarType;
-import org.apache.doris.common.Config;
 import org.apache.doris.nereids.exceptions.AnalysisException;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.functions.ComputePrecision;
@@ -81,7 +80,7 @@ public class Avg extends NullableAggregateFunction
     @Override
     public void checkLegalityBeforeTypeCoercion() {
         DataType argType = child().getDataType();
-        if (Config.support_character_cast_for_numeric_agg_function && argType.isCharacterType() && isPrestoDialect()) {
+        if (argType.isCharacterType() && supportCharacterCastForNumeric()) {
             return;
         }
 

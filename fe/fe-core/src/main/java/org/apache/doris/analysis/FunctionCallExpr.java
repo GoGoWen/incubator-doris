@@ -970,7 +970,9 @@ public class FunctionCallExpr extends Expr {
                 || fnName.getFunction().equalsIgnoreCase("avg"))
                 && ((!arg.type.isNumericType() && !arg.type.isNull() && !arg.type.isBoolean())
                         || arg.type.isOnlyMetricType())) {
-            throw new AnalysisException(fnName.getFunction() + " requires a numeric parameter: " + this.toSql());
+            if (!(arg.type.isStringType() && supportCharacterCastForNumeric())) {
+                throw new AnalysisException(fnName.getFunction() + " requires a numeric parameter: " + this.toSql());
+            }
         }
         // DecimalV3 scale lower than DEFAULT_MIN_AVG_DECIMAL128_SCALE should do cast
         if (fnName.getFunction().equalsIgnoreCase("avg") && arg.type.isDecimalV3()
@@ -1256,6 +1258,12 @@ public class FunctionCallExpr extends Expr {
                 fnName = FunctionName.createBuiltinName("sm4_encrypt");
             }
         }
+    }
+
+    private boolean supportCharacterCastForNumeric() {
+        return Optional.ofNullable(ConnectContext.get())
+            .map(ConnectContext::supportCharacterCastForNumeric)
+            .orElse(false);
     }
 
     private void analyzeArrayFunction(Analyzer analyzer) throws AnalysisException {
