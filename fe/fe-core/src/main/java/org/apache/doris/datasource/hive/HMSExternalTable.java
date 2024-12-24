@@ -161,6 +161,16 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         UNKNOWN, HIVE, HUDI, ICEBERG
     }
 
+    public boolean isViewBased = false;
+
+    public void setIsViewBased(boolean isViewBased) {
+        this.isViewBased = isViewBased;
+    }
+
+    public boolean isViewBased() {
+        return isViewBased;
+    }
+
     /**
      * Create hive metastore external table.
      *
@@ -186,7 +196,14 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
     protected synchronized void makeSureInitialized() {
         super.makeSureInitialized();
         if (!objectCreated) {
-            remoteTable = ((HMSExternalCatalog) catalog).getClient().getTable(dbName, name);
+            if (isViewBased) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("[ViewBased] db:{} table: {} getTableFromView from catalog.", dbName, name);
+                }
+                remoteTable = ((HMSExternalCatalog) catalog).getClient().getTableFromView(dbName, name);
+            } else {
+                remoteTable = ((HMSExternalCatalog) catalog).getClient().getTable(dbName, name);
+            }
             if (remoteTable == null) {
                 throw new IllegalArgumentException("Hms table not exists, table: " + getNameWithFullQualifiers());
             } else {
@@ -433,14 +450,29 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
 
     public Partition getPartition(List<String> partitionValues) {
         HMSCachedClient client = ((HMSExternalCatalog) catalog).getClient();
-        return client.getPartition(dbName, name, partitionValues);
+        if (isViewBased) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("[ViewBased] db:{} table: {} getPartition from catalog.", dbName, name);
+            }
+            return client.getPartitionFromView(dbName, name, partitionValues.get(0));
+        } else {
+            return client.getPartition(dbName, name, partitionValues);
+        }
     }
 
     @Override
     public Set<String> getPartitionNames() {
         makeSureInitialized();
         HMSCachedClient client = ((HMSExternalCatalog) catalog).getClient();
-        List<String> names = client.listPartitionNames(dbName, name);
+        List<String> names;
+        if (isViewBased) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("[ViewBased] db:{} table: {} getPartitionNames from catalog.", dbName, name);
+            }
+            names = client.listPartitionNamesFromView(dbName, name);
+        } else {
+            names = client.listPartitionNames(dbName, name);
+        }
         return new HashSet<>(names);
     }
 

@@ -190,7 +190,8 @@ public class HiveMetaStoreCache {
                     }
                 },
                 null);
-        partitionValuesCache = partitionValuesCacheFactory.buildCache(key -> loadPartitionValues(key), null,
+        partitionValuesCache = partitionValuesCacheFactory.buildCache(key -> loadPartitionValues(key),
+                null,
                 refreshExecutor);
         CacheFactory partitionCacheFactory = new CacheFactory(
                 OptionalLong.of(28800L),
@@ -290,13 +291,29 @@ public class HiveMetaStoreCache {
 
     private int loadPartitionNum(PartitionNumCacheKey key) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        return catalog.getClient().getNumPartitionsByFilter(key.dbName, key.tblName, "");
+        if (key.fromView) {
+            ///  todo check here, we dont have getNumPartitionsByFilterFromView
+            return catalog.getClient().listPartitionsByFilterFromView(key.dbName, key.tblName, "",
+                            (short) -1).size();
+        } else {
+            return catalog.getClient().getNumPartitionsByFilter(key.dbName, key.tblName, "");
+        }
     }
 
     private Map<Long, PartitionItem> loadFilterPartitionValues(FilterPartitionValueCacheKey key) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        List<Partition> partitions = catalog.getClient().listPartitionsByFilter(key.dbName, key.tblName, key.filter,
+        List<Partition> partitions;
+        if (key.fromView) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("[ViewBased] db:{} table: {} loadFilterPartitionValues from catalog.",
+                          key.dbName, key.tblName);
+            }
+            partitions = catalog.getClient().listPartitionsByFilterFromView(key.dbName, key.tblName, key.filter,
                 (short) -1);
+        } else {
+            partitions = catalog.getClient().listPartitionsByFilter(key.dbName, key.tblName, key.filter,
+                (short) -1);
+        }
         Map<Long, PartitionItem> idToPartitionItem = Maps.newHashMapWithExpectedSize(partitions.size());
         for (Partition partition : partitions) {
             List<PartitionValue> values = Lists.newArrayListWithExpectedSize(key.types.size());
@@ -322,10 +339,19 @@ public class HiveMetaStoreCache {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         try {
             // partition name format: nation=cn/city=beijing
-            List<String> partitionNames = catalog.getClient().listPartitionNames(key.dbName, key.tblName);
+            List<String> partitionNames;
+            if (key.fromView) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("[ViewBased] db:{} table: {} loadPartitionValues from catalog.",
+                             key.dbName, key.tblName);
+                }
+                partitionNames = catalog.getClient().listPartitionNamesFromView(key.dbName, key.tblName);
+            } else {
+                partitionNames = catalog.getClient().listPartitionNames(key.dbName, key.tblName);
+            }
             if (LOG.isDebugEnabled()) {
-                LOG.debug("load #{} partitions for {} in catalog {}", partitionNames.size(), key,
-                        catalog.getName());
+                LOG.debug("load #{} partitions for {} in catalog {}", partitionNames.size(), key.tblName,
+                          catalog.getName());
             }
             Map<Long, PartitionItem> idToPartitionItem = Maps.newHashMapWithExpectedSize(partitionNames.size());
             BiMap<String, Long> partitionNameToIdMap = HashBiMap.create(partitionNames.size());
@@ -349,7 +375,7 @@ public class HiveMetaStoreCache {
                 Preconditions.checkState(key.types.size() == 1, key.types);
                 // singleColumnRangeMap is only used for single-column partition
                 singleColumnRangeMap = ListPartitionPrunerV2.genSingleColumnRangeMap(idToPartitionItem,
-                        idToUniqueIdsMap);
+                    idToUniqueIdsMap);
                 singleUidToColumnRangeMap = ListPartitionPrunerV2.genSingleUidToColumnRange(singleColumnRangeMap);
             }
             Map<Long, List<String>> partitionValuesMap = ListPartitionPrunerV2.getPartitionValuesMap(idToPartitionItem);
@@ -385,7 +411,17 @@ public class HiveMetaStoreCache {
     private HivePartition loadPartition(PartitionCacheKey key) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         try {
-            Partition partition = catalog.getClient().getPartition(key.dbName, key.tblName, key.values);
+            Partition partition;
+            if (key.fromView) {
+                ///  TODO check here
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("[ViewBased] db:{} table: {} loadPartition from catalog.",
+                              key.dbName, key.tblName);
+                }
+                partition = catalog.getClient().getPartitionFromView(key.dbName, key.tblName, key.values.get(0));
+            } else {
+                partition = catalog.getClient().getPartition(key.dbName, key.tblName, key.values);
+            }
             StorageDescriptor sd = partition.getSd();
             if (LOG.isDebugEnabled()) {
                 LOG.debug("load partition format: {}, location: {} for {} in catalog {}",
@@ -410,8 +446,9 @@ public class HiveMetaStoreCache {
         PartitionCacheKey oneKey = Iterables.get(keys, 0);
         String dbName = oneKey.getDbName();
         String tblName = oneKey.getTblName();
-        List<Column> partitionColumns = ((HMSExternalTable)
-                (catalog.getDbNullable(dbName).getTableNullable(tblName))).getPartitionColumns();
+        boolean fromView = oneKey.fromView;
+        List<Column> partitionColumns = ((HMSExternalTable) (
+                catalog.getDbNullable(dbName).getTableNullable(tblName))).getPartitionColumns();
         // A partitionName is like "country=China/city=Beijing" or "date=2023-02-01"
         List<String> partitionNames = Streams.stream(keys).map(key -> {
             StringBuilder sb = new StringBuilder();
@@ -426,16 +463,22 @@ public class HiveMetaStoreCache {
             sb.delete(sb.length() - 1, sb.length());
             return sb.toString();
         }).collect(Collectors.toList());
-        List<Partition> partitions = catalog.getClient().getPartitions(dbName, tblName, partitionNames);
+
+        List<Partition> partitions;
+        if (fromView) {
+            partitions = catalog.getClient().getPartitionsFromView(dbName, tblName, partitionNames);
+        } else {
+            partitions = catalog.getClient().getPartitions(dbName, tblName, partitionNames);
+        }
         // Compose the return result map.
         BDPAuthContext bdpAuthContext = BDPAuthContext.get();
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
         for (Partition partition : partitions) {
             StorageDescriptor sd = partition.getSd();
             ret.put(new PartitionCacheKey(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(), dbName,
-                    tblName, partition.getValues()),
-                    new HivePartition(dbName, tblName, false,
-                            sd.getInputFormat(), sd.getLocation(), partition.getValues(), partition.getParameters()));
+                    tblName, fromView, partition.getValues()),
+                new HivePartition(dbName, tblName, false,
+                    sd.getInputFormat(), sd.getLocation(), partition.getValues(), partition.getParameters()));
         }
         return ret;
     }
@@ -557,10 +600,21 @@ public class HiveMetaStoreCache {
         jobConf.set(key, value);
     }
 
+    public HivePartitionValues getPartitionValuesFromView(String dbName, String tblName, List<Type> types) {
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        PartitionValueCacheKey key = new PartitionValueCacheKey(BDPAuthContext.get().getHadoopUserName(),
+                dbName, tblName, true, types);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("[ViewBased] db:{} table: {} fromView: {} getPartitionValuesFromView from cache.",
+                    key.dbName, key.tblName, key.fromView);
+        }
+        return getPartitionValues(key);
+    }
+
     public HivePartitionValues getPartitionValues(String dbName, String tblName, List<Type> types) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         PartitionValueCacheKey key = new PartitionValueCacheKey(BDPAuthContext.get().getHadoopUserName(),
-                dbName, tblName, types);
+                dbName, tblName, false, types);
         return getPartitionValues(key);
     }
 
@@ -568,7 +622,19 @@ public class HiveMetaStoreCache {
             List<String> partitionColumnNames, List<Type> types) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         FilterPartitionValueCacheKey key = new FilterPartitionValueCacheKey(BDPAuthContext.get().getHadoopUserName(),
-                dbName, tblName, filter, partitionColumnNames, types);
+                dbName, tblName, filter, false, partitionColumnNames, types);
+        return getFilterPartitionValues(key);
+    }
+
+    public Map<Long, PartitionItem> getPartitionValuesByFilterFromView(String dbName, String tblName, String filter,
+                                                               List<String> partitionColumnNames, List<Type> types) {
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        FilterPartitionValueCacheKey key = new FilterPartitionValueCacheKey(BDPAuthContext.get().getHadoopUserName(),
+                dbName, tblName, filter, true, partitionColumnNames, types);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("[ViewBased] db:{} table: {} fromView: {}getPartitionValuesByFilterFromView from cache.",
+                      key.dbName, key.tblName, key.fromView);
+        }
         return getFilterPartitionValues(key);
     }
 
@@ -579,7 +645,18 @@ public class HiveMetaStoreCache {
     public int getPartitionNum(String dbName, String tblName) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         PartitionNumCacheKey key = new PartitionNumCacheKey(BDPAuthContext.get().getHadoopUserName(),
-                dbName, tblName);
+                dbName, tblName, false);
+        return getPartitionNum(key);
+    }
+
+    public int getPartitionNumFromView(String dbName, String tblName) {
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        PartitionNumCacheKey key = new PartitionNumCacheKey(BDPAuthContext.get().getHadoopUserName(),
+                dbName, tblName, true);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("[ViewBased] db:{} table: {} fromView: {} getPartitionNumFromView from cache.",
+                    key.dbName, key.tblName, key.fromView);
+        }
         return getPartitionNum(key);
     }
 
@@ -647,30 +724,41 @@ public class HiveMetaStoreCache {
         return fileLists;
     }
 
+    public HivePartition getHivePartitionFromView(String dbName, String name, List<String> partitionValues) {
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        return partitionCache.get(new PartitionCacheKey(BDPAuthContext.get().getHadoopUserName(),
+            BDPAuthContext.get().getUserToken(), dbName, name, true, partitionValues));
+    }
+
     public HivePartition getHivePartition(String dbName, String name, List<String> partitionValues) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         return partitionCache.get(new PartitionCacheKey(BDPAuthContext.get().getHadoopUserName(),
-                BDPAuthContext.get().getUserToken(), dbName, name, partitionValues));
+                BDPAuthContext.get().getUserToken(), dbName, name, false, partitionValues));
+    }
+
+    public List<HivePartition> getAllPartitionsFromView(String dbName, String name,
+                                                         List<List<String>> partitionValuesList) {
+        return getAllPartitions(dbName, name, partitionValuesList, true, true);
     }
 
     public List<HivePartition> getAllPartitionsWithCache(String dbName, String name,
             List<List<String>> partitionValuesList) {
-        return getAllPartitions(dbName, name, partitionValuesList, true);
+        return getAllPartitions(dbName, name, partitionValuesList, true, false);
     }
 
     public List<HivePartition> getAllPartitionsWithoutCache(String dbName, String name,
             List<List<String>> partitionValuesList) {
-        return getAllPartitions(dbName, name, partitionValuesList, false);
+        return getAllPartitions(dbName, name, partitionValuesList, false, false);
     }
 
     private List<HivePartition> getAllPartitions(String dbName, String name, List<List<String>> partitionValuesList,
-            boolean withCache) {
+                boolean withCache, boolean fromView) {
         long start = System.currentTimeMillis();
         BDPAuthContext bdpAuthContext = BDPAuthContext.get();
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
         List<PartitionCacheKey> keys = partitionValuesList.stream()
                 .map(p -> new PartitionCacheKey(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(),
-                    dbName, name, p))
+                    dbName, name, fromView, p))
                 .collect(Collectors.toList());
 
         List<HivePartition> partitions;
@@ -802,7 +890,7 @@ public class HiveMetaStoreCache {
         BDPAuthContext bdpAuthContext = BDPAuthContext.get();
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
         PartitionValueCacheKey key = new PartitionValueCacheKey(bdpAuthContext.getHadoopUserName(), dbName,
-                tblName, partitionColumnTypes);
+                tblName, false, partitionColumnTypes);
         HivePartitionValues partitionValues = partitionValuesCache.getIfPresent(key);
         if (partitionValues == null) {
             return;
@@ -855,11 +943,11 @@ public class HiveMetaStoreCache {
     }
 
     public void dropPartitionsCache(String dbName, String tblName, List<String> partitionNames,
-                                    boolean invalidPartitionCache) {
+                                    boolean invalidPartitionCache, boolean isInlineView) {
         BDPAuthContext bdpAuthContext = BDPAuthContext.get();
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
-        PartitionValueCacheKey key = new PartitionValueCacheKey(bdpAuthContext.getHadoopUserName(), dbName,
-                tblName, null);
+        PartitionValueCacheKey key = new PartitionValueCacheKey(bdpAuthContext.getHadoopUserName(), dbName, tblName,
+                isInlineView, null);
         HivePartitionValues partitionValues = partitionValuesCache.getIfPresent(key);
         if (partitionValues == null) {
             return;
@@ -1048,11 +1136,13 @@ public class HiveMetaStoreCache {
         private String hadoopUserName;
         private String dbName;
         private String tblName;
+        private boolean fromView = false;
 
-        public PartitionNumCacheKey(String hadoopUserName, String dbName, String tblName) {
+        public PartitionNumCacheKey(String hadoopUserName, String dbName, String tblName, boolean fromView) {
             this.hadoopUserName = hadoopUserName;
             this.dbName = dbName;
             this.tblName = tblName;
+            this.fromView = fromView;
         }
 
         @Override
@@ -1065,18 +1155,20 @@ public class HiveMetaStoreCache {
             }
             return hadoopUserName.equals(((PartitionNumCacheKey) obj).hadoopUserName)
                     && dbName.equals(((PartitionNumCacheKey) obj).dbName)
-                    && tblName.equals(((PartitionNumCacheKey) obj).tblName);
+                    && tblName.equals(((PartitionNumCacheKey) obj).tblName)
+                    && fromView == ((PartitionNumCacheKey) obj).fromView;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(hadoopUserName, dbName, tblName);
+            return Objects.hash(hadoopUserName, dbName, tblName, fromView);
         }
 
         @Override
         public String toString() {
             return "PartitionNumCacheKey{" + "hadoopUserName='" + hadoopUserName + '\''
-                    + ",dbName='" + dbName + '\'' + ", tblName='" + tblName + '\'' + '}';
+                    + ",dbName='" + dbName + '\'' + ", tblName='" + tblName + '\''
+                    + ", fromView='" + fromView + '\'' + '}';
         }
     }
 
@@ -1089,16 +1181,18 @@ public class HiveMetaStoreCache {
         private String dbName;
         private String tblName;
         private String filter;
+        private boolean fromView = false;
         // not in key
         private List<String> partitionColumnNames;
         private List<Type> types;
 
         public FilterPartitionValueCacheKey(String hadoopUserName, String dbName, String tblName, String filter,
-                List<String> partitionColumnNames, List<Type> types) {
+                boolean fromView, List<String> partitionColumnNames, List<Type> types) {
             this.hadoopUserName = hadoopUserName;
             this.dbName = dbName;
             this.tblName = tblName;
             this.filter = filter;
+            this.fromView = fromView;
             this.partitionColumnNames = partitionColumnNames;
             this.types = types;
         }
@@ -1114,19 +1208,21 @@ public class HiveMetaStoreCache {
             return hadoopUserName.equals(((FilterPartitionValueCacheKey) obj).hadoopUserName)
                     && dbName.equals(((FilterPartitionValueCacheKey) obj).dbName)
                     && tblName.equals(((FilterPartitionValueCacheKey) obj).tblName)
-                    && filter.equals(((FilterPartitionValueCacheKey) obj).filter);
+                    && filter.equals(((FilterPartitionValueCacheKey) obj).filter)
+                    && fromView == ((FilterPartitionValueCacheKey) obj).fromView;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(hadoopUserName, dbName, tblName, filter);
+            return Objects.hash(hadoopUserName, dbName, tblName, filter, fromView);
         }
 
         @Override
         public String toString() {
             return "FilterPartitionValueCacheKey{" + "hadoopUserName='" + hadoopUserName + '\''
                     + ",dbName='" + dbName + '\'' + ", tblName='" + tblName + '\''
-                    + ",filter='" + filter + '\'' + '\'' + '}';
+                    + ",filter='" + filter + '\'' + '\''
+                    + ",fromView='" + fromView + '\'' + '\'' + '}';
         }
     }
 
@@ -1138,13 +1234,16 @@ public class HiveMetaStoreCache {
         private String hadoopUserName;
         private String dbName;
         private String tblName;
+        private boolean fromView = false;
         // not in key
         private List<Type> types;
 
-        public PartitionValueCacheKey(String hadoopUserName, String dbName, String tblName, List<Type> types) {
+        public PartitionValueCacheKey(String hadoopUserName, String dbName, String tblName, boolean fromView,
+                                       List<Type> types) {
             this.hadoopUserName = hadoopUserName;
             this.dbName = dbName;
             this.tblName = tblName;
+            this.fromView = fromView;
             this.types = types;
         }
 
@@ -1158,18 +1257,20 @@ public class HiveMetaStoreCache {
             }
             return hadoopUserName.equals(((PartitionValueCacheKey) obj).hadoopUserName)
                     && dbName.equals(((PartitionValueCacheKey) obj).dbName)
-                    && tblName.equals(((PartitionValueCacheKey) obj).tblName);
+                    && tblName.equals(((PartitionValueCacheKey) obj).tblName)
+                    && fromView == ((PartitionValueCacheKey) obj).fromView;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(hadoopUserName, dbName, tblName);
+            return Objects.hash(hadoopUserName, dbName, tblName, fromView);
         }
 
         @Override
         public String toString() {
             return "PartitionValueCacheKey{" + "hadoopUserName='" + hadoopUserName + '\''
-                    + ",dbName='" + dbName + '\'' + ", tblName='" + tblName + '\'' + '}';
+                    + ",dbName='" + dbName + '\'' + ", tblName='" + tblName + '\''
+                    + ", fromView='" + fromView + '\'' + '}';
         }
     }
 
@@ -1179,14 +1280,16 @@ public class HiveMetaStoreCache {
         private String userToken;
         private String dbName;
         private String tblName;
+        private boolean fromView = false;
         private List<String> values;
 
         public PartitionCacheKey(String hadoopUserName, String userToken, String dbName, String tblName,
-                                 List<String> values) {
+                                 boolean fromView, List<String> values) {
             this.hadoopUserName = hadoopUserName;
             this.userToken = userToken;
             this.dbName = dbName;
             this.tblName = tblName;
+            this.fromView = fromView;
             this.values = values;
         }
 
@@ -1202,6 +1305,7 @@ public class HiveMetaStoreCache {
                     && userToken.equals(((PartitionCacheKey) obj).userToken)
                     && dbName.equals(((PartitionCacheKey) obj).dbName)
                     && tblName.equals(((PartitionCacheKey) obj).tblName)
+                    && fromView == ((PartitionCacheKey) obj).fromView
                     && Objects.equals(values, ((PartitionCacheKey) obj).values);
         }
 
@@ -1214,7 +1318,7 @@ public class HiveMetaStoreCache {
         public String toString() {
             return "PartitionCacheKey{" + "hadoopUserName='" + hadoopUserName + '\'' + "userToken='" + userToken + '\''
                     + "dbName='" + dbName + '\'' + ", tblName='" + tblName + '\'' + ", values="
-                    + values + '}';
+                    + values + ", fromView='" + fromView + '\'' + '}';
         }
     }
 

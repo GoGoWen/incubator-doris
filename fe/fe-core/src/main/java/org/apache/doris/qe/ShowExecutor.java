@@ -1796,14 +1796,31 @@ public class ShowExecutor {
         LimitElement limit = showStmt.getLimitElement();
         Map<String, Expr> filterMap = showStmt.getFilterMap();
         List<OrderByPair> orderByPairs = showStmt.getOrderByPairs();
-
+        boolean isViewBased = false;
+        DatabaseIf db = catalog.getDbNullable(dbName);
+        if (db != null) {
+            HMSExternalTable table = (HMSExternalTable) db.getTableNullable(showStmt.getTableName().getTbl());
+            if (table != null) {
+                isViewBased = table.isViewBased();
+            }
+        }
         if (limit != null && limit.hasLimit() && limit.getOffset() == 0
                 && (orderByPairs == null || !orderByPairs.get(0).isDesc())) {
             // hmsClient returns unordered partition list, hence if offset > 0 cannot pass limit
-            partitionNames = catalog.getClient()
+            if (isViewBased) {
+                partitionNames = catalog.getClient()
+                    .listPartitionNamesFromView(dbName, showStmt.getTableName().getTbl(), limit.getLimit());
+            } else {
+                partitionNames = catalog.getClient()
                     .listPartitionNames(dbName, showStmt.getTableName().getTbl(), limit.getLimit());
+            }
         } else {
-            partitionNames = catalog.getClient().listPartitionNames(dbName, showStmt.getTableName().getTbl());
+            if (isViewBased) {
+                partitionNames = catalog.getClient().listPartitionNamesFromView(dbName,
+                    showStmt.getTableName().getTbl());
+            } else {
+                partitionNames = catalog.getClient().listPartitionNames(dbName, showStmt.getTableName().getTbl());
+            }
         }
 
         /* Filter add rows */

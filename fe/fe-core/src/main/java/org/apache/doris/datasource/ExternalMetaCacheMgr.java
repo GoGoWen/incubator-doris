@@ -274,11 +274,12 @@ public class ExternalMetaCacheMgr {
         }
     }
 
-    public void dropPartitionsCache(long catalogId, HMSExternalTable table, List<String> partitionNames) {
+    public void dropPartitionsCache(long catalogId, HMSExternalTable table, List<String> partitionNames,
+                                    boolean isViewBased) {
         String dbName = ClusterNamespace.getNameFromFullName(table.getDbName());
         HiveMetaStoreCache metaCache = cacheMap.get(catalogId);
         if (metaCache != null) {
-            metaCache.dropPartitionsCache(dbName, table.getName(), partitionNames, true);
+            metaCache.dropPartitionsCache(dbName, table.getName(), partitionNames, true, isViewBased);
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("drop partition cache for {}.{} in catalog {}", dbName, table.getName(), catalogId);

@@ -50,17 +50,27 @@ public interface HMSCachedClient {
 
     boolean tableExists(String dbName, String tblName);
 
-    List<String> listPartitionNames(String dbName, String tblName);
+    List<String> listPartitionNamesFromView(String dbName, String tblName);
 
-    List<Partition> listPartitions(String dbName, String tblName);
+    List<String> listPartitionNamesFromView(String dbName, String tblName, long maxListPartitionNum);
+
+    List<String> listPartitionNames(String dbName, String tblName);
 
     List<String> listPartitionNames(String dbName, String tblName, long maxListPartitionNum);
 
+    List<Partition> listPartitions(String dbName, String tblName);
+
     Partition getPartition(String dbName, String tblName, List<String> partitionValues);
+
+    Partition getPartitionFromView(String dbName, String tblName, String partitionValues);
 
     List<Partition> getPartitions(String dbName, String tblName, List<String> partitionNames);
 
+    List<Partition> getPartitionsFromView(String dbName, String tblName, List<String> partitionNames);
+
     Table getTable(String dbName, String tblName);
+
+    Table getTableFromView(String dbName, String tblName);
 
     List<FieldSchema> getSchema(String dbName, String tblName);
 
@@ -114,10 +124,11 @@ public interface HMSCachedClient {
 
     void dropPartition(String dbName, String tableName, List<String> partitionValues, boolean deleteData);
 
-
     int getNumPartitionsByFilter(String dbName, String tableName, String filter);
 
     List<Partition> listPartitionsByFilter(String dbName, String tableName, String filter, short maxParts);
+
+    List<Partition> listPartitionsByFilterFromView(String dbName, String tableName, String filter, short maxParts);
 
     default void setHadoopAuthenticator(HadoopAuthenticator hadoopAuthenticator) {
         // Ignored by default

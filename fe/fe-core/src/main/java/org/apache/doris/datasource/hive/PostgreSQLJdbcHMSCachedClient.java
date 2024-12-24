@@ -124,6 +124,16 @@ public class PostgreSQLJdbcHMSCachedClient extends JdbcHMSCachedClient {
     }
 
     @Override
+    public List<String> listPartitionNamesFromView(String dbName, String tblName) {
+        throw new HMSClientException("listPartitionNamesFromView is not implement" + dbName + "." + tblName);
+    }
+
+    @Override
+    public List<String> listPartitionNamesFromView(String dbName, String tblName, long maxListPartitionNum) {
+        throw new HMSClientException("listPartitionNamesFromView is not implement" + dbName + "." + tblName);
+    }
+
+    @Override
     public List<String> listPartitionNames(String dbName, String tblName) {
         return listPartitionNames(dbName, tblName, (long) -1);
     }
@@ -155,6 +165,11 @@ public class PostgreSQLJdbcHMSCachedClient extends JdbcHMSCachedClient {
         }
     }
 
+    @Override
+    public Partition getPartitionFromView(String dbName, String tblName, String partitionValues) {
+        throw new HMSClientException("getPartitionFromView is not implement" + dbName + "." + tblName);
+    }
+
     // not used
     @Override
     public Partition getPartition(String dbName, String tblName, List<String> partitionValues) {
@@ -172,6 +187,11 @@ public class PostgreSQLJdbcHMSCachedClient extends JdbcHMSCachedClient {
         }
         throw new HMSClientException("Can not get partition of partitionName = " + partitionName
                 + ", from " + dbName + "." + tblName);
+    }
+
+    @Override
+    public List<Partition> getPartitionsFromView(String dbName, String tblName, List<String> partitionNames) {
+        throw new HMSClientException("getPartitionsFromView is not implement" + dbName + "." + tblName);
     }
 
     @Override
@@ -259,6 +279,11 @@ public class PostgreSQLJdbcHMSCachedClient extends JdbcHMSCachedClient {
                     + " Will use null values instead.");
         }
         return new HashMap<>();
+    }
+
+    @Override
+    public Table getTableFromView(String dbName, String tblName) {
+        throw new HMSClientException("getTableFromView is not implement" + dbName + "." + tblName);
     }
 
     @Override
@@ -586,6 +611,12 @@ public class PostgreSQLJdbcHMSCachedClient extends JdbcHMSCachedClient {
 
     @Override
     public List<Partition> listPartitionsByFilter(String dbName, String tableName, String filter, short maxParts) {
+        throw new HMSClientException("Do not support in PostgreSQLJdbcHMSCachedClient.");
+    }
+
+    @Override
+    public List<Partition> listPartitionsByFilterFromView(String dbName, String tableName, String filter,
+                                                          short maxParts) {
         throw new HMSClientException("Do not support in PostgreSQLJdbcHMSCachedClient.");
     }
 

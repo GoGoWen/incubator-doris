@@ -242,6 +242,16 @@ public class ConnectContext {
     // it's default thread-safe
     private boolean isProxy = false;
 
+    private boolean isViewBased = false;
+
+    public void setIsViewBased(boolean isViewBased) {
+        this.isViewBased = isViewBased;
+    }
+
+    public boolean isViewBased() {
+        return isViewBased;
+    }
+
     private BDPAuthContext bdpAuthContext = null;
 
     public void setBdpAuthContext(BDPAuthContext bdpAuthContext) {

@@ -68,6 +68,8 @@ public class Analyzer extends AbstractBatchJobExecutor {
 
     private final List<RewriteJob> jobs;
 
+    private boolean isFromView = false;
+
     /**
      * Execute the analysis job with scope.
      * @param cascadesContext planner context for execute job
@@ -103,6 +105,14 @@ public class Analyzer extends AbstractBatchJobExecutor {
      */
     public void analyze() {
         execute();
+    }
+
+    public void setFromView(boolean isFromView) {
+        isFromView = isFromView;
+    }
+
+    public boolean isFromViewAnalyzer() {
+        return isFromView;
     }
 
     private static List<RewriteJob> buildAnalyzeJobs(Optional<CustomTableResolver> customTableResolver) {

@@ -28,6 +28,7 @@ import org.apache.doris.common.Pair;
 import org.apache.doris.common.io.Text;
 import org.apache.doris.common.io.Writable;
 import org.apache.doris.common.util.Util;
+import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.persist.gson.GsonPostProcessable;
 import org.apache.doris.persist.gson.GsonUtils;
 import org.apache.doris.statistics.AnalysisInfo;
@@ -143,7 +144,17 @@ public class ExternalTable implements TableIf, Writable, GsonPostProcessable {
     @Override
     public List<Column> getFullSchema() {
         ExternalSchemaCache cache = Env.getCurrentEnv().getExtMetaCacheMgr().getSchemaCache(catalog);
-        Optional<SchemaCacheValue> schemaCacheValue = cache.getSchemaValue(dbName, name);
+        Optional<SchemaCacheValue> schemaCacheValue = Optional.empty();
+        if (this instanceof HMSExternalTable) {
+            boolean isViewBased = ((HMSExternalTable) this).isViewBased;
+            if (isViewBased) {
+                schemaCacheValue = cache.getSchemaValueFromView(dbName, name);
+            } else {
+                schemaCacheValue = cache.getSchemaValue(dbName, name);
+            }
+        } else {
+            schemaCacheValue = cache.getSchemaValue(dbName, name);
+        }
         return schemaCacheValue.map(SchemaCacheValue::getSchema).orElse(null);
     }
 

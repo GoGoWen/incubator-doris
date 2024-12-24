@@ -894,7 +894,21 @@ public class MetadataGenerator {
     private static TFetchSchemaTableDataResult dealHMSCatalog(HMSExternalCatalog catalog, String dbName,
             String tableName) {
         List<TRow> dataBatch = Lists.newArrayList();
-        List<String> partitionNames = catalog.getClient().listPartitionNames(dbName, tableName);
+        boolean isViewBased = false;
+        DatabaseIf db = catalog.getDbNullable(dbName);
+        if (db != null) {
+            HMSExternalTable table = (HMSExternalTable) db.getTableNullable(tableName);
+            if (table != null) {
+                isViewBased = table.isViewBased();
+            }
+        }
+
+        List<String> partitionNames = Lists.newArrayList();
+        if (isViewBased) {
+            partitionNames = catalog.getClient().listPartitionNamesFromView(dbName, tableName);
+        } else {
+            partitionNames = catalog.getClient().listPartitionNames(dbName, tableName);
+        }
         for (String partition : partitionNames) {
             TRow trow = new TRow();
             trow.addToColumnValue(new TCell().setStringVal(partition));

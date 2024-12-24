@@ -346,7 +346,7 @@ public abstract class FileQueryScanNode extends FileScanNode {
             if (inputSplits.isEmpty() && !isFileStreamType()) {
                 return;
             }
-            Multimap<Backend, Split> assignment =  backendPolicy.computeScanRangeAssignment(inputSplits);
+            Multimap<Backend, Split> assignment = backendPolicy.computeScanRangeAssignment(inputSplits);
             for (Backend backend : assignment.keySet()) {
                 Collection<Split> splits = assignment.get(backend);
                 for (Split split : splits) {
@@ -387,7 +387,7 @@ public abstract class FileQueryScanNode extends FileScanNode {
         TFileRangeDesc rangeDesc = createFileRangeDesc(fileSplit, partitionValuesFromPath, pathPartitionKeys);
         TFileCompressType fileCompressType = getFileCompressType(fileSplit);
         rangeDesc.setCompressType(fileCompressType);
-        if (fileSplit instanceof  HiveSplit) {
+        if (fileSplit instanceof HiveSplit) {
             if (isACID) {
                 HiveSplit hiveSplit = (HiveSplit) fileSplit;
                 hiveSplit.setTableFormatType(TableFormatType.TRANSACTIONAL_HIVE);

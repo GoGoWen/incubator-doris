@@ -281,6 +281,9 @@ public class BindRelation extends OneAnalysisRuleFactory {
                     return new LogicalSubQueryAlias<>(qualifiedTableName, logicalView);
                 case HMS_EXTERNAL_TABLE:
                     HMSExternalTable hmsTable = (HMSExternalTable) table;
+                    if (cascadesContext.getConnectContext().isViewBased()) {
+                        hmsTable.setIsViewBased(true);
+                    }
                     if (Config.enable_query_hive_views && hmsTable.isView()) {
                         isView = true;
                         String hiveCatalog = hmsTable.getCatalog().getName();
@@ -345,10 +348,13 @@ public class BindRelation extends OneAnalysisRuleFactory {
         ConnectContext ctx = cascadesContext.getConnectContext();
         String previousCatalog = ctx.getCurrentCatalog().getName();
         String previousDb = ctx.getDatabase();
+        boolean isViewBased = ctx.isViewBased();
         ctx.changeDefaultCatalog(hiveCatalog);
+        ctx.setIsViewBased(true);
         Plan hiveViewPlan = parseAndAnalyzeView(table, ddlSql, cascadesContext);
         ctx.changeDefaultCatalog(previousCatalog);
         ctx.setDatabase(previousDb);
+        ctx.setIsViewBased(isViewBased);
         return hiveViewPlan;
     }
 
@@ -365,9 +371,11 @@ public class BindRelation extends OneAnalysisRuleFactory {
         }
         CascadesContext viewContext = CascadesContext.initContext(
                 parentContext.getStatementContext(), parsedViewPlan, PhysicalProperties.ANY);
+
         viewContext.keepOrShowPlanProcess(parentContext.showPlanProcess(), () -> {
             viewContext.newAnalyzer(customTableResolver).analyze();
         });
+
         parentContext.addPlanProcesses(viewContext.getPlanProcesses());
         // we should remove all group expression of the plan which in other memo, so the groupId would not conflict
         return viewContext.getRewritePlan();

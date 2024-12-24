@@ -131,10 +131,8 @@ public class HiveScanNode extends FileQueryScanNode {
         brokerName = hmsTable.getCatalog().bindBrokerName();
     }
 
-    @Override
-    protected void doInitialize() throws UserException {
+    @Override protected void doInitialize() throws UserException {
         super.doInitialize();
-
         if (hmsTable.isHiveTransactionalTable() && !Config.ignore_hive_table_transaction) {
             this.hiveTransaction = new HiveTransaction(DebugUtil.printId(ConnectContext.get().queryId()),
                     ConnectContext.get().getQualifiedUser(), hmsTable, hmsTable.isFullAcidTable());
@@ -155,8 +153,19 @@ public class HiveScanNode extends FileQueryScanNode {
             if (!isPartitionPruned) {
                 // partitionItems is null means that the partition is not pruned by Nereids,
                 // so need to prune partitions here by legacy ListPartitionPrunerV2.
-                HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValues(
+                HiveMetaStoreCache.HivePartitionValues hivePartitionValues;
+                if (hmsTable.isViewBased()) {
+                    long startTime = System.currentTimeMillis();
+                    hivePartitionValues = cache.getPartitionValuesFromView(
                         hmsTable.getDbName(), hmsTable.getName(), partitionColumnTypes);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("[ViewBased] hive partition values for table from view {}.{} cost: {} ms",
+                                  hmsTable.getDbName(), hmsTable.getName(), (System.currentTimeMillis() - startTime));
+                    }
+                } else {
+                    hivePartitionValues = cache.getPartitionValues(
+                        hmsTable.getDbName(), hmsTable.getName(), partitionColumnTypes);
+                }
                 Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
                 this.totalPartitionNum = idToPartitionItem.size();
                 if (!conjuncts.isEmpty()) {
@@ -168,7 +177,7 @@ public class HiveScanNode extends FileQueryScanNode {
                             true);
                     Collection<Long> filteredPartitionIds = pruner.prune();
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("hive partition fetch and prune for table {}.{} cost: {} ms",
+                        LOG.debug("[ViewBased] hive partition fetch and prune for table {}.{} cost: {} ms",
                                 hmsTable.getDbName(), hmsTable.getName(), (System.currentTimeMillis() - start));
                     }
                     partitionItems = Lists.newArrayListWithCapacity(filteredPartitionIds.size());
@@ -199,8 +208,18 @@ public class HiveScanNode extends FileQueryScanNode {
                 partitionValuesList.add(
                         ((ListPartitionItem) item).getItems().get(0).getPartitionValuesAsStringListForHive());
             }
-            resPartitions = cache.getAllPartitionsWithCache(hmsTable.getDbName(), hmsTable.getName(),
+            if (hmsTable.isViewBased()) {
+                long startTime = System.currentTimeMillis();
+                resPartitions = cache.getAllPartitionsFromView(hmsTable.getDbName(), hmsTable.getName(),
                     partitionValuesList);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("hive partition fetch for table from view {}.{} cost: {} ms",
+                              hmsTable.getDbName(), hmsTable.getName(), (System.currentTimeMillis() - startTime));
+                }
+            } else {
+                resPartitions = cache.getAllPartitionsWithCache(hmsTable.getDbName(), hmsTable.getName(),
+                    partitionValuesList);
+            }
         } else {
             // non partitioned table, create a dummy partition to save location and inputformat,
             // so that we can unify the interface.

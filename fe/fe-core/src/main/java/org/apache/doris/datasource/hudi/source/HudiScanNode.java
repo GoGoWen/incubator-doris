@@ -285,9 +285,10 @@ public class HudiScanNode extends HiveScanNode {
             TablePartitionValues partitionValues;
             if (snapshotTimestamp.isPresent()) {
                 partitionValues = processor.getSnapshotPartitionValues(
-                        hmsTable, metaClient, snapshotTimestamp.get(), useHiveSyncPartition);
+                        hmsTable, metaClient, snapshotTimestamp.get(), useHiveSyncPartition, hmsTable.isViewBased());
             } else {
-                partitionValues = processor.getPartitionValues(hmsTable, metaClient, useHiveSyncPartition);
+                partitionValues = processor.getPartitionValues(hmsTable, metaClient, useHiveSyncPartition,
+                    hmsTable.isViewBased());
             }
             if (partitionValues != null) {
                 // 2. prune partitions by expr

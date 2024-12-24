@@ -18,9 +18,12 @@
 package org.apache.doris.datasource;
 
 import org.apache.doris.catalog.Column;
+import org.apache.doris.catalog.DatabaseIf;
+import org.apache.doris.catalog.TableIf;
 import org.apache.doris.common.CacheFactory;
 import org.apache.doris.common.Config;
 import org.apache.doris.datasource.hive.HMSExternalCatalog;
+import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.metric.GaugeMetric;
 import org.apache.doris.metric.Metric;
 import org.apache.doris.metric.MetricLabel;
@@ -80,12 +83,32 @@ public class ExternalSchemaCache {
         // reload sync if connect_context is null
         if (catalog instanceof HMSExternalCatalog) {
             Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            DatabaseIf db = catalog.getDbNullable(key.dbName);
+            if (db != null) {
+                TableIf table = db.getTableNullable(key.tblName);
+                if (table != null && table instanceof HMSExternalTable) {
+                    if (((HMSExternalTable) table).isViewBased()) {
+                        key.fromView = true;
+                    }
+                }
+            }
         }
         Optional<SchemaCacheValue> schema = catalog.getSchema(key.dbName, key.tblName);
         if (LOG.isDebugEnabled()) {
             LOG.debug("load schema for {} in catalog {}", key, catalog.getName());
         }
         return schema;
+    }
+
+    public Optional<SchemaCacheValue> getSchemaValueFromView(String dbName, String tblName) {
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            SchemaCacheKey key = new SchemaCacheKey(BDPAuthContext.get().getHadoopUserName(), dbName, tblName,
+                          true);
+            return schemaCache.get(key);
+        } else {
+            return schemaCache.get(new SchemaCacheKey("", dbName, tblName));
+        }
     }
 
     public Optional<SchemaCacheValue> getSchemaValue(String dbName, String tblName) {
@@ -145,11 +168,19 @@ public class ExternalSchemaCache {
         private String hadoopUserName;
         private String dbName;
         private String tblName;
+        private boolean fromView = false;
 
         public SchemaCacheKey(String hadoopUserName, String dbName, String tblName) {
             this.hadoopUserName = hadoopUserName;
             this.dbName = dbName;
             this.tblName = tblName;
+        }
+
+        public SchemaCacheKey(String hadoopUserName, String dbName, String tblName, boolean fromView) {
+            this.hadoopUserName = hadoopUserName;
+            this.dbName = dbName;
+            this.tblName = tblName;
+            this.fromView = fromView;
         }
 
         @Override
@@ -162,18 +193,20 @@ public class ExternalSchemaCache {
             }
             return hadoopUserName.equals(((SchemaCacheKey) obj).hadoopUserName)
                     && dbName.equals(((SchemaCacheKey) obj).dbName)
-                    && tblName.equals(((SchemaCacheKey) obj).tblName);
+                    && tblName.equals(((SchemaCacheKey) obj).tblName)
+                    && fromView == ((SchemaCacheKey) obj).fromView;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(dbName, tblName);
+            return Objects.hash(dbName, tblName, fromView);
         }
 
         @Override
         public String toString() {
             return "SchemaCacheKey{" + "hadoopUserName='" + hadoopUserName + '\''
-                    + ", dbName='" + dbName + '\'' + ", tblName='" + tblName + '\'' + '}';
+                    + ", dbName='" + dbName + '\'' + ", tblName='" + tblName + '\''
+                    + ", fromView='" + fromView + '\'' + '}';
         }
     }
 }

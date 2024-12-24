@@ -35,6 +35,8 @@ import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
 import org.apache.doris.nereids.rules.expression.rules.PartitionPruneExpressionExtractor;
+import org.apache.doris.nereids.rules.expression.rules.PartitionPruner;
+import org.apache.doris.nereids.rules.expression.rules.PartitionPruner.PartitionTableType;
 import org.apache.doris.nereids.rules.expression.rules.PredicateRewriteForPartitionFilter;
 import org.apache.doris.nereids.rules.expression.rules.PredicateRewriteForPartitionPrune;
 import org.apache.doris.nereids.trees.expressions.Expression;
@@ -58,6 +60,7 @@ import org.apache.commons.text.StringSubstitutor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,7 +95,8 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                     // TODO(cmy): support other external table
                     if (tbl instanceof HMSExternalTable && ((HMSExternalTable) tbl).getDlaType() == DLAType.HIVE) {
                         HMSExternalTable hiveTbl = (HMSExternalTable) tbl;
-                        selectedPartitions = pruneHivePartitions(hiveTbl, filter, scan, ctx.cascadesContext);
+                        selectedPartitions = pruneHivePartitions(hiveTbl, filter, scan,
+                            ctx.cascadesContext, hiveTbl.isViewBased());
                     } else {
                         // set isPruned so that it won't go pass the partition prune again
                         selectedPartitions = new SelectedPartitions(0, ImmutableMap.of(), true);
@@ -104,13 +108,79 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                 }).toRule(RuleType.FILE_SCAN_PARTITION_PRUNE);
     }
 
+    private SelectedPartitions pruneHivePartitionsFromView(HMSExternalTable hiveTbl,
+                                                   LogicalFilter<LogicalFileScan> filter, LogicalFileScan scan,
+                                                   CascadesContext ctx) {
+        Map<Long, PartitionItem> selectedPartitionItems = Maps.newHashMap();
+        Map<String, Slot> scanOutput = scan.getOutput()
+                .stream()
+                .collect(Collectors.toMap(slot -> slot.getName().toLowerCase(), Function.identity()));
+
+        List<Slot> partitionSlots = hiveTbl.getPartitionColumns()
+                .stream()
+                .map(column -> scanOutput.get(column.getName().toLowerCase()))
+                .collect(Collectors.toList());
+
+        HiveMetaStoreCache cache = Env.getCurrentEnv().getExtMetaCacheMgr()
+                .getMetaStoreCache((HMSExternalCatalog) hiveTbl.getCatalog());
+        int partitionNum = cache.getPartitionNumFromView(hiveTbl.getDbName(), hiveTbl.getName());
+        boolean isDirectlyByFilter = partitionNum > Config.max_partition_num_for_single_hive_table_without_filter;
+        Expression partitionPredicate = null;
+        // use listPartitionsByFilterFromView
+        if (isDirectlyByFilter) {
+            try {
+                partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
+                        ImmutableSet.copyOf(partitionSlots), ctx);
+                List<String> partitionColumnNames = partitionSlots.stream().map(e -> e.getName())
+                        .collect(Collectors.toList());
+                partitionPredicate = PredicateRewriteForPartitionPrune.rewrite(partitionPredicate, ctx);
+                partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
+                if (BooleanLiteral.TRUE.equals(partitionPredicate)) {
+                    HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValuesFromView(
+                            hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+                    selectedPartitionItems = hivePartitionValues.getIdToPartitionItem();
+                } else if (BooleanLiteral.FALSE.equals(partitionPredicate) || partitionPredicate.isNullLiteral()) {
+                    // do nothing
+                } else {
+                    selectedPartitionItems = cache.getPartitionValuesByFilterFromView(hiveTbl.getDbName(),
+                            hiveTbl.getName(),
+                            partitionPredicate.toSql(), partitionColumnNames, hiveTbl.getPartitionColumnTypes());
+                }
+            } catch (Exception e) {
+                // for some complex case listPartitionsByFilterView may not support
+                LOG.warn("get selected partition items by listPartitionsByFilterFromView failed, filter sql is "
+                        + partitionPredicate.toSql() + ", use getPartitionValuesFromView instead");
+                isDirectlyByFilter = false;
+            }
+        }
+        if (!isDirectlyByFilter) {
+            ///
+            HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValuesFromView(
+                    hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+            Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
+            List<Long> prunedPartitions = new ArrayList<>(PartitionPruner.prune(
+                    partitionSlots, filter.getPredicate(), idToPartitionItem, ctx, PartitionTableType.HIVE));
+            for (Long id : prunedPartitions) {
+                selectedPartitionItems.put(id, idToPartitionItem.get(id));
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("[ViewBased] db:{} table: {} total partition num: {} selected partitions: {}",
+                        hiveTbl.getDbName(), hiveTbl.getName(), partitionNum, selectedPartitionItems.size());
+            }
+        }
+        return new SelectedPartitions(partitionNum, selectedPartitionItems, true);
+    }
+
     private SelectedPartitions pruneHivePartitions(HMSExternalTable hiveTbl,
-            LogicalFilter<LogicalFileScan> filter, LogicalFileScan scan, CascadesContext ctx) {
+            LogicalFilter<LogicalFileScan> filter, LogicalFileScan scan, CascadesContext ctx, boolean isViewBased) {
         Map<Long, PartitionItem> selectedPartitionItems = Maps.newHashMap();
         if (CollectionUtils.isEmpty(hiveTbl.getPartitionColumns())) {
             // non partitioned table, return NOT_PRUNED.
             // non partition table will be handled in HiveScanNode.
             return SelectedPartitions.NOT_PRUNED;
+        }
+        if (isViewBased) {
+            return pruneHivePartitionsFromView(hiveTbl, filter, scan, ctx);
         }
         Map<String, Slot> scanOutput = scan.getOutput()
                 .stream()

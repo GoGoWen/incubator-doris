@@ -449,7 +449,7 @@ public class CatalogMgrTest extends TestWithFeService {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
         PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
-                Lists.newArrayList(Type.INT, Type.SMALLINT));
+                false, Lists.newArrayList(Type.INT, Type.SMALLINT));
         HivePartitionValues hivePartitionValues = loadPartitionValues(partitionValueCacheKey,
                 Lists.newArrayList("y=2020/m=1", "y=2020/m=2"), metaStoreCache);
         metaStoreCache.putPartitionValuesCacheForTest(partitionValueCacheKey, hivePartitionValues);
@@ -464,12 +464,12 @@ public class CatalogMgrTest extends TestWithFeService {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
         PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
-                Lists.newArrayList(Type.INT, Type.SMALLINT));
+                false, Lists.newArrayList(Type.INT, Type.SMALLINT));
         HivePartitionValues hivePartitionValues = loadPartitionValues(partitionValueCacheKey,
                 Lists.newArrayList("y=2020/m=1", "y=2020/m=2"), metaStoreCache);
         metaStoreCache.putPartitionValuesCacheForTest(partitionValueCacheKey, hivePartitionValues);
         metaStoreCache.dropPartitionsCache("hiveDb", "hiveTable", Lists.newArrayList("y=2020/m=1", "y=2020/m=2"),
-                false);
+                false, false);
         HivePartitionValues partitionValues = metaStoreCache.getPartitionValues(partitionValueCacheKey);
         Assert.assertEquals(partitionValues.getPartitionNameToIdMap().size(), 0);
     }
@@ -479,7 +479,7 @@ public class CatalogMgrTest extends TestWithFeService {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
         PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
-                Lists.newArrayList(Type.SMALLINT));
+                false, Lists.newArrayList(Type.SMALLINT));
         HivePartitionValues hivePartitionValues = loadPartitionValues(partitionValueCacheKey,
                 Lists.newArrayList("m=1", "m=2"), metaStoreCache);
         metaStoreCache.putPartitionValuesCacheForTest(partitionValueCacheKey, hivePartitionValues);
@@ -495,12 +495,12 @@ public class CatalogMgrTest extends TestWithFeService {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
         PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
-                Lists.newArrayList(Type.SMALLINT));
+                false, Lists.newArrayList(Type.SMALLINT));
         HivePartitionValues hivePartitionValues = loadPartitionValues(partitionValueCacheKey,
                 Lists.newArrayList("m=1", "m=2"), metaStoreCache);
         metaStoreCache.putPartitionValuesCacheForTest(partitionValueCacheKey, hivePartitionValues);
         metaStoreCache.dropPartitionsCache("hiveDb", "hiveTable", Lists.newArrayList("m=1", "m=2"),
-                false);
+                false, false);
         HivePartitionValues partitionValues = metaStoreCache.getPartitionValues(partitionValueCacheKey);
         Assert.assertEquals(partitionValues.getPartitionNameToIdMap().size(), 0);
     }
@@ -510,7 +510,7 @@ public class CatalogMgrTest extends TestWithFeService {
         HMSExternalCatalog hiveCatalog = (HMSExternalCatalog) mgr.getCatalog("hive");
         HiveMetaStoreCache metaStoreCache = externalMetaCacheMgr.getMetaStoreCache(hiveCatalog);
         PartitionValueCacheKey partitionValueCacheKey = new PartitionValueCacheKey("olap", "hiveDb", "hiveTable",
-                Lists.newArrayList(Type.INT));
+                false, Lists.newArrayList(Type.INT));
         List<String> pNames = new ArrayList<>(100000);
         for (int i = 1; i <= 100000; i++) {
             pNames.add("m=" + i);

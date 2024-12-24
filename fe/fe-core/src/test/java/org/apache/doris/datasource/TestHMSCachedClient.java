@@ -88,6 +88,42 @@ public class TestHMSCachedClient implements HMSCachedClient {
     }
 
     @Override
+    public List<String> listPartitionNamesFromView(String dbName, String tblName, long maxListPartitionNum) {
+        List<Partition> partitionList = getPartitionList(dbName, tblName);
+        ArrayList<String> ret = new ArrayList<>();
+        for (Partition partition : partitionList) {
+            StringBuilder names = new StringBuilder();
+            List<String> values = partition.getValues();
+            for (int i = 0; i < values.size(); i++) {
+                names.append(values.get(i));
+                if (i < values.size() - 1) {
+                    names.append("/");
+                }
+            }
+            ret.add(names.toString());
+        }
+        return ret;
+    }
+
+    @Override
+    public List<String> listPartitionNamesFromView(String dbName, String tblName) {
+        List<Partition> partitionList = getPartitionList(dbName, tblName);
+        ArrayList<String> ret = new ArrayList<>();
+        for (Partition partition : partitionList) {
+            StringBuilder names = new StringBuilder();
+            List<String> values = partition.getValues();
+            for (int i = 0; i < values.size(); i++) {
+                names.append(values.get(i));
+                if (i < values.size() - 1) {
+                    names.append("/");
+                }
+            }
+            ret.add(names.toString());
+        }
+        return ret;
+    }
+
+    @Override
     public List<String> listPartitionNames(String dbName, String tblName) {
         List<Partition> partitionList = getPartitionList(dbName, tblName);
         ArrayList<String> ret = new ArrayList<>();
@@ -116,6 +152,19 @@ public class TestHMSCachedClient implements HMSCachedClient {
     }
 
     @Override
+    public Partition getPartitionFromView(String dbName, String tblName, String partitionValues) {
+        synchronized (this) {
+            List<Partition> partitionList = getPartitionList(dbName, tblName);
+            for (Partition partition : partitionList) {
+                if (partition.getValues().equals(partitionValues)) {
+                    return partition;
+                }
+            }
+            throw new RuntimeException("can't found partition");
+        }
+    }
+
+    @Override
     public Partition getPartition(String dbName, String tblName, List<String> partitionValues) {
         synchronized (this) {
             List<Partition> partitionList = getPartitionList(dbName, tblName);
@@ -125,6 +174,25 @@ public class TestHMSCachedClient implements HMSCachedClient {
                 }
             }
             throw new RuntimeException("can't found partition");
+        }
+    }
+
+    @Override
+    public List<Partition> getPartitionsFromView(String dbName, String tblName, List<String> partitionNames) {
+        synchronized (this) {
+            List<Partition> partitionList = getPartitionList(dbName, tblName);
+            ArrayList<Partition> ret = new ArrayList<>();
+            List<List<String>> partitionValuesList = partitionNames.stream().map(HiveUtil::toPartitionValues)
+                     .collect(Collectors.toList());
+            partitionValuesList.forEach(values -> {
+                for (Partition partition : partitionList) {
+                    if (partition.getValues().equals(values)) {
+                        ret.add(partition);
+                        break;
+                    }
+                }
+            });
+            return ret;
         }
     }
 
@@ -158,6 +226,11 @@ public class TestHMSCachedClient implements HMSCachedClient {
                 return table;
             }
         }
+        throw new RuntimeException("can't found table: " + tblName);
+    }
+
+    @Override
+    public Table getTableFromView(String dbName, String tblName) {
         throw new RuntimeException("can't found table: " + tblName);
     }
 
@@ -328,6 +401,12 @@ public class TestHMSCachedClient implements HMSCachedClient {
 
     @Override
     public List<Partition> listPartitionsByFilter(String dbName, String tableName, String filter, short maxParts) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public List<Partition> listPartitionsByFilterFromView(String dbName, String tableName, String filter,
+                                                          short maxParts) {
         return new ArrayList<>();
     }
 

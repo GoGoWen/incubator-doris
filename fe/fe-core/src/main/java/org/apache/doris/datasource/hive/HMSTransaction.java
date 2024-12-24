@@ -360,10 +360,18 @@ public class HMSTransaction implements Transaction {
                 }
             }
 
-            Map<String, Partition> partitionsByNamesMap = HiveUtil.convertToNamePartitionMap(
-                    partitionNames,
-                    hiveOps.getClient().getPartitions(tableInfo.getDbName(), tableInfo.getTbName(), partitionNames));
-
+            Table table = getTable(tableInfo);
+            boolean isView = table.isSetViewExpandedText();
+            List<Partition> partitionList = Lists.newArrayList();
+            if (isView) {
+                partitionList = hiveOps.getClient().getPartitionsFromView(
+                    tableInfo.getDbName(), tableInfo.getTbName(), partitionNames);
+            } else {
+                partitionList = hiveOps.getClient().getPartitions(
+                    tableInfo.getDbName(), tableInfo.getTbName(), partitionNames);
+            }
+            Map<String, Partition> partitionsByNamesMap = HiveUtil.convertToNamePartitionMap(partitionNames,
+                    partitionList);
             for (int i = 0; i < partitionsByNamesMap.size(); i++) {
                 String partitionName = partitionNames.get(i);
                 // check from hms
