@@ -39,6 +39,7 @@ import org.apache.doris.datasource.hive.HiveMetaStoreCache.FileCacheValue;
 import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
 import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper.HiveFileFormat;
 import org.apache.doris.datasource.hive.HivePartition;
+import org.apache.doris.datasource.hive.HiveProperties;
 import org.apache.doris.datasource.hive.HiveTransaction;
 import org.apache.doris.datasource.hive.source.HiveSplit.HiveSplitCreator;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
@@ -59,6 +60,7 @@ import com.google.common.collect.Maps;
 import lombok.Setter;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -511,10 +513,50 @@ public class HiveScanNode extends FileQueryScanNode {
 
     @Override
     protected TFileAttributes getFileAttributes() throws UserException {
-        TFileTextScanRangeParams textParams = new TFileTextScanRangeParams();
-        String serDeLib = hmsTable.getRemoteTable().getSd().getSerdeInfo().getSerializationLib();
-        if (serDeLib.equals("org.apache.hive.hcatalog.data.JsonSerDe")) {
-            TFileAttributes fileAttributes = new TFileAttributes();
+        Table table = hmsTable.getRemoteTable();
+        TFileAttributes fileAttributes = new TFileAttributes();
+        String serDeLib = table.getSd().getSerdeInfo().getSerializationLib();
+        if (serDeLib.equals("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe")) {
+            TFileTextScanRangeParams textParams = new TFileTextScanRangeParams();
+            // set properties of LazySimpleSerDe
+            // 1. set column separator
+            textParams.setColumnSeparator(HiveProperties.getFieldDelimiter(table));
+            // 2. set line delimiter
+            textParams.setLineDelimiter(HiveProperties.getLineDelimiter(table));
+            // 3. set mapkv delimiter
+            textParams.setMapkvDelimiter(HiveProperties.getMapKvDelimiter(table));
+            // 4. set collection delimiter
+            textParams.setCollectionDelimiter(HiveProperties.getCollectionDelimiter(table));
+            // 5. set escape delimiter
+            HiveProperties.getEscapeDelimiter(table).ifPresent(d -> textParams.setEscape(d.getBytes()[0]));
+            // 6. set null format
+            textParams.setNullFormat(HiveProperties.getNullFormat(table));
+            fileAttributes.setTextParams(textParams);
+            fileAttributes.setHeaderType("");
+            fileAttributes.setEnableTextValidateUtf8(
+                    ConnectContext.get().getSessionVariable().enableTextValidateUtf8);
+        } else if (serDeLib.equals("org.apache.hadoop.hive.serde2.OpenCSVSerde")) {
+            TFileTextScanRangeParams textParams = new TFileTextScanRangeParams();
+            // set set properties of OpenCSVSerde
+            // 1. set column separator
+            textParams.setColumnSeparator(HiveProperties.getSeparatorChar(table));
+            // 2. set line delimiter
+            textParams.setLineDelimiter(HiveProperties.getLineDelimiter(table));
+            // 3. set enclose char
+            textParams.setEnclose(HiveProperties.getQuoteChar(table).getBytes()[0]);
+            // 4. set escape char
+            textParams.setEscape(HiveProperties.getEscapeChar(table).getBytes()[0]);
+            fileAttributes.setTextParams(textParams);
+            fileAttributes.setHeaderType("");
+            if (textParams.isSetEnclose()) {
+                fileAttributes.setTrimDoubleQuotes(true);
+            }
+            fileAttributes.setEnableTextValidateUtf8(
+                    ConnectContext.get().getSessionVariable().enableTextValidateUtf8);
+
+        } else if (serDeLib.equals("org.apache.hive.hcatalog.data.JsonSerDe")) {
+            TFileTextScanRangeParams textParams = new TFileTextScanRangeParams();
+
             textParams.setColumnSeparator("\t");
             textParams.setLineDelimiter("\n");
             fileAttributes.setTextParams(textParams);
@@ -526,62 +568,10 @@ public class HiveScanNode extends FileQueryScanNode {
             fileAttributes.setReadJsonByLine(true);
             fileAttributes.setStripOuterArray(false);
             fileAttributes.setHeaderType("");
-            return fileAttributes;
-        }
-        // 1. set column separator
-        Optional<String> fieldDelim = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_FIELD_DELIMITER);
-        Optional<String> serFormat = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_SERIALIZATION_FORMAT);
-        Optional<String> columnSeparator = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_SEPARATOR_CHAR);
-        textParams.setColumnSeparator(HiveMetaStoreClientHelper.getByte(HiveMetaStoreClientHelper.firstPresentOrDefault(
-                DEFAULT_FIELD_DELIMITER, fieldDelim, columnSeparator, serFormat)));
-        // 2. set line delimiter
-        Optional<String> lineDelim = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_LINE_DELIMITER);
-        textParams.setLineDelimiter(HiveMetaStoreClientHelper.getByte(HiveMetaStoreClientHelper.firstPresentOrDefault(
-                DEFAULT_LINE_DELIMITER, lineDelim)));
-        // 3. set mapkv delimiter
-        Optional<String> mapkvDelim = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_MAP_KV_DELIMITER);
-        textParams.setMapkvDelimiter(HiveMetaStoreClientHelper.getByte(HiveMetaStoreClientHelper.firstPresentOrDefault(
-                DEFAULT_MAP_KV_DELIMITER, mapkvDelim)));
-        // 4. set collection delimiter
-        Optional<String> collectionDelimHive2 = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_COLLECTION_DELIMITER_HIVE2);
-        Optional<String> collectionDelimHive3 = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_COLLECTION_DELIMITER_HIVE3);
-        textParams.setCollectionDelimiter(
-                HiveMetaStoreClientHelper.getByte(HiveMetaStoreClientHelper.firstPresentOrDefault(
-                        DEFAULT_COLLECTION_DELIMITER, collectionDelimHive2, collectionDelimHive3)));
-        // 5. set quote char
-        Map<String, String> serdeParams = hmsTable.getRemoteTable().getSd().getSerdeInfo().getParameters();
-        if (serdeParams.containsKey(PROP_QUOTE_CHAR)) {
-            textParams.setEnclose(serdeParams.get(PROP_QUOTE_CHAR).getBytes()[0]);
+        } else {
+            throw new UserException("unsupport hive table serde " + serDeLib);
         }
 
-        // TODO: support escape char and null format in csv_reader
-        Optional<String> escapeChar = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_ESCAPE_DELIMITER);
-        if (escapeChar.isPresent() && !escapeChar.get().equals(DEFAULT_ESCAPE_DELIMIER)) {
-            throw new UserException(
-                    "not support serde prop " + PROP_ESCAPE_DELIMITER + " in hive text reading");
-        }
-
-        Optional<String> nullFormat = HiveMetaStoreClientHelper.getSerdeProperty(hmsTable.getRemoteTable(),
-                PROP_NULL_FORMAT);
-        if (nullFormat.isPresent() && !nullFormat.get().equals(DEFAULT_NULL_FORMAT)) {
-            throw new UserException(
-                    "not support serde prop " + PROP_NULL_FORMAT + " in hive text reading");
-        }
-
-        TFileAttributes fileAttributes = new TFileAttributes();
-        fileAttributes.setTextParams(textParams);
-        fileAttributes.setHeaderType("");
-        if (textParams.isSet(TFileTextScanRangeParams._Fields.ENCLOSE)) {
-            fileAttributes.setTrimDoubleQuotes(true);
-        }
         return fileAttributes;
     }
 
