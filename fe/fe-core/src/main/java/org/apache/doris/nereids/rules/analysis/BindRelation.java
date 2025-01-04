@@ -287,7 +287,7 @@ public class BindRelation extends OneAnalysisRuleFactory {
                     if (Config.enable_query_hive_views && hmsTable.isView()) {
                         isView = true;
                         String hiveCatalog = hmsTable.getCatalog().getName();
-                        String ddlSql = hmsTable.getViewText();
+                        String ddlSql = hmsTable.getViewText().toLowerCase();
                         Plan hiveViewPlan = parseAndAnalyzeHiveView(hmsTable, hiveCatalog, ddlSql, cascadesContext);
                         return new LogicalSubQueryAlias<>(qualifiedTableName, hiveViewPlan);
                     }
