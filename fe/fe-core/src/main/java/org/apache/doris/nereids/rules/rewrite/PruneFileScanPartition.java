@@ -36,12 +36,22 @@ import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
 import org.apache.doris.nereids.rules.expression.rules.PartitionPruneExpressionExtractor;
 import org.apache.doris.nereids.rules.expression.rules.PartitionPruner;
-import org.apache.doris.nereids.rules.expression.rules.PartitionPruner.PartitionTableType;
 import org.apache.doris.nereids.rules.expression.rules.PredicateRewriteForPartitionFilter;
 import org.apache.doris.nereids.rules.expression.rules.PredicateRewriteForPartitionPrune;
+import org.apache.doris.nereids.trees.expressions.And;
+import org.apache.doris.nereids.trees.expressions.BinaryOperator;
+import org.apache.doris.nereids.trees.expressions.EqualTo;
 import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.expressions.GreaterThan;
+import org.apache.doris.nereids.trees.expressions.GreaterThanEqual;
+import org.apache.doris.nereids.trees.expressions.LessThan;
+import org.apache.doris.nereids.trees.expressions.LessThanEqual;
+import org.apache.doris.nereids.trees.expressions.Not;
+import org.apache.doris.nereids.trees.expressions.Or;
 import org.apache.doris.nereids.trees.expressions.Slot;
+import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.expressions.literal.BooleanLiteral;
+import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
@@ -159,7 +169,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                     hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
             Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
             List<Long> prunedPartitions = new ArrayList<>(PartitionPruner.prune(
-                    partitionSlots, filter.getPredicate(), idToPartitionItem, ctx, PartitionTableType.HIVE));
+                    partitionSlots, filter.getPredicate(), idToPartitionItem, ctx));
             for (Long id : prunedPartitions) {
                 selectedPartitionItems.put(id, idToPartitionItem.get(id));
             }
@@ -169,6 +179,27 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             }
         }
         return new SelectedPartitions(partitionNum, selectedPartitionItems, true);
+    }
+
+    private boolean isFilterSupportedByListPartitions(Expression expression) {
+        if (expression instanceof SlotReference) {
+            return true;
+        }
+        if (expression instanceof Literal) {
+            return true;
+        }
+        if (expression instanceof And || expression instanceof Or || expression instanceof EqualTo
+                || expression instanceof GreaterThan || expression instanceof GreaterThanEqual
+                || expression instanceof LessThan || expression instanceof LessThanEqual) {
+            BinaryOperator binaryOperator = (BinaryOperator) expression;
+            return isFilterSupportedByListPartitions(binaryOperator.left())
+                    && isFilterSupportedByListPartitions(binaryOperator.right());
+        }
+        if (expression instanceof Not) {
+            Not not = (Not) expression;
+            return isFilterSupportedByListPartitions(not.child());
+        }
+        return false;
     }
 
     private SelectedPartitions pruneHivePartitions(HMSExternalTable hiveTbl,
@@ -194,33 +225,50 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
         HiveMetaStoreCache cache = Env.getCurrentEnv().getExtMetaCacheMgr()
                 .getMetaStoreCache((HMSExternalCatalog) hiveTbl.getCatalog());
         int partitionNum = cache.getPartitionNum(hiveTbl.getDbName(), hiveTbl.getName());
-        boolean isDirectlyByFilter = partitionNum > Config.max_partition_num_for_single_hive_table_without_filter;
+        boolean isDirectlyByFilter = true;
         Expression partitionPredicate = null;
         // use listPartitionsByFilter
-        if (isDirectlyByFilter) {
-            try {
-                partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
-                        ImmutableSet.copyOf(partitionSlots), ctx);
-                List<String> partitionColumnNames = partitionSlots.stream().map(e -> e.getName())
-                        .collect(Collectors.toList());
-                partitionPredicate = PredicateRewriteForPartitionPrune.rewrite(partitionPredicate, ctx);
-                partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
-                if (BooleanLiteral.TRUE.equals(partitionPredicate)) {
+        try {
+            partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
+                    ImmutableSet.copyOf(partitionSlots), ctx);
+            List<String> partitionColumnNames = partitionSlots.stream().map(e -> e.getName())
+                    .collect(Collectors.toList());
+            partitionPredicate = PredicateRewriteForPartitionPrune.rewrite(partitionPredicate, ctx);
+            partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
+
+            if (BooleanLiteral.TRUE.equals(partitionPredicate)) {
+                HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValues(
+                        hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+                selectedPartitionItems = hivePartitionValues.getIdToPartitionItem();
+            } else if (BooleanLiteral.FALSE.equals(partitionPredicate) || partitionPredicate.isNullLiteral()) {
+                // do nothing
+            } else {
+                if (partitionNum > Config.max_partition_num_for_single_hive_table_without_filter
+                        && isFilterSupportedByListPartitions(partitionPredicate)) {
+                    selectedPartitionItems = cache.getPartitionValuesByFilter(hiveTbl.getDbName(),
+                            hiveTbl.getName(), partitionPredicate.toSql(), partitionColumnNames,
+                                hiveTbl.getPartitionColumnTypes());
+                } else {
                     HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValues(
                             hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
-                    selectedPartitionItems = hivePartitionValues.getIdToPartitionItem();
-                } else if (BooleanLiteral.FALSE.equals(partitionPredicate) || partitionPredicate.isNullLiteral()) {
-                    // do nothing
-                } else {
-                    selectedPartitionItems = cache.getPartitionValuesByFilter(hiveTbl.getDbName(), hiveTbl.getName(),
-                            partitionPredicate.toSql(), partitionColumnNames, hiveTbl.getPartitionColumnTypes());
+                    Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
+                    partitionNum = idToPartitionItem.size();
+                    List<Long> prunedPartitions = Lists.newArrayList();
+                    if (PartitionPruner.tryPrune(partitionSlots, filter.getPredicate(), idToPartitionItem,
+                            prunedPartitions, ctx)) {
+                        for (Long id : prunedPartitions) {
+                            selectedPartitionItems.put(id, idToPartitionItem.get(id));
+                        }
+                    } else {
+                        isDirectlyByFilter = false;
+                    }
                 }
-            } catch (Exception e) {
-                // for some complex case listPartitionsByFilter may not support
-                LOG.warn("get selected partition items by listPartitionsByFilter failed, filter sql is "
-                        + partitionPredicate.toSql() + ", use getPartitionValues instead");
-                isDirectlyByFilter = false;
             }
+        } catch (Exception e) {
+            // for some complex case listPartitionsByFilter may not support
+            LOG.warn("get selected partition items by listPartitionsByFilter failed, filter sql is "
+                    + partitionPredicate.toSql() + ", use getPartitionValues instead");
+            isDirectlyByFilter = false;
         }
         if (!isDirectlyByFilter) {
             try (AutoCloseConnectContext r = StatisticsUtil.buildConnectContext()) {

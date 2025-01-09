@@ -52,10 +52,11 @@ public class PartitionPruner extends DefaultExpressionRewriter<Void> {
     private final List<OnePartitionEvaluator> partitions;
     private final Expression partitionPredicate;
 
-    /** Different type of table may have different partition prune behavior. */
-    public enum PartitionTableType {
-        OLAP,
-        HIVE
+    /** Different type of partition with prune behavior */
+    public enum PruneOutType {
+        TRUE,
+        FALSE,
+        UNKNOWN
     }
 
     private PartitionPruner(List<OnePartitionEvaluator> partitions, Expression partitionPredicate) {
@@ -116,8 +117,7 @@ public class PartitionPruner extends DefaultExpressionRewriter<Void> {
      * prune partition with `idToPartitions` as parameter.
      */
     public static List<Long> prune(List<Slot> partitionSlots, Expression partitionPredicate,
-            Map<Long, PartitionItem> idToPartitions, CascadesContext cascadesContext,
-            PartitionTableType partitionTableType) {
+            Map<Long, PartitionItem> idToPartitions, CascadesContext cascadesContext) {
         partitionPredicate = PartitionPruneExpressionExtractor.extract(
                 partitionPredicate, ImmutableSet.copyOf(partitionSlots), cascadesContext);
         partitionPredicate = PredicateRewriteForPartitionPrune.rewrite(partitionPredicate, cascadesContext);
@@ -142,6 +142,41 @@ public class PartitionPruner extends DefaultExpressionRewriter<Void> {
         PartitionPruner partitionPruner = new PartitionPruner(evaluators, partitionPredicate);
         //TODO: we keep default partition because it's too hard to prune it, we return false in canPrune().
         return partitionPruner.prune();
+    }
+
+    /** try prune */
+    public boolean tryPrune(List<Long> scanPartitionIds) {
+        for (OnePartitionEvaluator partition : partitions) {
+            switch (getPrunedOutType(partition)) {
+                case TRUE:
+                    break;
+                case FALSE:
+                    scanPartitionIds.add(partition.getPartitionId());
+                    break;
+                case UNKNOWN:
+                    return false;
+                default:
+                    break;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * try prune partition with `idToPartitions` as parameter.
+     */
+    public static boolean tryPrune(List<Slot> partitionSlots, Expression partitionPredicate,
+            Map<Long, PartitionItem> idToPartitions, List<Long> prunedPartitionIds, CascadesContext cascadesContext) {
+        int expandThreshold = cascadesContext.getAndCacheSessionVariable(
+                "partitionPruningExpandThreshold",
+                10, sessionVariable -> sessionVariable.partitionPruningExpandThreshold);
+        List<OnePartitionEvaluator> evaluators = Lists.newArrayListWithCapacity(idToPartitions.size());
+        for (Entry<Long, PartitionItem> kv : idToPartitions.entrySet()) {
+            evaluators.add(toPartitionEvaluator(
+                    kv.getKey(), kv.getValue(), partitionSlots, cascadesContext, expandThreshold));
+        }
+        PartitionPruner partitionPruner = new PartitionPruner(evaluators, partitionPredicate);
+        return partitionPruner.tryPrune(prunedPartitionIds);
     }
 
     /**
@@ -175,4 +210,22 @@ public class PartitionPruner extends DefaultExpressionRewriter<Void> {
         // only have false result: Can be pruned out. have other exprs: CanNot be pruned out
         return true;
     }
+
+    private PruneOutType getPrunedOutType(OnePartitionEvaluator evaluator) {
+        List<Map<Slot, PartitionSlotInput>> onePartitionInputs = evaluator.getOnePartitionInputs();
+        for (Map<Slot, PartitionSlotInput> currentInputs : onePartitionInputs) {
+            // evaluate whether there's possible for this partition to accept this predicate
+            Expression result = evaluator.evaluateWithDefaultPartition(partitionPredicate, currentInputs);
+            if (!result.equals(BooleanLiteral.FALSE) && !(result instanceof NullLiteral)) {
+                if (result.equals(BooleanLiteral.TRUE)) {
+                    return PruneOutType.FALSE;
+                } else {
+                    return PruneOutType.UNKNOWN;
+                }
+            }
+        }
+        // only have false result: Can be pruned out. have other exprs: CanNot be pruned out
+        return PruneOutType.TRUE;
+    }
+
 }

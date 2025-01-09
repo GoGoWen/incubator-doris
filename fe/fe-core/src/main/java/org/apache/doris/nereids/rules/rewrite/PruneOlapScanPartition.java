@@ -24,7 +24,6 @@ import org.apache.doris.catalog.PartitionItem;
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
 import org.apache.doris.nereids.rules.expression.rules.PartitionPruner;
-import org.apache.doris.nereids.rules.expression.rules.PartitionPruner.PartitionTableType;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.plans.logical.LogicalEmptyRelation;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
@@ -87,8 +86,7 @@ public class PruneOlapScanPartition extends OneRewriteRuleFactory {
                         .collect(Collectors.toMap(Function.identity(), allPartitions::get));
             }
             List<Long> prunedPartitions = PartitionPruner.prune(
-                    partitionSlots, filter.getPredicate(), idToPartitions, ctx.cascadesContext,
-                    PartitionTableType.OLAP);
+                    partitionSlots, filter.getPredicate(), idToPartitions, ctx.cascadesContext);
             if (prunedPartitions.isEmpty()) {
                 return new LogicalEmptyRelation(
                         ConnectContext.get().getStatementContext().getNextRelationId(),
