@@ -46,7 +46,6 @@ import org.apache.doris.nereids.trees.expressions.GreaterThan;
 import org.apache.doris.nereids.trees.expressions.GreaterThanEqual;
 import org.apache.doris.nereids.trees.expressions.LessThan;
 import org.apache.doris.nereids.trees.expressions.LessThanEqual;
-import org.apache.doris.nereids.trees.expressions.Not;
 import org.apache.doris.nereids.trees.expressions.Or;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
@@ -194,10 +193,6 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             BinaryOperator binaryOperator = (BinaryOperator) expression;
             return isFilterSupportedByListPartitions(binaryOperator.left())
                     && isFilterSupportedByListPartitions(binaryOperator.right());
-        }
-        if (expression instanceof Not) {
-            Not not = (Not) expression;
-            return isFilterSupportedByListPartitions(not.child());
         }
         return false;
     }
