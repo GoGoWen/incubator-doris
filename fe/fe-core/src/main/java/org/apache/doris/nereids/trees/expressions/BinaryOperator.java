@@ -17,8 +17,6 @@
 
 package org.apache.doris.nereids.trees.expressions;
 
-import org.apache.doris.analysis.SqlScanner;
-import org.apache.doris.common.util.SqlUtils;
 import org.apache.doris.nereids.trees.expressions.shape.BinaryExpression;
 import org.apache.doris.nereids.trees.expressions.typecoercion.ExpectsInputTypes;
 import org.apache.doris.nereids.types.DataType;
@@ -52,13 +50,7 @@ public abstract class BinaryOperator extends Expression implements BinaryExpress
 
     @Override
     public String toSql() {
-        String leftSql = left().toSql();
-
-        if (SqlScanner.isKeyword(leftSql)) {
-            leftSql = SqlUtils.getIdentSql(leftSql);
-        }
-
-        return "(" + leftSql + " " + symbol + " " + right().toSql() + ")";
+        return "(" + left().toSql() + " " + symbol + " " + right().toSql() + ")";
     }
 
     @Override

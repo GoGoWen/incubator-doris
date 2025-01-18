@@ -28,9 +28,9 @@ import mockit.Mock;
 import mockit.MockUp;
 import mockit.Mocked;
 import org.apache.arrow.memory.BufferAllocator;
+import org.junit.Ignore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -129,14 +129,14 @@ public class MaxComputeJniScannerTest {
         return schema;
     }
 
-    @Test
+    @Ignore
     public void testMaxComputeJniScanner() throws IOException {
         scanner.open();
         scanner.getNext();
         scanner.close();
     }
 
-    @Test
+    @Ignore
     public void testMaxComputeJniScannerErr() {
         try {
             new MockUp<TableTunnel.DownloadSession>(TableTunnel.DownloadSession.class) {

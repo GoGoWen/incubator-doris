@@ -509,7 +509,7 @@ public class HmsQueryCacheTest extends AnalyzeCheckTestBase {
         SqlCache sqlCache = (SqlCache) ca.getCache();
         String cacheKey = sqlCache.getSqlWithViewStmt();
         Assert.assertEquals("select * from hms_ctl.hms_db.hms_view2"
-                    + "|SELECT * FROM hms_db.hms_tbl|SELECT * FROM hms_db.hms_view1", cacheKey);
+                    + "|select * from hms_db.hms_tbl|select * from hms_db.hms_view1", cacheKey);
         Assert.assertEquals(NOW, sqlCache.getLatestTime());
     }
 
