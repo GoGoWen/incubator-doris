@@ -40,12 +40,12 @@ public class DateTimeAcquire {
     /**
      * date acquire function: now
      */
-    @ExecFunction(name = "now", argTypes = {}, returnType = "DATETIME")
+    @ExecFunction(name = "now")
     public static Expression now() {
         return DateTimeLiteral.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
     }
 
-    @ExecFunction(name = "now", argTypes = {"INT"}, returnType = "DATETIMEV2")
+    @ExecFunction(name = "now")
     public static Expression now(IntegerLiteral precision) {
         return DateTimeV2Literal.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()),
                 precision.getValue());
@@ -54,12 +54,12 @@ public class DateTimeAcquire {
     /**
      * date acquire function: current_timestamp
      */
-    @ExecFunction(name = "current_timestamp", argTypes = {}, returnType = "DATETIME")
+    @ExecFunction(name = "current_timestamp")
     public static Expression currentTimestamp() {
         return DateTimeLiteral.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
     }
 
-    @ExecFunction(name = "current_timestamp", argTypes = {"INT"}, returnType = "DATETIMEV2")
+    @ExecFunction(name = "current_timestamp")
     public static Expression currentTimestamp(IntegerLiteral precision) {
         return DateTimeV2Literal.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()), precision.getValue());
     }
@@ -67,12 +67,12 @@ public class DateTimeAcquire {
     /**
      * date acquire function: localtime/localtimestamp
      */
-    @ExecFunction(name = "localtime", argTypes = {}, returnType = "DATETIME")
+    @ExecFunction(name = "localtime")
     public static Expression localTime() {
         return DateTimeLiteral.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
     }
 
-    @ExecFunction(name = "localtimestamp", argTypes = {}, returnType = "DATETIME")
+    @ExecFunction(name = "localtimestamp")
     public static Expression localTimestamp() {
         return DateTimeV2Literal.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
     }
@@ -80,12 +80,12 @@ public class DateTimeAcquire {
     /**
      * date acquire function: current_date
      */
-    @ExecFunction(name = "curdate", argTypes = {}, returnType = "DATE")
+    @ExecFunction(name = "curdate")
     public static Expression curDate() {
         return DateLiteral.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
     }
 
-    @ExecFunction(name = "current_date", argTypes = {}, returnType = "DATE")
+    @ExecFunction(name = "current_date")
     public static Expression currentDate() {
         return DateLiteral.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
     }
@@ -93,7 +93,7 @@ public class DateTimeAcquire {
     /**
      * date acquire function: sysdate
      */
-    @ExecFunction(name = "sysdate", argTypes = {}, returnType = "VARCHAR")
+    @ExecFunction(name = "sysdate")
     public static Expression sysDate() {
         Calendar cl = Calendar.getInstance();
         Long clTemp = Long.valueOf(cl.getTimeInMillis());
@@ -107,7 +107,7 @@ public class DateTimeAcquire {
     /**
      * date acquire function: sysdate
      */
-    @ExecFunction(name = "sysdate", argTypes = { "INT" }, returnType = "VARCHAR")
+    @ExecFunction(name = "sysdate")
     public static Expression sysDate(IntegerLiteral arg) {
         Calendar cl = Calendar.getInstance();
         Long clTemp = Long.valueOf(cl.getTimeInMillis() + arg.getLongValue() * 24L * 60L * 60L * 1000L);
@@ -125,12 +125,12 @@ public class DateTimeAcquire {
     // /**
     //  * date acquire function: current_time
     //  */
-    // @ExecFunction(name = "curtime", argTypes = {}, returnType = "TIME")
+    // @ExecFunction(name = "curtime")
     // public static Expression curTime() {
     //     return DateTimeLiteral.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
     // }
 
-    // @ExecFunction(name = "current_time", argTypes = {}, returnType = "TIME")
+    // @ExecFunction(name = "current_time")
     // public static Expression currentTime() {
     //     return DateTimeLiteral.fromJavaDateType(LocalDateTime.now(DateUtils.getTimeZone()));
     // }
@@ -138,7 +138,7 @@ public class DateTimeAcquire {
     /**
      * date transformation function: unix_timestamp
      */
-    @ExecFunction(name = "unix_timestamp", argTypes = {}, returnType = "INT")
+    @ExecFunction(name = "unix_timestamp")
     public static Expression unixTimestamp() {
         return new IntegerLiteral((int) (System.currentTimeMillis() / 1000L));
     }
@@ -146,7 +146,7 @@ public class DateTimeAcquire {
     /**
      * date transformation function: utc_timestamp
      */
-    @ExecFunction(name = "utc_timestamp", argTypes = {}, returnType = "INT")
+    @ExecFunction(name = "utc_timestamp")
     public static Expression utcTimestamp() {
         return DateTimeLiteral.fromJavaDateType(LocalDateTime.now(ZoneId.of("UTC+0")));
     }
