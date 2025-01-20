@@ -1777,14 +1777,7 @@ std::string OrcReader::get_field_name_lower_case(const orc::Type* orc_type, int 
 }
 
 Status OrcReader::get_next_block(Block* block, size_t* read_rows, bool* eof) {
-    RETURN_IF_ERROR(get_next_block_impl(block, read_rows, eof));
-    if (_orc_filter) {
-        RETURN_IF_ERROR(_orc_filter->get_status());
-    }
-    if (_string_dict_filter) {
-        RETURN_IF_ERROR(_string_dict_filter->get_status());
-    }
-    return Status::OK();
+    return get_next_block_impl(block, read_rows, eof);
 }
 
 Status OrcReader::get_next_block_impl(Block* block, size_t* read_rows, bool* eof) {
@@ -1824,6 +1817,12 @@ Status OrcReader::get_next_block_impl(Block* block, size_t* read_rows, bool* eof
             _decimal_scale_params_index = 0;
             try {
                 rr = _row_reader->nextBatch(*_batch, block);
+                if (_orc_filter) {
+                    RETURN_IF_ERROR(_orc_filter->get_status());
+                }
+                if (_string_dict_filter) {
+                    RETURN_IF_ERROR(_string_dict_filter->get_status());
+                }
                 if (rr == 0 || _batch->numElements == 0) {
                     *eof = true;
                     *read_rows = 0;
@@ -1894,6 +1893,12 @@ Status OrcReader::get_next_block_impl(Block* block, size_t* read_rows, bool* eof
             _decimal_scale_params_index = 0;
             try {
                 rr = _row_reader->nextBatch(*_batch, block);
+                if (_orc_filter) {
+                    RETURN_IF_ERROR(_orc_filter->get_status());
+                }
+                if (_string_dict_filter) {
+                    RETURN_IF_ERROR(_string_dict_filter->get_status());
+                }
                 if (rr == 0 || _batch->numElements == 0) {
                     *eof = true;
                     *read_rows = 0;
