@@ -24,6 +24,7 @@ import org.apache.doris.catalog.TableIf;
 import org.apache.doris.catalog.View;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.Pair;
+import org.apache.doris.common.util.HiveViewSqlTransformer;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.datasource.ExternalTable;
 import org.apache.doris.datasource.es.EsExternalTable;
@@ -287,7 +288,7 @@ public class BindRelation extends OneAnalysisRuleFactory {
                     if (Config.enable_query_hive_views && hmsTable.isView()) {
                         isView = true;
                         String hiveCatalog = hmsTable.getCatalog().getName();
-                        String ddlSql = hmsTable.getViewText().toLowerCase();
+                        String ddlSql = HiveViewSqlTransformer.format(hmsTable.getViewText());
                         Plan hiveViewPlan = parseAndAnalyzeHiveView(hmsTable, hiveCatalog, ddlSql, cascadesContext);
                         return new LogicalSubQueryAlias<>(qualifiedTableName, hiveViewPlan);
                     }
