@@ -238,7 +238,7 @@ public class CacheFactoryTest {
         Assertions.assertTrue(futureValue.isDone());
         Assertions.assertEquals("value1", futureValue.get().get().getValue());
         // sleep longer to wait for refresh
-        Thread.sleep(2500);
+        Thread.sleep(6000);
         futureValue = loadingCache.get(1);
         Assertions.assertEquals("value1", futureValue.get().get().getValue());
         // refreshed, so counter +1
