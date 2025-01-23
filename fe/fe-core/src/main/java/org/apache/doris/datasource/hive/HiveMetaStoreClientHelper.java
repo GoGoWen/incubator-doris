@@ -720,6 +720,9 @@ public class HiveMetaStoreClientHelper {
         if (lowerCaseType.startsWith("int")) {
             return Type.INT;
         }
+        if (lowerCaseType.startsWith("tinyint")) {
+            return Type.TINYINT;
+        }
         if (lowerCaseType.startsWith("timestamp")) {
             return ScalarType.createDatetimeV2Type(timeScale);
         }
