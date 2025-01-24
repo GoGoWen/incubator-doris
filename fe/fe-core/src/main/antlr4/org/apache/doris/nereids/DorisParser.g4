@@ -122,6 +122,7 @@ statementBase
         DROP CONSTRAINT constraintName=errorCapturingIdentifier           #dropConstraint
     | SHOW CONSTRAINTS FROM table=multipartIdentifier                     #showConstraint
     | unsupportedStatement                                                #unsupported
+    | USE (catalog=identifier DOT)? database=identifier                   #useDatabase
     ;
 
 unsupportedStatement
@@ -139,7 +140,6 @@ unsupportedStatement
     | SET NAMES (charsetName=identifierOrText | DEFAULT) (COLLATE collateName=identifierOrText | DEFAULT)?    #setCollate
     | SET PASSWORD (FOR userIdentify)? EQ (STRING_LITERAL | (PASSWORD LEFT_PAREN STRING_LITERAL RIGHT_PAREN)) #setPassword
     | SET LDAP_ADMIN_PASSWORD EQ (STRING_LITERAL | (PASSWORD LEFT_PAREN STRING_LITERAL RIGHT_PAREN))          #setLdapAdminPassword
-    | USE (catalog=identifier DOT)? database=identifier                              #useDatabase
     | USE ((catalog=identifier DOT)? database=identifier)? ATSIGN cluster=identifier #useCloudCluster
     ;
 
