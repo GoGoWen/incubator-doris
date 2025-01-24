@@ -1,5 +1,6 @@
 package org.apache.doris.udf.date;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.joda.time.format.DateTimeFormat;
 
@@ -14,25 +15,33 @@ import java.util.Locale;
 public class ToDate extends UDF {
 
     /**
-     * to_date(varchar)
+     * to_date(String)
      * select select to_date('2023-10-05 14:30:45');
      * @param inputTimestamp
      * @return
      */
     public String evaluate(String inputTimestamp) {
+        if(StringUtils.isEmpty(inputTimestamp)) {
+            return null;
+        }
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd[ HH:mm:ss[.SSS]][ zzz]");
         LocalDate date = LocalDate.parse(inputTimestamp, formatter);
         return date.toString();
     }
 
     /**
-     * to_date(timestamp(p))
+     * to_date(Datetime)
      * SELECT to_date(cast('2024-12-12 03:04:05.321' as DATETIME));
      * select to_date(cast('2024-07-09 09:20:14.000000' as DATETIME));
      * @param timestamp
      * @return
      */
-    public String evaluate(long timestamp) {
+    public String evaluate(Long timestamp) {
+        if (timestamp == null) {
+            return null;
+        }
+
         return formatDatetime(timestamp);
     }
 

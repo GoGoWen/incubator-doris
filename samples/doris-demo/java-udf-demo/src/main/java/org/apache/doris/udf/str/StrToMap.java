@@ -1,6 +1,7 @@
 package org.apache.doris.udf.str;
 
 import com.google.common.collect.Maps;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.ql.exec.UDF;
 
 import java.util.Map;
@@ -11,7 +12,7 @@ import java.util.Map;
 public class StrToMap extends UDF {
 
     /**
-     * str_to_map(varchar, varchar, varchar)
+     * str_to_map(String, String, String)
      * SELECT str_to_map('a:1,b:2,c:3', ',', ':')
      * @param input
      * @param entryDelimiter
@@ -19,7 +20,8 @@ public class StrToMap extends UDF {
      * @return
      */
     public String evaluate(String input, String entryDelimiter, String keyValueDelimiter) {
-        if (input == null || entryDelimiter == null || keyValueDelimiter == null) {
+        if (StringUtils.isEmpty(input) || StringUtils.isEmpty(entryDelimiter)
+            || StringUtils.isEmpty(keyValueDelimiter)) {
             return null;
         }
 

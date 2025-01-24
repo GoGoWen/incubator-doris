@@ -1,5 +1,6 @@
 package org.apache.doris.udf.date;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.udf.util.DateUtils;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.joda.time.DateTime;
@@ -15,13 +16,17 @@ import static java.math.BigDecimal.ROUND_HALF_UP;
 public class MonthsBetween extends UDF {
 
     /**
-     * months_between(varchar,varchar)
+     * months_between(String, String)
      * SELECT months_between('1997-02-28 10:30:00', '1996-10-30')
      * @param date1
      * @param date2
      * @return
      */
-    public double evaluate(String date1, String date2) {
+    public Double evaluate(String date1, String date2) {
+        if(StringUtils.isEmpty(date1) || StringUtils.isEmpty(date2)) {
+            return null;
+        }
+
         Date d1 = DateUtils.getTimestampFromString(date1);
         Date d2 = DateUtils.getTimestampFromString(date2);
         if (d1 == null || d2 == null) {
@@ -35,9 +40,9 @@ public class MonthsBetween extends UDF {
         int monDiffInt = (jodaTime1.getYear() - jodaTime2.getYear()) * 12 +
                 (jodaTime1.getMonthOfYear() - jodaTime2.getMonthOfYear());
         if (jodaTime1.getDayOfMonth() == jodaTime2.getDayOfMonth()
-                || (jodaTime1.getDayOfMonth() == jodaTime1.dayOfMonth().withMaximumValue().getDayOfMonth() &&
-                jodaTime2.getDayOfMonth() == jodaTime2.dayOfMonth().withMaximumValue().getDayOfMonth())) {
-            return monDiffInt;
+            || (jodaTime1.getDayOfMonth() == jodaTime1.dayOfMonth().withMaximumValue().getDayOfMonth() &&
+            jodaTime2.getDayOfMonth() == jodaTime2.dayOfMonth().withMaximumValue().getDayOfMonth())) {
+            return (double) monDiffInt;
         }
 
         int sec1 = DateUtils.getDayPartInSec(jodaTime1);

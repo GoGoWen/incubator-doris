@@ -10,12 +10,16 @@ import org.joda.time.LocalDateTime;
 public class DayOfWeek extends UDF {
 
     /**
-     * dow(Date)
+     * dow(Datetime)
      *
      * @param date
      * @return
      */
-    public double evaluate(LocalDateTime date) {
-        return date.dayOfWeek().get();
+    public Double evaluate(LocalDateTime date) {
+        if (date == null) {
+            return null;
+        }
+
+        return (double) date.dayOfWeek().get();
     }
 }

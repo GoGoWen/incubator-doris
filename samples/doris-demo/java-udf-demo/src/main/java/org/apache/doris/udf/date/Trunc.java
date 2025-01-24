@@ -1,5 +1,6 @@
 package org.apache.doris.udf.date;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hive.common.util.DateUtils;
 import org.joda.time.DateTime;
@@ -12,13 +13,17 @@ import java.util.Date;
 public class Trunc extends UDF {
 
     /**
-     * trunc(varchar, varchar)
+     * trunc(String, String)
      * SELECT trunc('2015-03-17', 'MM');
      * @param inputTimestamp
      * @param fmtInput
      * @return
      */
     public String evaluate(String inputTimestamp, String fmtInput) {
+        if(StringUtils.isEmpty(inputTimestamp) || StringUtils.isEmpty(fmtInput)) {
+            return null;
+        }
+
         Date date;
         try {
             date = DateUtils.getDateFormat().parse(inputTimestamp);

@@ -1,5 +1,6 @@
 package org.apache.doris.udf.date;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hive.common.util.DateUtils;
 import org.joda.time.DateTime;
 
@@ -13,13 +14,17 @@ import static org.apache.doris.udf.util.DateUtils.getIntDayOfWeek;
 public class NextDay {
 
     /**
-     * next_day(varchar, varchar)
+     * next_day(String, String)
      * SELECT next_day('2015-01-14', 'TU');
      * @param inputTimestamp
      * @param dayOfWeek
      * @return
      */
     public String evaluate(String inputTimestamp, String dayOfWeek) {
+        if(StringUtils.isEmpty(inputTimestamp) || StringUtils.isEmpty(dayOfWeek)) {
+            return null;
+        }
+
         Date date;
         try {
             date = DateUtils.getDateFormat().parse(inputTimestamp);

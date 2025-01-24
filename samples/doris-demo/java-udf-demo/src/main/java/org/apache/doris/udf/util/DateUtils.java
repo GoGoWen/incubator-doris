@@ -5,10 +5,15 @@ import org.joda.time.DateTimeConstants;
 
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 
 public class DateUtils {
+    public static final DateTimeFormatter YEAR_MATTER = DateTimeFormatter.ofPattern("yyyy");
+    public static final DateTimeFormatter YEAR_MONTH_MATTER = DateTimeFormatter.ofPattern("yyyy-MM");
+    public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private static Map<String, ThreadLocal<SimpleDateFormat>> dfMap = new HashMap<>();
     private static final Object lockObj = new Object();
