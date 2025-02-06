@@ -661,7 +661,7 @@ public abstract class ExternalCatalog
             if (!isInitialized()) {
                 return Optional.empty();
             }
-            return metaCache.getMetaObjById(hadoopUsername == null ? "" : hadoopUsername, dbId);
+            return metaCache.getMetaObjByIdForReplay(hadoopUsername == null ? "" : hadoopUsername, dbId);
         } else {
             return Optional.ofNullable(idToDb.get(dbId));
         }

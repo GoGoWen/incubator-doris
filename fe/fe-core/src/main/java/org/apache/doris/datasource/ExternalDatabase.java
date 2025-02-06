@@ -253,7 +253,7 @@ public abstract class ExternalDatabase<T extends ExternalTable>
             if (!isInitialized()) {
                 return Optional.empty();
             }
-            return metaCache.getMetaObjById(hadoopUsername == null ? "" : hadoopUsername, tableId);
+            return metaCache.getMetaObjByIdForReplay(hadoopUsername == null ? "" : hadoopUsername, tableId);
         } else {
             return Optional.ofNullable(idToTbl.get(tableId));
         }

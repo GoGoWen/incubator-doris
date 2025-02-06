@@ -86,6 +86,12 @@ public class MetaCache<T> {
         return val;
     }
 
+    public Optional<T> getMetaObjByIdForReplay(String hadoopUserName, long id) {
+        String name = idToName.get(id);
+        return name == null ? Optional.empty() :
+                (Optional<T>) Optional.ofNullable(metaObjCache.getIfPresent(Pair.of(hadoopUserName, name)));
+    }
+
     public Optional<T> getMetaObjById(String hadoopUserName, long id) {
         String name = idToName.get(id);
         return name == null ? Optional.empty() : getMetaObj(hadoopUserName, name, id);
