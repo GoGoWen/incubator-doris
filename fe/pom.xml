@@ -319,7 +319,7 @@ under the License.
         <avro.version>1.11.4</avro.version>
         <arrow.version>17.0.0</arrow.version>
         <!-- hudi -->
-        <hudi.version>JD.0.13.1-FOR-DORIS-20241202-SNAPSHOT</hudi.version>
+        <hudi.version>JD.0.13.1-FOR-DORIS-20250210-SNAPSHOT</hudi.version>
         <parquet.version>1.13.1</parquet.version>
         <commons-collections.version>3.2.2</commons-collections.version>
         <commons-compress.version>1.22</commons-compress.version>
