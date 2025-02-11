@@ -548,7 +548,7 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         long rowCount = getRowCountFromExternalSource();
         // Only hive table supports estimate row count by listing file.
         if (rowCount == -1 && dlaType.equals(DLAType.HIVE)) {
-            LOG.debug("Will estimate row count from file list.");
+            LOG.info("Will estimate row count from file list, db {} name {}", dbName, name);
             rowCount = getRowCountFromFileList();
         }
         return rowCount;

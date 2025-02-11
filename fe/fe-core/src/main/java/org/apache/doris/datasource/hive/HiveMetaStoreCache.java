@@ -50,7 +50,6 @@ import org.apache.doris.planner.ColumnBound;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PartitionPrunerV2Base.UniqueId;
 import org.apache.doris.qe.BDPAuthContext;
-import org.apache.doris.qe.ConnectContext;
 
 import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.LoadingCache;
@@ -337,55 +336,49 @@ public class HiveMetaStoreCache {
 
     private HivePartitionValues loadPartitionValues(PartitionValueCacheKey key) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        try {
-            // partition name format: nation=cn/city=beijing
-            List<String> partitionNames;
-            if (key.fromView) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("[ViewBased] db:{} table: {} loadPartitionValues from catalog.",
-                             key.dbName, key.tblName);
-                }
-                partitionNames = catalog.getClient().listPartitionNamesFromView(key.dbName, key.tblName);
-            } else {
-                partitionNames = catalog.getClient().listPartitionNames(key.dbName, key.tblName);
-            }
+        // partition name format: nation=cn/city=beijing
+        List<String> partitionNames;
+        if (key.fromView) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("load #{} partitions for {} in catalog {}", partitionNames.size(), key.tblName,
-                          catalog.getName());
+                LOG.debug("[ViewBased] db:{} table: {} loadPartitionValues from catalog.",
+                         key.dbName, key.tblName);
             }
-            Map<Long, PartitionItem> idToPartitionItem = Maps.newHashMapWithExpectedSize(partitionNames.size());
-            BiMap<String, Long> partitionNameToIdMap = HashBiMap.create(partitionNames.size());
-            Map<Long, List<UniqueId>> idToUniqueIdsMap = Maps.newHashMapWithExpectedSize(partitionNames.size());
-            for (String partitionName : partitionNames) {
-                long partitionId = Util.genIdByName(catalog.getName(), key.dbName, key.tblName, partitionName);
-                ListPartitionItem listPartitionItem = toListPartitionItem(partitionName, key.types);
-                idToPartitionItem.put(partitionId, listPartitionItem);
-                partitionNameToIdMap.put(partitionName, partitionId);
-            }
-
-            Map<UniqueId, Range<PartitionKey>> uidToPartitionRange = null;
-            Map<Range<PartitionKey>, UniqueId> rangeToId = null;
-            RangeMap<ColumnBound, UniqueId> singleColumnRangeMap = null;
-            Map<UniqueId, Range<ColumnBound>> singleUidToColumnRangeMap = null;
-            if (key.types.size() > 1) {
-                // uidToPartitionRange and rangeToId are only used for multi-column partition
-                uidToPartitionRange = ListPartitionPrunerV2.genUidToPartitionRange(idToPartitionItem, idToUniqueIdsMap);
-                rangeToId = ListPartitionPrunerV2.genRangeToId(uidToPartitionRange);
-            } else {
-                Preconditions.checkState(key.types.size() == 1, key.types);
-                // singleColumnRangeMap is only used for single-column partition
-                singleColumnRangeMap = ListPartitionPrunerV2.genSingleColumnRangeMap(idToPartitionItem,
-                    idToUniqueIdsMap);
-                singleUidToColumnRangeMap = ListPartitionPrunerV2.genSingleUidToColumnRange(singleColumnRangeMap);
-            }
-            Map<Long, List<String>> partitionValuesMap = ListPartitionPrunerV2.getPartitionValuesMap(idToPartitionItem);
-            return new HivePartitionValues(idToPartitionItem, uidToPartitionRange, rangeToId, singleColumnRangeMap,
-                partitionNameToIdMap, idToUniqueIdsMap, singleUidToColumnRangeMap, partitionValuesMap);
-        } finally {
-            if (ConnectContext.get() == null) {
-                BDPAuthContext.clear();
-            }
+            partitionNames = catalog.getClient().listPartitionNamesFromView(key.dbName, key.tblName);
+        } else {
+            partitionNames = catalog.getClient().listPartitionNames(key.dbName, key.tblName);
         }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("load #{} partitions values for {} in catalog {} key = {}", partitionNames.size(),
+                     key.tblName, catalog.getName(), key.toString());
+        }
+        Map<Long, PartitionItem> idToPartitionItem = Maps.newHashMapWithExpectedSize(partitionNames.size());
+        BiMap<String, Long> partitionNameToIdMap = HashBiMap.create(partitionNames.size());
+        Map<Long, List<UniqueId>> idToUniqueIdsMap = Maps.newHashMapWithExpectedSize(partitionNames.size());
+        for (String partitionName : partitionNames) {
+            long partitionId = Util.genIdByName(catalog.getName(), key.dbName, key.tblName, partitionName);
+            ListPartitionItem listPartitionItem = toListPartitionItem(partitionName, key.types);
+            idToPartitionItem.put(partitionId, listPartitionItem);
+            partitionNameToIdMap.put(partitionName, partitionId);
+        }
+
+        Map<UniqueId, Range<PartitionKey>> uidToPartitionRange = null;
+        Map<Range<PartitionKey>, UniqueId> rangeToId = null;
+        RangeMap<ColumnBound, UniqueId> singleColumnRangeMap = null;
+        Map<UniqueId, Range<ColumnBound>> singleUidToColumnRangeMap = null;
+        if (key.types.size() > 1) {
+            // uidToPartitionRange and rangeToId are only used for multi-column partition
+            uidToPartitionRange = ListPartitionPrunerV2.genUidToPartitionRange(idToPartitionItem, idToUniqueIdsMap);
+            rangeToId = ListPartitionPrunerV2.genRangeToId(uidToPartitionRange);
+        } else {
+            Preconditions.checkState(key.types.size() == 1, key.types);
+            // singleColumnRangeMap is only used for single-column partition
+            singleColumnRangeMap = ListPartitionPrunerV2.genSingleColumnRangeMap(idToPartitionItem,
+                idToUniqueIdsMap);
+            singleUidToColumnRangeMap = ListPartitionPrunerV2.genSingleUidToColumnRange(singleColumnRangeMap);
+        }
+        Map<Long, List<String>> partitionValuesMap = ListPartitionPrunerV2.getPartitionValuesMap(idToPartitionItem);
+        return new HivePartitionValues(idToPartitionItem, uidToPartitionRange, rangeToId, singleColumnRangeMap,
+             partitionNameToIdMap, idToUniqueIdsMap, singleUidToColumnRangeMap, partitionValuesMap);
     }
 
     public ListPartitionItem toListPartitionItem(String partitionName, List<Type> types) {
@@ -410,32 +403,25 @@ public class HiveMetaStoreCache {
 
     private HivePartition loadPartition(PartitionCacheKey key) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        try {
-            Partition partition;
-            if (key.fromView) {
-                ///  TODO check here
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("[ViewBased] db:{} table: {} loadPartition from catalog.",
-                              key.dbName, key.tblName);
-                }
-                partition = catalog.getClient().getPartitionFromView(key.dbName, key.tblName, key.values.get(0));
-            } else {
-                partition = catalog.getClient().getPartition(key.dbName, key.tblName, key.values);
-            }
-            StorageDescriptor sd = partition.getSd();
+        Partition partition;
+        if (key.fromView) {
+            ///  TODO check here
             if (LOG.isDebugEnabled()) {
-                LOG.debug("load partition format: {}, location: {} for {} in catalog {}",
-                        sd.getInputFormat(), sd.getLocation(), key, catalog.getName());
+                LOG.debug("[ViewBased] db:{} table: {} loadPartition from catalog.",
+                         key.dbName, key.tblName);
             }
-            // TODO: more info?
-            return new HivePartition(key.dbName, key.tblName, false, sd.getInputFormat(),
-                    sd.getLocation(), key.values, partition.getParameters());
-        } finally {
-            if (ConnectContext.get() == null) {
-                BDPAuthContext.clear();
-            }
+            partition = catalog.getClient().getPartitionFromView(key.dbName, key.tblName, key.values.get(0));
+        } else {
+            partition = catalog.getClient().getPartition(key.dbName, key.tblName, key.values);
         }
-
+        StorageDescriptor sd = partition.getSd();
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("load partition format: {}, location: {} for {} in catalog {}",
+                     sd.getInputFormat(), sd.getLocation(), key, catalog.getName());
+        }
+        // TODO: more info?
+        return new HivePartition(key.dbName, key.tblName, false, sd.getInputFormat(),
+                sd.getLocation(), key.values, partition.getParameters());
     }
 
     private Map<PartitionCacheKey, HivePartition> loadPartitions(Iterable<? extends PartitionCacheKey> keys) {
@@ -569,9 +555,6 @@ public class HiveMetaStoreCache {
                 throw new CacheException("failed to get input splits for %s in catalog %s", e, key, catalog.getName());
             }
         } finally {
-            if (ConnectContext.get() == null) {
-                BDPAuthContext.clear();
-            }
             Thread.currentThread().setContextClassLoader(classLoader);
         }
     }

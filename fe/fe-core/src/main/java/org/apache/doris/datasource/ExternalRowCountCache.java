@@ -87,7 +87,7 @@ public class ExternalRowCountCache {
                 return Optional.of(table.fetchRowCount());
             } catch (Exception e) {
                 LOG.warn("Failed to get table with catalogId {}, dbId {}, tableId {}", rowCountKey.catalogId,
-                        rowCountKey.dbId, rowCountKey.tableId);
+                        rowCountKey.dbId, rowCountKey.tableId, e);
                 return Optional.empty();
             }
         }
