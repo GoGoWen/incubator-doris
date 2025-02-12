@@ -352,6 +352,16 @@ void S3FileWriter::_upload_one_part(int64_t part_num, UploadFileBuffer& buf) {
 
     upload_request.SetBody(buf.get_stream());
 
+    auto stream = buf.get_stream();
+    if (!stream || !stream->good()) {
+        auto s = Status::IOError("failed to upload part (bucket={}, key={}, part_num={}, up_load_id={}): "
+                                 "buf stream is nullptr or invalid",
+                                 _bucket, _path.native(), part_num, _upload_id);
+        LOG_WARNING(s.to_string());
+        buf.set_status(std::move(s));
+        return;
+    }
+
     Aws::Utils::ByteBuffer part_md5(Aws::Utils::HashingUtils::CalculateMD5(*buf.get_stream()));
     upload_request.SetContentMD5(Aws::Utils::HashingUtils::Base64Encode(part_md5));
 
