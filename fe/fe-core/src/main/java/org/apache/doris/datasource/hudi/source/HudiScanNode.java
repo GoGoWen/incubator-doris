@@ -177,9 +177,13 @@ public class HudiScanNode extends HiveScanNode {
         boolean queryWithoutCacheLayer = false;
         Map<String, String> storageDescriptorParameters =
                 hmsTable.getRemoteTable().getSd().getSerdeInfo().getParameters();
-        if (storageDescriptorParameters != null) {
-            queryWithoutCacheLayer = Boolean.valueOf(storageDescriptorParameters.getOrDefault(
-                    "hoodie.query.without.cache.layer.enabled", "false"));
+        Map<String, String> paras = hmsTable.getRemoteTable().getParameters();
+        String key = "hoodie.query.without.cache.layer.enabled";
+        if (paras != null) {
+            queryWithoutCacheLayer = Boolean.valueOf(paras.getOrDefault(key, "false"));
+            if (!queryWithoutCacheLayer && storageDescriptorParameters != null) {
+                queryWithoutCacheLayer = Boolean.valueOf(storageDescriptorParameters.getOrDefault(key, "false"));
+            }
         }
         storageStrategy = HoodieStorageStrategyFactory.getInstant(hudiClient, queryWithoutCacheLayer);
         columnNames = new ArrayList<>();

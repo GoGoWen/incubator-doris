@@ -192,11 +192,12 @@ public class LogicalHudiScan extends LogicalFileScan {
             }
             Map<String, String> storageDescriptorParameters =
                     table.getRemoteTable().getSd().getSerdeInfo().getParameters();
-            if (storageDescriptorParameters != null) {
-                if (storageDescriptorParameters.containsKey("hoodie.query.without.cache.layer.enabled")) {
-                    optParams.put("hoodie.query.without.cache.layer.enabled",
-                            storageDescriptorParameters.get("hoodie.query.without.cache.layer.enabled"));
-                }
+            Map<String, String> paras = table.getRemoteTable().getParameters();
+            String key = "hoodie.query.without.cache.layer.enabled";
+            if (paras != null && paras.containsKey(key)) {
+                optParams.put(key, paras.get(key));
+            } else if (storageDescriptorParameters != null && storageDescriptorParameters.containsKey(key)) {
+                optParams.put(key, storageDescriptorParameters.get(key));
             }
             scanParams.getParams().forEach((k, v) -> {
                 if (k.startsWith("hoodie.")) {
