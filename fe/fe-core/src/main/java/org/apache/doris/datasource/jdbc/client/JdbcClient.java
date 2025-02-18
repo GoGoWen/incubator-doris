@@ -115,6 +115,9 @@ public abstract class JdbcClient {
         this.jdbcLowerCaseMetaMatching = new JdbcIdentifierMapping(isLowerCaseMetaNames, metaNamesMapping, this);
     }
 
+    protected JdbcClient() {
+    }
+
     // Initialize DataSource
     private void initializeDataSource(JdbcClientConfig config) {
         ClassLoader oldClassLoader = Thread.currentThread().getContextClassLoader();

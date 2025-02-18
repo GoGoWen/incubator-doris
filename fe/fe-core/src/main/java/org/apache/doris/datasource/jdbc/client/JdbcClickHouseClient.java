@@ -30,6 +30,9 @@ public class JdbcClickHouseClient extends JdbcClient {
         super(jdbcClientConfig);
     }
 
+    protected JdbcClickHouseClient() {
+    }
+
     @Override
     protected String[] getTableTypes() {
         return new String[] {"TABLE", "VIEW", "SYSTEM TABLE"};
@@ -93,6 +96,7 @@ public class JdbcClickHouseClient extends JdbcClient {
             case "Bool":
                 return Type.BOOLEAN;
             case "Int8":
+            case "Nothing":
                 return Type.TINYINT;
             case "Int16":
             case "UInt8":
