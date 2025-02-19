@@ -70,7 +70,6 @@ import org.apache.hudi.org.apache.avro.Schema;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.net.URI;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.time.LocalDateTime;
@@ -847,15 +846,6 @@ public class HiveMetaStoreClientHelper {
     public static HoodieTableMetaClient getHudiClient(HMSExternalTable table) {
         String hudiBasePath = table.getRemoteTable().getSd().getLocation();
         Configuration conf = getConfiguration(table);
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("try setting 'fs.xxx.impl.disable.cache' to true for hudi's base path: {}", hudiBasePath);
-        }
-        URI hudiBasePathUri = URI.create(hudiBasePath);
-        String scheme = hudiBasePathUri.getScheme();
-        if (!Strings.isNullOrEmpty(scheme)) {
-            // Avoid using Cache in Hadoop FileSystem, which may cause FE OOM.
-            conf.set("fs." + scheme + ".impl.disable.cache", "true");
-        }
         BDPAuthContext bdpAuthContext = BDPAuthContext.get();
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
