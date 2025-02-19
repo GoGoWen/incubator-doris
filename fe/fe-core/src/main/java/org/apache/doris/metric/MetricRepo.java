@@ -70,6 +70,18 @@ public final class MetricRepo {
     public static final String TABLET_NUM = "tablet_num";
     public static final String TABLET_MAX_COMPACTION_SCORE = "tablet_max_compaction_score";
 
+    public static GaugeMetricImpl<Long> GAUGE_HMS_CONNECTIONS;
+    public static LongCounterMetric COUNTER_HMS_CALL_ERROR;
+    public static Histogram HISTO_HMS_API_CALL_GET_TABLE;
+    public static Histogram HISTO_HMS_API_CALL_GET_TABLE_FROM_VIEW;
+    public static Histogram HISTO_HMS_API_CALL_GET_ALL_TABLES;
+    public static Histogram HISTO_HMS_API_CALL_GET_PARTITION;
+    public static Histogram HISTO_HMS_API_CALL_GET_PARTITION_FROM_VIEW;
+    public static Histogram HISTO_HMS_API_CALL_GET_PARTITIONS;
+    public static Histogram HISTO_HMS_API_CALL_GET_PARTITIONS_FROM_VIEW;
+    public static Histogram HISTO_HMS_API_CALL_LIST_PARTITIONS;
+    public static Histogram HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER;
+    public static Histogram HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER_FROM_VIEW;
     public static LongCounterMetric COUNTER_REQUEST_ALL;
     public static LongCounterMetric COUNTER_QUERY_ALL;
     public static LongCounterMetric COUNTER_QUERY_ERR;
@@ -520,6 +532,36 @@ public final class MetricRepo {
                 new LongCounterMetric("thrift_rpc_total", MetricUnit.NOUNIT, ""));
         THRIFT_COUNTER_RPC_LATENCY = addLabeledMetrics("method", () ->
                 new LongCounterMetric("thrift_rpc_latency_ms", MetricUnit.MILLISECONDS, ""));
+
+        GAUGE_HMS_CONNECTIONS = new GaugeMetricImpl<>("hive_metastore_connections", MetricUnit.NOUNIT,
+            "total hive metastore connections");
+        DORIS_METRIC_REGISTER.addMetrics(GAUGE_HMS_CONNECTIONS);
+        GAUGE_HMS_CONNECTIONS.setValue(0L);
+        COUNTER_HMS_CALL_ERROR = new LongCounterMetric("hive_metastore_call_error", MetricUnit.NOUNIT,
+            "total hive metastore api call errors");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_HMS_CALL_ERROR);
+
+        HISTO_HMS_API_CALL_GET_TABLE = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "get_table"));
+        HISTO_HMS_API_CALL_GET_TABLE_FROM_VIEW = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "get_table_from_view"));
+        HISTO_HMS_API_CALL_GET_ALL_TABLES = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "get_all_tables"));
+        HISTO_HMS_API_CALL_GET_PARTITION = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "get_partition"));
+        HISTO_HMS_API_CALL_GET_PARTITION_FROM_VIEW = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "get_partition_from_view"));
+        HISTO_HMS_API_CALL_GET_PARTITIONS = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "get_partitions"));
+        HISTO_HMS_API_CALL_GET_PARTITIONS_FROM_VIEW = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "get_partitions_from_view"));
+        HISTO_HMS_API_CALL_LIST_PARTITIONS = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "list_partitions"));
+        HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "list_partitions_by_filter"));
+        HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER_FROM_VIEW = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "list_partitions_by_filter_from_view"));
+
 
         // init system metrics
         initSystemMetrics();

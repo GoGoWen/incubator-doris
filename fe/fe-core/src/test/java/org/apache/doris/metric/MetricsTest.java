@@ -89,6 +89,25 @@ public class MetricsTest {
     }
 
     @Test
+    public void testHmsMetrics() {
+        MetricRepo.GAUGE_HMS_CONNECTIONS.setValue(1L);
+        MetricVisitor visitor = new PrometheusMetricVisitor();
+        MetricRepo.HISTO_HMS_API_CALL_GET_PARTITIONS.update(10L);
+
+        MetricRepo.DORIS_METRIC_REGISTER.accept(visitor);
+        SortedMap<String, Histogram> histograms = MetricRepo.METRIC_REGISTER.getHistograms();
+        for (Map.Entry<String, Histogram> entry : histograms.entrySet()) {
+            visitor.visitHistogram(MetricVisitor.FE_PREFIX, entry.getKey(), entry.getValue());
+        }
+        String metricResult = visitor.finish();
+        Assert.assertTrue(metricResult.contains("# TYPE doris_fe_hive_metastore_connections gauge"));
+        Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_connections 1"));
+        Assert.assertTrue(metricResult.contains("# TYPE doris_fe_hive_metastore_api_get_partitions summary"));
+        Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_api_get_partitions{quantile=\"0.999\"} 10.0"));
+        Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_api_get_partitions{quantile=\"0.999\"} 10.0"));
+    }
+
+    @Test
     public void testGc() {
         PrometheusMetricVisitor visitor = new PrometheusMetricVisitor();
         JvmService jvmService = new JvmService();

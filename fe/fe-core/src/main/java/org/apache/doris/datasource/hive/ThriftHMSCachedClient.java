@@ -25,6 +25,7 @@ import org.apache.doris.datasource.DatabaseMetadata;
 import org.apache.doris.datasource.TableMetadata;
 import org.apache.doris.datasource.hive.event.MetastoreNotificationFetchException;
 import org.apache.doris.datasource.property.constants.HMSProperties;
+import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.qe.BDPAuthContext;
 
 import com.aliyun.datalake.metastore.hive2.ProxyMetaStoreClient;
@@ -70,6 +71,7 @@ import org.apache.logging.log4j.Logger;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -119,6 +121,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
         synchronized (clientPool) {
             this.isClosed = true;
             clientPool.clear();
+            MetricRepo.GAUGE_HMS_CONNECTIONS.setValue(getPoolSize());
         }
     }
 
@@ -139,11 +142,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public List<String> getAllTables(String dbName) {
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.getAllTables(dbName);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_GET_ALL_TABLES.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get all tables for db %s", e, dbName);
@@ -276,11 +282,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
 
     public List<Partition> listPartitions(String dbName, String tblName) {
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.listPartitions(dbName, tblName, MAX_LIST_PARTITION_NUM);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to list partitions in table '%s.%s'.", e, dbName, tblName);
@@ -322,11 +331,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public Partition getPartitionFromView(String dbName, String tblName, String partitionValues) {
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.getPartitionFromView(dbName, tblName, partitionValues);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITION_FROM_VIEW.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
@@ -337,11 +349,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public Partition getPartition(String dbName, String tblName, List<String> partitionValues) {
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.getPartition(dbName, tblName, partitionValues);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITION.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
@@ -352,11 +367,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public List<Partition> getPartitionsFromView(String dbName, String tblName, List<String> partitionNames) {
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.getPartitionsByNamesFromView(dbName, tblName, partitionNames);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITIONS_FROM_VIEW.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
@@ -367,11 +385,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public List<Partition> getPartitions(String dbName, String tblName, List<String> partitionNames) {
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.getPartitionsByNames(dbName, tblName, partitionNames);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITIONS.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
@@ -417,11 +438,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public Table getTable(String dbName, String tblName) {
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.getTable(dbName, tblName);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_GET_TABLE.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get table %s in db %s from hms client", e, tblName, dbName);
@@ -431,11 +455,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public Table getTableFromView(String dbName, String tblName) {
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.getTableFromView(dbName, tblName);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_GET_TABLE_FROM_VIEW.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get table %s in db %s from hms client", e, tblName, dbName);
@@ -684,6 +711,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
 
         public void setThrowable(Throwable throwable) {
             this.throwable = throwable;
+            MetricRepo.COUNTER_HMS_CALL_ERROR.increase(1L);
         }
 
         public void setReadyToClose() {
@@ -708,6 +736,8 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                         }
                     }
                 }
+
+                MetricRepo.GAUGE_HMS_CONNECTIONS.setValue(getPoolSize());
             }
             if (readyToClose) {
                 client.close();
@@ -737,6 +767,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                         }
                         client.client.setMetaConf("BEE_SOURCE", bdpAuthContext.getSource());
                         client.client.setMetaConf("BEE_USER", bdpAuthContext.getErp());
+                        MetricRepo.GAUGE_HMS_CONNECTIONS.setValue(getPoolSize());
                         return client;
                     }
                 }
@@ -860,7 +891,16 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     public List<Partition> listPartitionsByFilterFromView(String dbName, String tableName, String filter,
                                                           short maxParts) {
         try (ThriftHMSClient client = getClient()) {
-            return client.client.listPartitionsByFilterFromView(dbName, tableName, filter, maxParts);
+            long start = System.currentTimeMillis();
+            try {
+                return client.client.listPartitionsByFilterFromView(dbName, tableName, filter, maxParts);
+            } catch (Exception e) {
+                client.setThrowable(e);
+                throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER_FROM_VIEW
+                    .update(System.currentTimeMillis() - start);
+            }
         } catch (Exception e) {
             throw new RuntimeException("failed to list partitions by filter for " + dbName + "." + tableName, e);
         }
@@ -869,9 +909,25 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public List<Partition> listPartitionsByFilter(String dbName, String tableName, String filter, short maxParts) {
         try (ThriftHMSClient client = getClient()) {
-            return client.client.listPartitionsByFilter(dbName, tableName, filter, maxParts);
+            long start = System.currentTimeMillis();
+            try {
+                return client.client.listPartitionsByFilter(dbName, tableName, filter, maxParts);
+            } catch (Exception e) {
+                client.setThrowable(e);
+                throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER.update(System.currentTimeMillis() - start);
+            }
         } catch (Exception e) {
             throw new RuntimeException("failed to list partitions by filter for " + dbName + "." + tableName, e);
         }
+    }
+
+    public long getPoolSize() {
+        return clientPool.asMap()
+            .values()
+            .stream()
+            .mapToLong(Collection::size)
+            .sum();
     }
 }
