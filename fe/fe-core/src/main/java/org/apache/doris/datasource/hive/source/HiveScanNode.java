@@ -350,10 +350,17 @@ public class HiveScanNode extends FileQueryScanNode {
         if (hiveTransaction != null) {
             fileCaches = getFileSplitByTransaction(cache, partitions, bindBrokerName);
         } else {
-            Map<String, String> parameters =
-                    hmsTable.getRemoteTable().getSd().getSerdeInfo().getParameters();
-            boolean withCache = Boolean.valueOf(parameters.getOrDefault("doris_x.enable_external_file_cache",
-                    "true"));
+            String key = "doris_x.enable_external_file_cache";
+            Map<String, String> parameters = hmsTable.getRemoteTable().getParameters();
+            boolean withCache;
+            if (parameters.containsKey(key)) {
+                withCache = Boolean.valueOf(parameters.get(key));
+            } else {
+                parameters =
+                        hmsTable.getRemoteTable().getSd().getSerdeInfo().getParameters();
+                withCache = Boolean.valueOf(parameters.getOrDefault(key,
+                        "true"));
+            }
             withCache = withCache && Config.max_external_file_cache_num > 0 && (ConnectContext.get() == null
                     || ConnectContext.get().getSessionVariable().getEnableExternalFileCache());
             fileCaches = cache.getFilesByPartitions(partitions, withCache, !withCache, bindBrokerName);
