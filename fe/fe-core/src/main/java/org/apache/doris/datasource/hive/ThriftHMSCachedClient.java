@@ -771,6 +771,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                         return client;
                     }
                 }
+                long start = System.currentTimeMillis();
                 HiveConf conf = new HiveConf(hiveConf);
                 conf.set("BEE_SOURCE", bdpAuthContext.getSource());
                 conf.set("BEE_USER", bdpAuthContext.getErp());
@@ -782,9 +783,11 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                     client.client.setMetaConf("USER_TYPE", bdpAuthContext.getUserType());
                     client.client.setMetaConf("BUSINESS_LINE", bdpAuthContext.getBusinessLine());
                 }
+                MetricRepo.HISTO_HMS_CREATE_CLIENT.update(System.currentTimeMillis() - start);
                 return client;
             } catch (Exception e) {
                 LOG.warn("failed to get hive client", e);
+                MetricRepo.COUNTER_HMS_CREATE_CLIENT_ERROR.increase(1L);
                 throw new MetaException(e.getMessage());
             }
         } finally {

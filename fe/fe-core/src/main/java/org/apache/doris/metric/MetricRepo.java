@@ -72,6 +72,8 @@ public final class MetricRepo {
 
     public static GaugeMetricImpl<Long> GAUGE_HMS_CONNECTIONS;
     public static LongCounterMetric COUNTER_HMS_CALL_ERROR;
+    public static LongCounterMetric COUNTER_HMS_CREATE_CLIENT_ERROR;
+    public static Histogram HISTO_HMS_CREATE_CLIENT;
     public static Histogram HISTO_HMS_API_CALL_GET_TABLE;
     public static Histogram HISTO_HMS_API_CALL_GET_TABLE_FROM_VIEW;
     public static Histogram HISTO_HMS_API_CALL_GET_ALL_TABLES;
@@ -540,7 +542,11 @@ public final class MetricRepo {
         COUNTER_HMS_CALL_ERROR = new LongCounterMetric("hive_metastore_call_error", MetricUnit.NOUNIT,
             "total hive metastore api call errors");
         DORIS_METRIC_REGISTER.addMetrics(COUNTER_HMS_CALL_ERROR);
-
+        COUNTER_HMS_CREATE_CLIENT_ERROR = new LongCounterMetric("hive_metastore_create_client_errors",
+            MetricUnit.NOUNIT, "create hive metastore client errors");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_HMS_CREATE_CLIENT_ERROR);
+        HISTO_HMS_CREATE_CLIENT = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_create_client"));
         HISTO_HMS_API_CALL_GET_TABLE = METRIC_REGISTER.histogram(
             MetricRegistry.name("hive_metastore_api", "get_table"));
         HISTO_HMS_API_CALL_GET_TABLE_FROM_VIEW = METRIC_REGISTER.histogram(

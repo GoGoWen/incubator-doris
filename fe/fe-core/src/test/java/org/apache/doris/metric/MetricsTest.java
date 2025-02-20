@@ -91,7 +91,9 @@ public class MetricsTest {
     @Test
     public void testHmsMetrics() {
         MetricRepo.GAUGE_HMS_CONNECTIONS.setValue(1L);
+        MetricRepo.COUNTER_HMS_CREATE_CLIENT_ERROR.increase(2L);
         MetricVisitor visitor = new PrometheusMetricVisitor();
+        MetricRepo.HISTO_HMS_CREATE_CLIENT.update(5L);
         MetricRepo.HISTO_HMS_API_CALL_GET_PARTITIONS.update(10L);
 
         MetricRepo.DORIS_METRIC_REGISTER.accept(visitor);
@@ -102,9 +104,14 @@ public class MetricsTest {
         String metricResult = visitor.finish();
         Assert.assertTrue(metricResult.contains("# TYPE doris_fe_hive_metastore_connections gauge"));
         Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_connections 1"));
+        Assert.assertTrue(metricResult.contains("# TYPE doris_fe_hive_metastore_create_client_errors counter"));
+        Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_create_client_errors 2"));
         Assert.assertTrue(metricResult.contains("# TYPE doris_fe_hive_metastore_api_get_partitions summary"));
         Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_api_get_partitions{quantile=\"0.999\"} 10.0"));
         Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_api_get_partitions{quantile=\"0.999\"} 10.0"));
+        Assert.assertTrue(metricResult.contains("# TYPE doris_fe_hive_metastore_create_client summary"));
+        Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_create_client{quantile=\"0.999\"} 5.0"));
+        Assert.assertTrue(metricResult.contains("doris_fe_hive_metastore_create_client{quantile=\"0.999\"} 5.0"));
     }
 
     @Test
