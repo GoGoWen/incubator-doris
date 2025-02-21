@@ -401,18 +401,26 @@ public class HiveMetaStoreCache {
         }
     }
 
-    private HivePartition loadPartition(PartitionCacheKey key) {
+    @VisibleForTesting
+    public HivePartition loadPartition(PartitionCacheKey key) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         Partition partition;
+        String dbName = key.getDbName();
+        String tblName = key.getTblName();
+        List<Column> partitionColumns = ((HMSExternalTable) (catalog.getDbNullable(dbName).getTableNullable(tblName)))
+                .getPartitionColumns();
+        // A partitionName is like "country=China/city=Beijing" or "date=2023-02-01"
+        String partitionName = buildPartitionName(key, partitionColumns);
         if (key.fromView) {
             ///  TODO check here
             if (LOG.isDebugEnabled()) {
                 LOG.debug("[ViewBased] db:{} table: {} loadPartition from catalog.",
                          key.dbName, key.tblName);
             }
-            partition = catalog.getClient().getPartitionFromView(key.dbName, key.tblName, key.values.get(0));
+            partition = catalog.getClient().getPartitionFromView(key.dbName, key.tblName, partitionName);
         } else {
-            partition = catalog.getClient().getPartition(key.dbName, key.tblName, key.values);
+            partition = catalog.getClient().getPartition(key.dbName, key.tblName,
+                Collections.singletonList(partitionName));
         }
         StorageDescriptor sd = partition.getSd();
         if (LOG.isDebugEnabled()) {
@@ -436,19 +444,9 @@ public class HiveMetaStoreCache {
         List<Column> partitionColumns = ((HMSExternalTable) (
                 catalog.getDbNullable(dbName).getTableNullable(tblName))).getPartitionColumns();
         // A partitionName is like "country=China/city=Beijing" or "date=2023-02-01"
-        List<String> partitionNames = Streams.stream(keys).map(key -> {
-            StringBuilder sb = new StringBuilder();
-            Preconditions.checkState(key.getValues().size() == partitionColumns.size());
-            for (int i = 0; i < partitionColumns.size(); i++) {
-                sb.append(partitionColumns.get(i).getName());
-                sb.append("=");
-                // Partition value may contain special character, like / and so on. Need to encode.
-                sb.append(FileUtils.escapePathName(key.getValues().get(i)));
-                sb.append("/");
-            }
-            sb.delete(sb.length() - 1, sb.length());
-            return sb.toString();
-        }).collect(Collectors.toList());
+        List<String> partitionNames = Streams.stream(keys)
+                .map(key -> buildPartitionName(key, partitionColumns))
+                .collect(Collectors.toList());
 
         List<Partition> partitions;
         if (fromView) {
@@ -467,6 +465,20 @@ public class HiveMetaStoreCache {
                     sd.getInputFormat(), sd.getLocation(), partition.getValues(), partition.getParameters()));
         }
         return ret;
+    }
+
+    private String buildPartitionName(PartitionCacheKey key, List<Column> partitionColumns) {
+        StringBuilder sb = new StringBuilder();
+        Preconditions.checkState(key.getValues().size() == partitionColumns.size());
+        for (int i = 0; i < partitionColumns.size(); i++) {
+            sb.append(partitionColumns.get(i).getName());
+            sb.append("=");
+            // Partition value may contain special character, like / and so on. Need to encode.
+            sb.append(FileUtils.escapePathName(key.getValues().get(i)));
+            sb.append("/");
+        }
+        sb.delete(sb.length() - 1, sb.length());
+        return sb.toString();
     }
 
     // Get File Status by using FileSystem API.
