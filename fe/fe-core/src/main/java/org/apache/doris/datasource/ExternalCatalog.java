@@ -242,7 +242,7 @@ public abstract class ExternalCatalog
                     metaCache = Env.getCurrentEnv().getExtMetaCacheMgr().buildMetaCache(
                             name,
                             OptionalLong.of(86400L),
-                            OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60L),
+                            OptionalLong.of(Config.external_db_cache_expire_time_minutes_after_write * 60L),
                             Config.max_meta_object_cache_num,
                             ignored -> getFilteredDatabaseNames(),
                             key -> Optional.ofNullable(
@@ -404,6 +404,10 @@ public abstract class ExternalCatalog
     }
 
     private void refreshOnlyCatalogCache(boolean invalidCache) {
+        this.invalidCacheInInit = invalidCache;
+        if (invalidCache) {
+            Env.getCurrentEnv().getExtMetaCacheMgr().invalidateCatalogCache(id);
+        }
         if (useMetaCache.isPresent()) {
             if (useMetaCache.get() && metaCache != null) {
                 metaCache.invalidateAll();
@@ -412,10 +416,6 @@ public abstract class ExternalCatalog
                     db.setUnInitialized(invalidCache);
                 }
             }
-        }
-        this.invalidCacheInInit = invalidCache;
-        if (invalidCache) {
-            Env.getCurrentEnv().getExtMetaCacheMgr().invalidateCatalogCache(id);
         }
     }
 

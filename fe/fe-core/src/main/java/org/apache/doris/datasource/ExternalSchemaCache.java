@@ -37,11 +37,12 @@ import lombok.Data;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 // The schema cache for external table
 public class ExternalSchemaCache {
@@ -86,7 +87,7 @@ public class ExternalSchemaCache {
             DatabaseIf db = catalog.getDbNullable(key.dbName);
             if (db != null) {
                 TableIf table = db.getTableNullable(key.tblName);
-                if (table != null && table instanceof HMSExternalTable) {
+                if (table instanceof HMSExternalTable) {
                     if (((HMSExternalTable) table).isViewBased()) {
                         key.fromView = true;
                     }
@@ -131,11 +132,11 @@ public class ExternalSchemaCache {
     }
 
     public void invalidateTableCache(String dbName, String tblName) {
-        Set<SchemaCacheKey> keys = schemaCache.asMap().keySet();
-        for (SchemaCacheKey key : keys) {
-            if (key.dbName.equals(dbName) && key.tblName.equals(tblName)) {
-                schemaCache.invalidate(key);
-            }
+        List<SchemaCacheKey> keysToInvalidate = schemaCache.asMap().keySet().stream()
+                .filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
+                .collect(Collectors.toList());
+        if (!keysToInvalidate.isEmpty()) {
+            schemaCache.invalidateAll(keysToInvalidate);
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("invalid schema cache for {}.{} in catalog {}", dbName, tblName, catalog.getName());
@@ -144,11 +145,11 @@ public class ExternalSchemaCache {
 
     public void invalidateDbCache(String dbName) {
         long start = System.currentTimeMillis();
-        Set<SchemaCacheKey> keys = schemaCache.asMap().keySet();
-        for (SchemaCacheKey key : keys) {
-            if (key.dbName.equals(dbName)) {
-                schemaCache.invalidate(key);
-            }
+        List<SchemaCacheKey> keysToInvalidate = schemaCache.asMap().keySet().stream()
+                .filter(key -> key.dbName.equals(dbName))
+                .collect(Collectors.toList());
+        if (!keysToInvalidate.isEmpty()) {
+            schemaCache.invalidateAll(keysToInvalidate);
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("invalid schema cache for db {} in catalog {} cost: {} ms", dbName, catalog.getName(),

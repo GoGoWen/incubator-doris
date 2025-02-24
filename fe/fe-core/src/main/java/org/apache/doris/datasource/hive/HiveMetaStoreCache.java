@@ -86,13 +86,13 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -227,7 +227,7 @@ public class HiveMetaStoreCache {
         CacheFactory fileCacheFactory = new CacheFactory(
                 OptionalLong.of(fileMetaCacheTtlSecond >= HMSExternalCatalog.FILE_META_CACHE_TTL_DISABLE_CACHE
                         ? fileMetaCacheTtlSecond : 28800L),
-                OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60L),
+                OptionalLong.of(Config.external_file_cache_expire_time_minutes_after_write * 60L),
                 Config.max_external_file_cache_num,
                 true,
                 null);
@@ -663,9 +663,8 @@ public class HiveMetaStoreCache {
         return partitionValuesCache.get(key);
     }
 
-    public List<FileCacheValue> getFilesByPartitionsWithCache(List<HivePartition> partitions,
-                                                              String bindBrokerName) {
-        return getFilesByPartitions(partitions, true, true, bindBrokerName);
+    public HivePartitionValues getPartitionValuesIfPresent(PartitionValueCacheKey key) {
+        return partitionValuesCache.getIfPresent(key);
     }
 
     public List<FileCacheValue> getFilesByPartitionsWithoutCache(List<HivePartition> partitions,
@@ -719,12 +718,6 @@ public class HiveMetaStoreCache {
         return fileLists;
     }
 
-    public HivePartition getHivePartitionFromView(String dbName, String name, List<String> partitionValues) {
-        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        return partitionCache.get(new PartitionCacheKey(BDPAuthContext.get().getHadoopUserName(),
-            BDPAuthContext.get().getUserToken(), dbName, name, true, partitionValues));
-    }
-
     public HivePartition getHivePartition(String dbName, String name, List<String> partitionValues) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         return partitionCache.get(new PartitionCacheKey(BDPAuthContext.get().getHadoopUserName(),
@@ -771,106 +764,140 @@ public class HiveMetaStoreCache {
         return partitions;
     }
 
+
     public void invalidateTableCache(String dbName, String tblName) {
-        boolean isPartitionValuesNotFound = true;
-        for (PartitionValueCacheKey key : partitionValuesCache.asMap().keySet()) {
-            if (key.dbName.equals(dbName) && key.tblName.equals(tblName)) {
-                HivePartitionValues partitionValues = partitionValuesCache.getIfPresent(key);
-                if (partitionValues != null) {
-                    isPartitionValuesNotFound = false;
-                    long start = System.currentTimeMillis();
-                    for (List<String> values : partitionValues.partitionValuesMap.values()) {
-                        for (PartitionCacheKey partKey : partitionCache.asMap().keySet()) {
-                            if (dbName.equals(partKey.dbName) && tblName.equals(partKey.tblName)
-                                    && Objects.equals(values, partKey.values)) {
-                                HivePartition partition = partitionCache.getIfPresent(partKey);
-                                if (partition != null) {
-                                    for (FileCacheKey fileCacheKey : fileCacheRef.get().asMap().keySet()) {
-                                        if (partition.getPath().equals(fileCacheKey.location)
-                                                && Objects.equals(partition.getPartitionValues(),
-                                                fileCacheKey.partitionValues)) {
-                                            fileCacheRef.get().invalidate(fileCacheKey);
-                                        }
-                                    }
-                                    partitionCache.invalidate(partKey);
-                                }
-                            }
-                        }
-                    }
-                    partitionValuesCache.invalidate(key);
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("invalid table cache for {}.{} in catalog {}, cache num: {}, cost: {} ms",
-                                dbName, tblName, catalog.getName(), partitionValues.partitionValuesMap.size(),
-                                (System.currentTimeMillis() - start));
-                    }
-                }
-            }
+        long start = System.currentTimeMillis();
+        List<PartitionValueCacheKey> pvKeysToInvalidate = partitionValuesCache.asMap().keySet().stream()
+                .filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
+                .collect(Collectors.toList());
+        partitionValuesCache.invalidateAll(pvKeysToInvalidate);
+
+        List<FilterPartitionValueCacheKey> filterPvKeysToInvalidate = filterPartitionValuesCache.asMap().keySet()
+                .stream().filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
+                .collect(Collectors.toList());
+        filterPartitionValuesCache.invalidateAll(filterPvKeysToInvalidate);
+
+        List<PartitionNumCacheKey> pnKeysToInvalidate = partitionNumCache.asMap().keySet()
+                .stream().filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
+                .collect(Collectors.toList());
+        partitionNumCache.invalidateAll(pnKeysToInvalidate);
+
+        List<PartitionCacheKey> partitionKeysToInvalidate = partitionCache.asMap().keySet().stream()
+                .filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
+                .collect(Collectors.toList());
+        LoadingCache<FileCacheKey, FileCacheValue> fileCache = fileCacheRef.get();
+        if (!pvKeysToInvalidate.isEmpty() || !filterPvKeysToInvalidate.isEmpty() || !pnKeysToInvalidate.isEmpty()) {
+            List<FileCacheKey> fileKeysToInvalidate = new ArrayList<>();
+            partitionKeysToInvalidate.stream()
+                    .map(partitionCache::getIfPresent)
+                    .filter(Objects::nonNull)
+                    .forEach(partition -> {
+                        fileCache.asMap().keySet().stream()
+                                .filter(fileKey -> partition.getPath().equals(fileKey.location))
+                                .forEach(fileKeysToInvalidate::add);
+                    });
+            partitionCache.invalidateAll(partitionKeysToInvalidate);
+            fileCache.invalidateAll(fileKeysToInvalidate);
+        } else {
+            String dummyKey = dbName + "." + tblName;
+            List<FileCacheKey> dummyFileKeys = fileCache.asMap().keySet().stream()
+                    .filter(fileKey -> Objects.equals(fileKey.dummyKey, dummyKey))
+                    .collect(Collectors.toList());
+            fileCache.invalidateAll(dummyFileKeys);
         }
-        if (isPartitionValuesNotFound) {
-            /**
-             * A file cache entry can be created reference to
-             * {@link org.apache.doris.planner.external.HiveSplitter#getSplits},
-             * so we need to invalidate it if this is a non-partitioned table.
-             * We use {@link org.apache.doris.datasource.hive.HiveMetaStoreCache.FileCacheKey#createDummyCacheKey}
-             * to avoid invocation by Hms Client, because this method may be invoked when salve FE replay journal logs,
-             * and FE will exit if some network problems occur.
-             * */
-            Set<FileCacheKey> fileCacheKeys = fileCacheRef.get().asMap().keySet();
-            String dummyCacheKey = dbName + "." + tblName;
-            for (FileCacheKey fileCacheKey : fileCacheKeys) {
-                if (Objects.equals(dummyCacheKey, fileCacheKey.dummyKey)) {
-                    fileCacheRef.get().invalidate(fileCacheKey);
-                }
-            }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("invalid table cache for {}.{} in catalog {}, cost: {} ms",
+                    dbName, tblName, catalog.getName(), (System.currentTimeMillis() - start));
         }
+
     }
 
-    public void invalidatePartitionCache(String dbName, String tblName, String partitionName) {
-        Set<PartitionValueCacheKey> keys = partitionValuesCache.asMap().keySet();
-        for (PartitionValueCacheKey key : keys) {
-            if (key.dbName.equals(dbName) && key.tblName.equals(tblName)) {
-                HivePartitionValues partitionValues = partitionValuesCache.getIfPresent(key);
-                if (partitionValues != null) {
-                    Long partitionId = partitionValues.partitionNameToIdMap.get(partitionName);
-                    List<String> values = partitionValues.partitionValuesMap.get(partitionId);
-                    Set<PartitionCacheKey> partKeys = partitionCache.asMap().keySet();
-                    for (PartitionCacheKey partKey : partKeys) {
-                        if (partKey.dbName.equals(dbName) && partKey.tblName.equals(tblName)
-                                && Objects.equals(partKey.values, values)) {
-                            HivePartition partition = partitionCache.getIfPresent(partKey);
-                            if (partition != null) {
-                                partitionCache.invalidate(partKey);
-                                Set<FileCacheKey> fileKeys = fileCacheRef.get().asMap().keySet();
-                                for (FileCacheKey fileKey : fileKeys) {
-                                    if (Objects.equals(fileKey.location, partition.getPath()) && Objects.equals(
-                                            fileKey.partitionValues, partition.getPartitionValues())) {
-                                        fileCacheRef.get().invalidate(fileKey);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    public void invalidatePartitionCache(String dbName, String tblName, List<String> partitionNames) {
+        List<PartitionValueCacheKey> pvKeysToProcess = partitionValuesCache.asMap().keySet().stream()
+                .filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
+                .collect(Collectors.toList());
+        partitionValuesCache.invalidateAll(pvKeysToProcess);
+        List<FilterPartitionValueCacheKey> filterPvKeysToProcess = filterPartitionValuesCache.asMap().keySet().stream()
+                .filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
+                .collect(Collectors.toList());
+        filterPartitionValuesCache.invalidateAll(filterPvKeysToProcess);
+
+        LoadingCache<FileCacheKey, FileCacheValue> currentFileCache = fileCacheRef.get();
+        List<PartitionCacheKey> partitionKeysToInvalidate = new ArrayList<>();
+        List<FileCacheKey> fileKeysToInvalidate = new ArrayList<>();
+
+        for (String partitionName : partitionNames) {
+            List<String> targetValues = Arrays.stream(partitionName.split("/"))
+                    .map(p -> p.split("=")[1])
+                    .collect(Collectors.toList());
+            partitionCache.asMap().keySet().stream()
+                    .filter(partKey -> partKey.dbName.equals(dbName)
+                            && partKey.tblName.equals(tblName)
+                            && Objects.equals(partKey.values, targetValues))
+                    .forEach(partitionKeysToInvalidate::add);
         }
+        partitionKeysToInvalidate.stream()
+                .map(partitionCache::getIfPresent)
+                .filter(Objects::nonNull)
+                .forEach(partition -> {
+                    String targetPath = partition.getPath();
+                    currentFileCache.asMap().keySet().stream()
+                            .filter(fileKey -> Objects.equals(fileKey.location, targetPath))
+                            .forEach(fileKeysToInvalidate::add);
+                });
+        currentFileCache.invalidateAll(fileKeysToInvalidate);
+        partitionCache.invalidateAll(partitionKeysToInvalidate);
     }
 
     public void invalidateDbCache(String dbName) {
         long start = System.currentTimeMillis();
-        Set<PartitionValueCacheKey> keys = partitionValuesCache.asMap().keySet();
-        for (PartitionValueCacheKey key : keys) {
-            if (key.dbName.equals(dbName)) {
-                invalidateTableCache(dbName, key.tblName);
-            }
+        List<PartitionValueCacheKey> pvKeysToInvalidate = partitionValuesCache.asMap().keySet().stream()
+                .filter(key -> key.dbName.equals(dbName))
+                .collect(Collectors.toList());
+        partitionValuesCache.invalidateAll(pvKeysToInvalidate);
+
+        List<FilterPartitionValueCacheKey> filterPvKeysToInvalidate = filterPartitionValuesCache.asMap().keySet()
+                .stream().filter(key -> key.dbName.equals(dbName))
+                .collect(Collectors.toList());
+        filterPartitionValuesCache.invalidateAll(filterPvKeysToInvalidate);
+
+        List<PartitionNumCacheKey> pnKeysToInvalidate = partitionNumCache.asMap().keySet()
+                .stream().filter(key -> key.dbName.equals(dbName))
+                .collect(Collectors.toList());
+        partitionNumCache.invalidateAll(pnKeysToInvalidate);
+
+        List<PartitionCacheKey> partitionKeysToInvalidate = partitionCache.asMap().keySet().stream()
+                .filter(key -> key.dbName.equals(dbName))
+                .collect(Collectors.toList());
+        LoadingCache<FileCacheKey, FileCacheValue> fileCache = fileCacheRef.get();
+        if (!pvKeysToInvalidate.isEmpty() || !filterPvKeysToInvalidate.isEmpty() || !pnKeysToInvalidate.isEmpty()) {
+            List<FileCacheKey> fileKeysToInvalidate = new ArrayList<>();
+            partitionKeysToInvalidate.stream()
+                    .map(partitionCache::getIfPresent)
+                    .filter(Objects::nonNull)
+                    .forEach(partition -> {
+                        fileCache.asMap().keySet().stream()
+                                .filter(fileKey -> partition.getPath().equals(fileKey.location))
+                                .forEach(fileKeysToInvalidate::add);
+                    });
+            partitionCache.invalidateAll(partitionKeysToInvalidate);
+            fileCache.invalidateAll(fileKeysToInvalidate);
+        } else {
+            String dummyKeyPrefix = dbName + ".";
+            List<FileCacheKey> dummyFileKeys = fileCache.asMap().keySet().stream()
+                    .filter(fileKey -> fileKey.dummyKey.startsWith(dummyKeyPrefix))
+                    .collect(Collectors.toList());
+            fileCache.invalidateAll(dummyFileKeys);
         }
         if (LOG.isDebugEnabled()) {
-            LOG.debug("invalid db cache for {} in catalog {}, cache num: {}, cost: {} ms", dbName, catalog.getName(),
-                    keys.size(), (System.currentTimeMillis() - start));
+            LOG.debug("invalid db cache for {} in catalog {}, cost: {} ms", dbName, catalog.getName(),
+                    (System.currentTimeMillis() - start));
         }
     }
 
     public void invalidateAll() {
         partitionNumCache.invalidateAll();
+        filterPartitionValuesCache.invalidateAll();
         partitionValuesCache.invalidateAll();
         partitionCache.invalidateAll();
         fileCacheRef.get().invalidateAll();
@@ -956,6 +983,7 @@ public class HiveMetaStoreCache {
         RangeMap<ColumnBound, UniqueId> singleColumnRangeMapBefore = copy.getSingleColumnRangeMap();
         Map<UniqueId, Range<ColumnBound>> singleUidToColumnRangeMapBefore = copy.getSingleUidToColumnRangeMap();
         Map<Long, List<String>> partitionValuesMap = copy.getPartitionValuesMap();
+        List<String> partitionNamesToInvalidate = Lists.newArrayList();
         for (String partitionName : partitionNames) {
             if (!partitionNameToIdMapBefore.containsKey(partitionName)) {
                 LOG.info("dropPartitionsCache partitionName:[{}] not exist in table:[{}]", partitionName, tblName);
@@ -982,9 +1010,10 @@ public class HiveMetaStoreCache {
             }
 
             if (invalidPartitionCache) {
-                invalidatePartitionCache(dbName, tblName, partitionName);
+                partitionNamesToInvalidate.add(partitionName);
             }
         }
+        invalidatePartitionCache(dbName, tblName, partitionNamesToInvalidate);
         HivePartitionValues partitionValuesCur = partitionValuesCache.getIfPresent(key);
         if (partitionValuesCur == partitionValues) {
             partitionValuesCache.put(key, copy);

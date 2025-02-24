@@ -112,7 +112,7 @@ public class ExternalMetaCacheMgr {
         // The queue size should be large enough,
         // because there may be thousands of partitions being queried at the same time.
         fileListingExecutor = TtlExecutors.getTtlExecutorService(ThreadPoolManager.newDaemonFixedThreadPool(
-                Config.max_external_cache_loader_thread_pool_size,
+                Config.max_external_file_cache_loader_thread_pool_size,
                 Config.max_external_cache_loader_thread_pool_size * 1000,
                 "FileListingExecutor", 10, true));
 
@@ -291,10 +291,7 @@ public class ExternalMetaCacheMgr {
         HiveMetaStoreCache metaCache = cacheMap.get(catalogId);
         if (metaCache != null) {
             dbName = ClusterNamespace.getNameFromFullName(dbName);
-            for (String partitionName : partitionNames) {
-                metaCache.invalidatePartitionCache(dbName, tableName, partitionName);
-            }
-
+            metaCache.invalidatePartitionCache(dbName, tableName, partitionNames);
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("invalidate partition cache for {}.{} in catalog {}", dbName, tableName, catalogId);

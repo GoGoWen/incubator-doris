@@ -470,8 +470,8 @@ public class CatalogMgrTest extends TestWithFeService {
         metaStoreCache.putPartitionValuesCacheForTest(partitionValueCacheKey, hivePartitionValues);
         metaStoreCache.dropPartitionsCache("hiveDb", "hiveTable", Lists.newArrayList("y=2020/m=1", "y=2020/m=2"),
                 false, false);
-        HivePartitionValues partitionValues = metaStoreCache.getPartitionValues(partitionValueCacheKey);
-        Assert.assertEquals(partitionValues.getPartitionNameToIdMap().size(), 0);
+        HivePartitionValues partitionValues = metaStoreCache.getPartitionValuesIfPresent(partitionValueCacheKey);
+        Assert.assertNull(partitionValues);
     }
 
     @Test
@@ -501,8 +501,9 @@ public class CatalogMgrTest extends TestWithFeService {
         metaStoreCache.putPartitionValuesCacheForTest(partitionValueCacheKey, hivePartitionValues);
         metaStoreCache.dropPartitionsCache("hiveDb", "hiveTable", Lists.newArrayList("m=1", "m=2"),
                 false, false);
-        HivePartitionValues partitionValues = metaStoreCache.getPartitionValues(partitionValueCacheKey);
-        Assert.assertEquals(partitionValues.getPartitionNameToIdMap().size(), 0);
+
+        HivePartitionValues partitionValues = metaStoreCache.getPartitionValuesIfPresent(partitionValueCacheKey);
+        Assert.assertNull(partitionValues);
     }
 
     @Test

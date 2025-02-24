@@ -2006,7 +2006,7 @@ public class Config extends ConfigBase {
 
     @ConfField(description = {"External Catalog 中，Database 和 Table 的实例缓存的最大数量。",
             "Max cache number of database and table instance in external catalog."})
-    public static long max_meta_object_cache_num = 1000;
+    public static long max_meta_object_cache_num = 10000;
 
     @ConfField(description = {"过滤的Hive分区表缓存的最大数量",
             "Max cache number of filter hive partition table"})
@@ -2033,8 +2033,15 @@ public class Config extends ConfigBase {
      * Max thread pool size for loading external meta cache
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static int max_external_cache_loader_thread_pool_size = 64;
+    public static int max_external_cache_loader_thread_pool_size = 128;
 
+
+    /**
+     * Max file cache loader thread-pool size.
+     * Max thread pool size for loading external file meta cache
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static int max_external_file_cache_loader_thread_pool_size = 1024;
     /**
      * Max cache num of external catalog's file
      * Decrease this value if FE's memory is small
@@ -2051,17 +2058,33 @@ public class Config extends ConfigBase {
 
     /**
      * The expiration time of a cache object after last write of it.
-     * For external schema cache.
+     * For external schema cache or table cache.
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static long external_schema_cache_expire_time_minutes_after_write = 60; // 60 mins
+    public static long external_schema_cache_expire_time_minutes_after_write = 3; // 3 mins
+
+
+    /**
+     * The expiration time of a cache object after last write of it.
+     * For external db cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_db_cache_expire_time_minutes_after_write = 1440; // 1440 mins
 
     /**
      * The expiration time of a cache object after last access of it.
-     * For external schema cache and hive meta cache.
+     * For hive meta cache.
      */
     @ConfField(mutable = false, masterOnly = false)
     public static long external_cache_expire_time_minutes_after_access = 10; // 10 mins
+
+
+    /**
+     * The expiration time of a file cache after last write of it.
+     * For file meta cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_file_cache_expire_time_minutes_after_write = 3; // 3 mins
 
     /**
      * Github workflow test type, for setting some session variables
