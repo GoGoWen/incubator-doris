@@ -409,7 +409,6 @@ public class HiveMetaStoreCache {
         String tblName = key.getTblName();
         List<Column> partitionColumns = ((HMSExternalTable) (catalog.getDbNullable(dbName).getTableNullable(tblName)))
                 .getPartitionColumns();
-        // A partitionName is like "country=China/city=Beijing" or "date=2023-02-01"
         String partitionName = buildPartitionName(key, partitionColumns);
         if (key.fromView) {
             ///  TODO check here
@@ -417,10 +416,11 @@ public class HiveMetaStoreCache {
                 LOG.debug("[ViewBased] db:{} table: {} loadPartition from catalog.",
                          key.dbName, key.tblName);
             }
+            // A partitionName is like "country=China/city=Beijing" or "date=2023-02-01"
             partition = catalog.getClient().getPartitionFromView(key.dbName, key.tblName, partitionName);
         } else {
-            partition = catalog.getClient().getPartition(key.dbName, key.tblName,
-                Collections.singletonList(partitionName));
+            // A partitionName is like "China/Beijing" or "2023-02-01"
+            partition = catalog.getClient().getPartition(key.dbName, key.tblName, key.values);
         }
         StorageDescriptor sd = partition.getSd();
         if (LOG.isDebugEnabled()) {
