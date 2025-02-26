@@ -82,6 +82,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
@@ -118,6 +119,8 @@ public class HiveMetaStoreCache {
     private final ExecutorService refreshExecutor;
     private final ExecutorService fileListingExecutor;
 
+    private final ExecutorService expiredFileListClearExecutor;
+
     // cache from <dbname-tblname> -> <num of partitions>
     private LoadingCache<PartitionNumCacheKey, Integer> partitionNumCache;
 
@@ -134,10 +137,12 @@ public class HiveMetaStoreCache {
             = new AtomicReference<>();
 
     public HiveMetaStoreCache(HMSExternalCatalog catalog,
-            ExecutorService refreshExecutor, ExecutorService fileListingExecutor) {
+            ExecutorService refreshExecutor, ExecutorService fileListingExecutor,
+            ExecutorService expiredFileListClearExecutor) {
         this.catalog = catalog;
         this.refreshExecutor = refreshExecutor;
         this.fileListingExecutor = fileListingExecutor;
+        this.expiredFileListClearExecutor = expiredFileListClearExecutor;
         init();
         initMetrics();
     }
@@ -224,13 +229,16 @@ public class HiveMetaStoreCache {
                 (catalog.getProperties().get(HMSExternalCatalog.FILE_META_CACHE_TTL_SECOND)),
                 HMSExternalCatalog.FILE_META_CACHE_NO_TTL);
 
-        CacheFactory fileCacheFactory = new CacheFactory(
-                OptionalLong.of(fileMetaCacheTtlSecond >= HMSExternalCatalog.FILE_META_CACHE_TTL_DISABLE_CACHE
-                        ? fileMetaCacheTtlSecond : 28800L),
-                OptionalLong.of(Config.external_file_cache_expire_time_minutes_after_write * 60L),
-                Config.max_external_file_cache_num,
-                true,
-                null);
+        CacheFactory fileCacheFactory = new CacheFactory(OptionalLong.of(
+                fileMetaCacheTtlSecond >= HMSExternalCatalog.FILE_META_CACHE_TTL_DISABLE_CACHE ? fileMetaCacheTtlSecond
+                        : 28800L), OptionalLong.of(Config.external_file_cache_expire_time_minutes_after_write * 60L),
+                true, Config.max_external_file_cache_num, new Weigher<FileCacheKey, FileCacheValue>() {
+                    @Override
+                    public @NonNegative int weigh(@NotNull FileCacheKey fileCacheKey,
+                            @NotNull FileCacheValue fileCacheValue) {
+                        return fileCacheValue.files.size();
+                    }
+                }, null);
 
         CacheLoader<FileCacheKey, FileCacheValue> loader = new CacheBulkLoader<FileCacheKey, FileCacheValue>() {
             @Override
@@ -754,7 +762,7 @@ public class HiveMetaStoreCache {
             partitions = partitionCache.getAll(keys).values().stream().collect(Collectors.toList());
         } else {
             Map<PartitionCacheKey, HivePartition> map = loadPartitions(keys);
-            partitions = map.values().stream().collect(Collectors.toList());
+            partitions = new ArrayList<>(map.values());
         }
 
         if (LOG.isDebugEnabled()) {
@@ -771,17 +779,14 @@ public class HiveMetaStoreCache {
                 .filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
                 .collect(Collectors.toList());
         partitionValuesCache.invalidateAll(pvKeysToInvalidate);
-
         List<FilterPartitionValueCacheKey> filterPvKeysToInvalidate = filterPartitionValuesCache.asMap().keySet()
                 .stream().filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
                 .collect(Collectors.toList());
         filterPartitionValuesCache.invalidateAll(filterPvKeysToInvalidate);
-
         List<PartitionNumCacheKey> pnKeysToInvalidate = partitionNumCache.asMap().keySet()
                 .stream().filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
                 .collect(Collectors.toList());
         partitionNumCache.invalidateAll(pnKeysToInvalidate);
-
         List<PartitionCacheKey> partitionKeysToInvalidate = partitionCache.asMap().keySet().stream()
                 .filter(key -> key.dbName.equals(dbName) && key.tblName.equals(tblName))
                 .collect(Collectors.toList());
@@ -809,7 +814,28 @@ public class HiveMetaStoreCache {
             LOG.debug("invalid table cache for {}.{} in catalog {}, cost: {} ms",
                     dbName, tblName, catalog.getName(), (System.currentTimeMillis() - start));
         }
+    }
 
+    public void invalidateFileCacheAsync(String dbName, String tblName, List<HivePartition> partitions) {
+        expiredFileListClearExecutor.submit(() -> {
+            LoadingCache<FileCacheKey, FileCacheValue> fileCache = fileCacheRef.get();
+            if (partitions.isEmpty()) {
+                String dummyKey = dbName + "." + tblName;
+                List<FileCacheKey> dummyFileKeys = fileCache.asMap().keySet().stream()
+                        .filter(fileKey -> Objects.equals(fileKey.dummyKey, dummyKey))
+                        .collect(Collectors.toList());
+                fileCache.invalidateAll(dummyFileKeys);
+            } else {
+                List<FileCacheKey> fileKeysToInvalidate = Lists.newArrayList();
+                partitions.forEach(partition -> {
+                    String targetPath = partition.getPath();
+                    fileCache.asMap().keySet().stream()
+                            .filter(fileKey -> Objects.equals(fileKey.location, targetPath))
+                            .forEach(fileKeysToInvalidate::add);
+                });
+                fileCache.invalidateAll(fileKeysToInvalidate);
+            }
+        });
     }
 
     public void invalidatePartitionCache(String dbName, String tblName, List<String> partitionNames) {
@@ -1358,7 +1384,7 @@ public class HiveMetaStoreCache {
         private String bindBrokerName;
         // The values of partitions.
         // e.g for file : hdfs://path/to/table/part1=a/part2=b/datafile
-        // partitionValues would be ["part1", "part2"]
+        // partitionValues would be ["a", "b"]
         protected List<String> partitionValues;
 
         public FileCacheKey(String hadoopUserName, String userToken, String location, String inputFormat,

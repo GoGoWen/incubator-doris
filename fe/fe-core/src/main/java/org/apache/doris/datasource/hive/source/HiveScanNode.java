@@ -45,7 +45,6 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPart
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.ConnectContext;
-import org.apache.doris.qe.cache.CacheAnalyzer;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
 import org.apache.doris.thrift.TFileAttributes;
@@ -248,17 +247,29 @@ public class HiveScanNode extends FileQueryScanNode {
                     .getMetaStoreCache((HMSExternalCatalog) hmsTable.getCatalog());
             String bindBrokerName = hmsTable.getCatalog().bindBrokerName();
             List<Split> allFiles = Lists.newArrayList();
-            getFileSplitByPartitions(cache, prunedPartitions, allFiles, bindBrokerName);
-            if (ConnectContext.get().getExecutor() != null) {
-                ConnectContext.get().getExecutor().getSummaryProfile().setGetPartitionFilesFinishTime();
-            }
-            if (!hmsTable.getPartitionColumns().isEmpty() && CacheAnalyzer.canUseCache(
-                    ConnectContext.get().getSessionVariable())) {
+            List<HivePartition> outdatedPartition = Lists.newArrayList();
+            boolean withCache = true;
+            if (!hmsTable.getPartitionColumns().isEmpty()) {
                 for (HivePartition partition : prunedPartitions) {
                     if (hmsTable.getPartitionUpdateTime() < partition.getLastModifiedTime()) {
                         hmsTable.setPartitionUpdateTime(partition.getLastModifiedTime());
+                        outdatedPartition.add(partition);
                     }
                 }
+            } else {
+                if (hmsTable.getSchemaUpdateTime() + Config.external_cache_expire_time_minutes_after_access * 60
+                        > System.currentTimeMillis()) {
+                    cache.invalidateFileCacheAsync(hmsTable.getDbName(), hmsTable.getName(), outdatedPartition);
+                    withCache = false;
+                }
+            }
+            if (!outdatedPartition.isEmpty()) {
+                cache.invalidateFileCacheAsync(hmsTable.getDbName(), hmsTable.getName(), outdatedPartition);
+                withCache = false;
+            }
+            getFileSplitByPartitions(cache, prunedPartitions, allFiles, bindBrokerName, withCache);
+            if (ConnectContext.get().getExecutor() != null) {
+                ConnectContext.get().getExecutor().getSummaryProfile().setGetPartitionFilesFinishTime();
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("get #{} files for table: {}.{}, cost: {} ms",
@@ -300,7 +311,8 @@ public class HiveScanNode extends FileQueryScanNode {
                 CompletableFuture.runAsync(() -> {
                     try {
                         List<Split> allFiles = Lists.newArrayList();
-                        getFileSplitByPartitions(cache, Collections.singletonList(partition), allFiles, bindBrokerName);
+                        getFileSplitByPartitions(cache, Collections.singletonList(partition), allFiles, bindBrokerName,
+                                true);
                         if (allFiles.size() > numSplitsPerPartition.get()) {
                             numSplitsPerPartition.set(allFiles.size());
                         }
@@ -344,7 +356,7 @@ public class HiveScanNode extends FileQueryScanNode {
     }
 
     private void getFileSplitByPartitions(HiveMetaStoreCache cache, List<HivePartition> partitions,
-                                          List<Split> allFiles, String bindBrokerName)
+                                          List<Split> allFiles, String bindBrokerName, boolean withCache)
                                           throws IOException, AnalysisException {
         List<FileCacheValue> fileCaches;
         if (hiveTransaction != null) {
@@ -352,14 +364,13 @@ public class HiveScanNode extends FileQueryScanNode {
         } else {
             String key = "doris_x.enable_external_file_cache";
             Map<String, String> parameters = hmsTable.getRemoteTable().getParameters();
-            boolean withCache;
             if (parameters.containsKey(key)) {
-                withCache = Boolean.valueOf(parameters.get(key));
+                withCache = Boolean.valueOf(parameters.get(key)) && withCache;
             } else {
                 parameters =
                         hmsTable.getRemoteTable().getSd().getSerdeInfo().getParameters();
                 withCache = Boolean.valueOf(parameters.getOrDefault(key,
-                        "true"));
+                        "true")) && withCache;
             }
             withCache = withCache && Config.max_external_file_cache_num > 0 && (ConnectContext.get() == null
                     || ConnectContext.get().getSessionVariable().getEnableExternalFileCache());

@@ -82,6 +82,7 @@ public class ExternalMetaCacheMgr {
     private ExecutorService commonRefreshExecutor;
     private ExecutorService fileListingExecutor;
     private ExecutorService scheduleExecutor;
+    private ExecutorService expiredFileListClearExecutor;
 
     private ExecutorService forkJoinPoolExecutor;
 
@@ -121,6 +122,11 @@ public class ExternalMetaCacheMgr {
                 Config.max_external_cache_loader_thread_pool_size * 1000,
                 "ScheduleExecutor", 10, true));
 
+        expiredFileListClearExecutor = ThreadPoolManager.newDaemonFixedThreadPool(
+                Config.max_external_cache_loader_thread_pool_size,
+                Config.max_external_cache_loader_thread_pool_size * 1000,
+                "ExpiredFileListClearExecutor", 20, true);
+
         forkJoinPoolExecutor = TtlExecutors.getTtlExecutorService(new ForkJoinPool(Runtime.getRuntime()
                 .availableProcessors()));
 
@@ -150,7 +156,8 @@ public class ExternalMetaCacheMgr {
             synchronized (cacheMap) {
                 if (!cacheMap.containsKey(catalog.getId())) {
                     cacheMap.put(catalog.getId(),
-                            new HiveMetaStoreCache(catalog, commonRefreshExecutor, fileListingExecutor));
+                            new HiveMetaStoreCache(catalog, commonRefreshExecutor, fileListingExecutor,
+                                    expiredFileListClearExecutor));
                 }
                 cache = cacheMap.get(catalog.getId());
             }

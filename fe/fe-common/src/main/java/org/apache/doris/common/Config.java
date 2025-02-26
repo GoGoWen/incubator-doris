@@ -1998,11 +1998,11 @@ public class Config extends ConfigBase {
      */
     @ConfField(description = {"Hive Metastore 表级别分区缓存的最大数量。",
             "Max cache number of partition at table level in Hive Metastore."})
-    public static long max_hive_partition_cache_num = 10000;
+    public static long max_hive_partition_cache_num = 100000;
 
     @ConfField(description = {"Hudi/Iceberg 表级别缓存的最大数量。",
             "Max cache number of hudi/iceberg table."})
-    public static long max_external_table_cache_num = 1000;
+    public static long max_external_table_cache_num = 10000;
 
     @ConfField(description = {"External Catalog 中，Database 和 Table 的实例缓存的最大数量。",
             "Max cache number of database and table instance in external catalog."})
@@ -2010,11 +2010,11 @@ public class Config extends ConfigBase {
 
     @ConfField(description = {"过滤的Hive分区表缓存的最大数量",
             "Max cache number of filter hive partition table"})
-    public static long max_filter_hive_partition_table_cache_num = 1000;
+    public static long max_filter_hive_partition_table_cache_num = 100000;
 
     @ConfField(description = {"Hive分区表缓存的最大数量",
             "Max cache number of hive partition table"})
-    public static long max_hive_partition_table_cache_num = 1000;
+    public static long max_hive_partition_table_cache_num = 100000;
 
     @ConfField(mutable = false, masterOnly = false, description = {"获取Hive分区值时候的最大返回数量，-1代表没有限制。",
             "Max number of hive partition values to return while list partitions, -1 means no limitation."})
@@ -2026,7 +2026,7 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = false, masterOnly = false, description = {"外表行数缓存最大数量",
         "Max cache number of external table row count"})
-    public static long max_external_table_row_count_cache_num = 100000;
+    public static long max_external_table_row_count_cache_num = 10000;
 
     /**
      * Max cache loader thread-pool size.
@@ -2080,11 +2080,18 @@ public class Config extends ConfigBase {
 
 
     /**
+     * The expiration time of a row count cache after last write of it.
+     * For hive meta cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_row_count_cache_expire_time_minutes_after_write = 60; // 60 mins
+
+    /**
      * The expiration time of a file cache after last write of it.
      * For file meta cache.
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static long external_file_cache_expire_time_minutes_after_write = 3; // 3 mins
+    public static long external_file_cache_expire_time_minutes_after_write = 1440; // 1440 mins
 
     /**
      * Github workflow test type, for setting some session variables

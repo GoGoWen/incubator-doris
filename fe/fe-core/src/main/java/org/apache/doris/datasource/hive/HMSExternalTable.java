@@ -300,17 +300,13 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
 
     public List<Type> getPartitionColumnTypes() {
         makeSureInitialized();
-        Optional<SchemaCacheValue> schemaCacheValue = getSchemaCacheValue();
-        return schemaCacheValue.map(value -> ((HMSSchemaCacheValue) value).getPartitionColTypes())
-                .orElse(Collections.emptyList());
+        return initPartitionColumns().stream().map(Column::getType).collect(Collectors.toList());
     }
 
     @Override
     public List<Column> getPartitionColumns() {
         makeSureInitialized();
-        Optional<SchemaCacheValue> schemaCacheValue = getSchemaCacheValue();
-        return schemaCacheValue.map(value -> ((HMSSchemaCacheValue) value).getPartitionColumns())
-                .orElse(Collections.emptyList());
+        return initPartitionColumns();
     }
 
     public boolean isHiveTransactionalTable() {
@@ -478,7 +474,6 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
 
     @Override
     public Optional<SchemaCacheValue> initSchemaAndUpdateTime() {
-        unsetObjectCreated();
         makeSureInitialized();
         // try to use transient_lastDdlTime from hms client
         schemaUpdateTime = MapUtils.isNotEmpty(remoteTable.getParameters())
