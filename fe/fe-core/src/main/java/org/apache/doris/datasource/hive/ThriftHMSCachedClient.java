@@ -301,11 +301,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
         // list all parts when the limit is greater than the short maximum
         short limited = maxListPartitionNum <= Short.MAX_VALUE ? (short) maxListPartitionNum : MAX_LIST_PARTITION_NUM;
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.listPartitionNamesFromView(dbName, tblName, limited);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITION_FROM_VIEW.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to list partition names for table %s in db %s", e, tblName, dbName);
@@ -317,11 +320,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
         // list all parts when the limit is greater than the short maximum
         short limited = maxListPartitionNum <= Short.MAX_VALUE ? (short) maxListPartitionNum : MAX_LIST_PARTITION_NUM;
         try (ThriftHMSClient client = getClient()) {
+            long start = System.currentTimeMillis();
             try {
                 return client.client.listPartitionNames(dbName, tblName, limited);
             } catch (Exception e) {
                 client.setThrowable(e);
                 throw e;
+            } finally {
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES.update(System.currentTimeMillis() - start);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to list partition names for table %s in db %s", e, tblName, dbName);

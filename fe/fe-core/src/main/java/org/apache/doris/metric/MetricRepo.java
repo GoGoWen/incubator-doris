@@ -84,6 +84,8 @@ public final class MetricRepo {
     public static Histogram HISTO_HMS_API_CALL_LIST_PARTITIONS;
     public static Histogram HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER;
     public static Histogram HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER_FROM_VIEW;
+    public static Histogram HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES;
+    public static Histogram HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES_FROM_VIEW;
     public static LongCounterMetric COUNTER_REQUEST_ALL;
     public static LongCounterMetric COUNTER_QUERY_ALL;
     public static LongCounterMetric COUNTER_QUERY_ERR;
@@ -567,6 +569,10 @@ public final class MetricRepo {
             MetricRegistry.name("hive_metastore_api", "list_partitions_by_filter"));
         HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER_FROM_VIEW = METRIC_REGISTER.histogram(
             MetricRegistry.name("hive_metastore_api", "list_partitions_by_filter_from_view"));
+        HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "list_partitions_names"));
+        HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES_FROM_VIEW = METRIC_REGISTER.histogram(
+            MetricRegistry.name("hive_metastore_api", "list_partitions_names_from_view"));
 
 
         // init system metrics
