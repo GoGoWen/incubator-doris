@@ -18,6 +18,7 @@
 package org.apache.doris.plugin.dialect;
 
 import org.apache.doris.common.Config;
+import org.apache.doris.metric.MetricRepo;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -42,6 +43,7 @@ public class HttpDialectUtils {
 
     public static String convertSql(String targetURL, String originStmt, String dialect) {
         ConvertRequest convertRequest = new ConvertRequest(originStmt, dialect);
+        MetricRepo.COUNTER_SQL_CONVERT_ALL.increase(1L);
 
         HttpURLConnection connection = null;
         try {
@@ -98,6 +100,7 @@ public class HttpDialectUtils {
             }
         } catch (Exception e) {
             LOG.warn("failed to convert sql", e);
+            MetricRepo.COUNTER_SQL_CONVERT_SERVICE_UNREACHABLE.increase(1L);
             return originStmt;
         } finally {
             if (connection != null) {

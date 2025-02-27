@@ -154,6 +154,8 @@ public final class MetricRepo {
 
     // statistics sql convert and fallback to catalog
     public static LongCounterMetric COUNTER_FALLBACK_ALL;
+    public static LongCounterMetric COUNTER_SQL_CONVERT_ALL;
+    public static LongCounterMetric COUNTER_SQL_CONVERT_SERVICE_UNREACHABLE;
 
     private static Map<Pair<EtlJobType, JobState>, Long> loadJobNum = Maps.newHashMap();
 
@@ -385,6 +387,14 @@ public final class MetricRepo {
         // statistics sql convert and fallback to catalog
         COUNTER_FALLBACK_ALL = new LongCounterMetric("fallback_total", MetricUnit.REQUESTS, "total fallback request");
         DORIS_METRIC_REGISTER.addMetrics(COUNTER_FALLBACK_ALL);
+
+        // SQL conversion metrics
+        COUNTER_SQL_CONVERT_ALL = new LongCounterMetric("sql_convert_total", MetricUnit.REQUESTS,
+                "total SQL conversion attempts");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_SQL_CONVERT_ALL);
+        COUNTER_SQL_CONVERT_SERVICE_UNREACHABLE = new LongCounterMetric("sql_convert_service_unreachable",
+                MetricUnit.REQUESTS, "total SQL conversion attempts to service unreachable");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_SQL_CONVERT_SERVICE_UNREACHABLE);
 
         // cache
         COUNTER_CACHE_ADDED_SQL = new LongCounterMetric("cache_added", MetricUnit.REQUESTS,

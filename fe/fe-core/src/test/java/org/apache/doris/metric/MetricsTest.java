@@ -89,6 +89,21 @@ public class MetricsTest {
     }
 
     @Test
+    public void testConvertMetrics() {
+        MetricRepo.COUNTER_SQL_CONVERT_ALL.increase(1L);
+        MetricRepo.COUNTER_SQL_CONVERT_SERVICE_UNREACHABLE.increase(1L);
+
+        MetricVisitor visitor = new PrometheusMetricVisitor();
+        MetricRepo.DORIS_METRIC_REGISTER.accept(visitor);
+        String metricResult = visitor.finish();
+
+        Assert.assertTrue(metricResult.contains("# TYPE doris_fe_sql_convert_total counter"));
+        Assert.assertTrue(metricResult.contains("doris_fe_sql_convert_total 1"));
+        Assert.assertTrue(metricResult.contains("# TYPE doris_fe_sql_convert_service_unreachable counter"));
+        Assert.assertTrue(metricResult.contains("doris_fe_sql_convert_service_unreachable 1"));
+    }
+
+    @Test
     public void testHmsMetrics() {
         MetricRepo.GAUGE_HMS_CONNECTIONS.setValue(1L);
         MetricRepo.COUNTER_HMS_CREATE_CLIENT_ERROR.increase(2L);
