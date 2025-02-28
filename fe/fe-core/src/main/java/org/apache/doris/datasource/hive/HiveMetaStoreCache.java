@@ -614,6 +614,20 @@ public class HiveMetaStoreCache {
         return getPartitionValues(key);
     }
 
+    public HivePartitionValues getPartitionValuesWithoutCache(String dbName, String tblName, List<Type> types) {
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        PartitionValueCacheKey key = new PartitionValueCacheKey(BDPAuthContext.get().getHadoopUserName(),
+                dbName, tblName, false, types);
+        return loadPartitionValues(key);
+    }
+
+    public HivePartitionValues getPartitionValuesFromViewWithoutCache(String dbName, String tblName, List<Type> types) {
+        Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+        PartitionValueCacheKey key = new PartitionValueCacheKey(BDPAuthContext.get().getHadoopUserName(),
+                dbName, tblName, true, types);
+        return loadPartitionValues(key);
+    }
+
     public HivePartitionValues getPartitionValues(String dbName, String tblName, List<Type> types) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
         PartitionValueCacheKey key = new PartitionValueCacheKey(BDPAuthContext.get().getHadoopUserName(),

@@ -129,43 +129,70 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                 .stream()
                 .map(column -> scanOutput.get(column.getName().toLowerCase()))
                 .collect(Collectors.toList());
-
+        // use listPartitionsByFilterFromView
         HiveMetaStoreCache cache = Env.getCurrentEnv().getExtMetaCacheMgr()
                 .getMetaStoreCache((HMSExternalCatalog) hiveTbl.getCatalog());
         int partitionNum = cache.getPartitionNumFromView(hiveTbl.getDbName(), hiveTbl.getName());
-        boolean isDirectlyByFilter = partitionNum > Config.max_partition_num_for_single_hive_table_without_filter;
+        boolean isDirectlyByFilter = true;
         Expression partitionPredicate = null;
-        // use listPartitionsByFilterFromView
-        if (isDirectlyByFilter) {
-            try {
-                partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
-                        ImmutableSet.copyOf(partitionSlots), ctx);
-                List<String> partitionColumnNames = partitionSlots.stream().map(e -> e.getName())
-                        .collect(Collectors.toList());
-                partitionPredicate = PredicateRewriteForPartitionPrune.rewrite(partitionPredicate, ctx);
-                partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
-                if (BooleanLiteral.TRUE.equals(partitionPredicate)) {
-                    HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValuesFromView(
-                            hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
-                    selectedPartitionItems = hivePartitionValues.getIdToPartitionItem();
-                } else if (BooleanLiteral.FALSE.equals(partitionPredicate) || partitionPredicate.isNullLiteral()) {
-                    // do nothing
-                } else {
+        // use listPartitionsByFilter
+        try {
+            partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
+                    ImmutableSet.copyOf(partitionSlots), ctx);
+            List<String> partitionColumnNames = partitionSlots.stream().map(e -> e.getName())
+                    .collect(Collectors.toList());
+            partitionPredicate = PredicateRewriteForPartitionPrune.rewrite(partitionPredicate, ctx);
+            partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
+
+            if (BooleanLiteral.TRUE.equals(partitionPredicate)) {
+                HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
+                        > Config.max_partition_num_for_single_hive_table_without_filter
+                        ? cache.getPartitionValuesFromViewWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
+                        hiveTbl.getPartitionColumnTypes()) :
+                        cache.getPartitionValuesFromView(
+                                hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+                selectedPartitionItems = hivePartitionValues.getIdToPartitionItem();
+            } else if (BooleanLiteral.FALSE.equals(partitionPredicate) || partitionPredicate.isNullLiteral()) {
+                // do nothing
+            } else {
+                if (partitionNum > Config.max_partition_num_for_single_hive_table_without_filter
+                        && isFilterSupportedByListPartitions(partitionPredicate)) {
                     selectedPartitionItems = cache.getPartitionValuesByFilterFromView(hiveTbl.getDbName(),
-                            hiveTbl.getName(),
-                            partitionPredicate.toSql(), partitionColumnNames, hiveTbl.getPartitionColumnTypes());
+                            hiveTbl.getName(), partitionPredicate.toSql(), partitionColumnNames,
+                            hiveTbl.getPartitionColumnTypes());
+                } else {
+                    HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
+                            > Config.max_partition_num_for_single_hive_table_without_filter
+                            ? cache.getPartitionValuesFromViewWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
+                            hiveTbl.getPartitionColumnTypes()) :
+                            cache.getPartitionValuesFromView(
+                                    hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+                    Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
+                    partitionNum = idToPartitionItem.size();
+                    List<Long> prunedPartitions = Lists.newArrayList();
+                    if (PartitionPruner.tryPrune(partitionSlots, filter.getPredicate(), idToPartitionItem,
+                            prunedPartitions, ctx)) {
+                        for (Long id : prunedPartitions) {
+                            selectedPartitionItems.put(id, idToPartitionItem.get(id));
+                        }
+                    } else {
+                        isDirectlyByFilter = false;
+                    }
                 }
-            } catch (Exception e) {
-                // for some complex case listPartitionsByFilterView may not support
-                LOG.warn("get selected partition items by listPartitionsByFilterFromView failed, filter sql is "
-                        + partitionPredicate.toSql() + ", use getPartitionValuesFromView instead");
-                isDirectlyByFilter = false;
             }
+        } catch (Exception e) {
+            // for some complex case listPartitionsByFilter may not support
+            LOG.warn("get selected partition items by listPartitionsByFilter failed, filter sql is "
+                    + partitionPredicate.toSql() + ", use getPartitionValues instead");
+            isDirectlyByFilter = false;
         }
         if (!isDirectlyByFilter) {
-            ///
-            HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValuesFromView(
-                    hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+            HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
+                    > Config.max_partition_num_for_single_hive_table_without_filter
+                    ? cache.getPartitionValuesFromViewWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
+                    hiveTbl.getPartitionColumnTypes()) :
+                    cache.getPartitionValuesFromView(
+                            hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
             Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
             List<Long> prunedPartitions = new ArrayList<>(PartitionPruner.prune(
                     partitionSlots, filter.getPredicate(), idToPartitionItem, ctx));
@@ -232,8 +259,12 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
 
             if (BooleanLiteral.TRUE.equals(partitionPredicate)) {
-                HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValues(
-                        hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+                HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
+                        > Config.max_partition_num_for_single_hive_table_without_filter
+                        ? cache.getPartitionValuesWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
+                                hiveTbl.getPartitionColumnTypes()) :
+                        cache.getPartitionValues(
+                                hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
                 selectedPartitionItems = hivePartitionValues.getIdToPartitionItem();
             } else if (BooleanLiteral.FALSE.equals(partitionPredicate) || partitionPredicate.isNullLiteral()) {
                 // do nothing
@@ -244,8 +275,12 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                             hiveTbl.getName(), partitionPredicate.toSql(), partitionColumnNames,
                                 hiveTbl.getPartitionColumnTypes());
                 } else {
-                    HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValues(
-                            hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
+                    HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
+                            > Config.max_partition_num_for_single_hive_table_without_filter
+                            ? cache.getPartitionValuesWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
+                                    hiveTbl.getPartitionColumnTypes()) :
+                            cache.getPartitionValues(
+                                    hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
                     Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
                     partitionNum = idToPartitionItem.size();
                     List<Long> prunedPartitions = Lists.newArrayList();

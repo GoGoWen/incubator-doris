@@ -39,6 +39,7 @@ import org.apache.doris.catalog.PrimitiveType;
 import org.apache.doris.catalog.ResourceMgr;
 import org.apache.doris.catalog.Type;
 import org.apache.doris.common.AnalysisException;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.ExceptionChecker;
 import org.apache.doris.common.FeConstants;
@@ -97,6 +98,14 @@ public class CatalogMgrTest extends TestWithFeService {
     @Override
     protected void runBeforeAll() throws Exception {
         FeConstants.runningUnitTest = true;
+        Config.max_hive_partition_cache_num = 1000;
+        Config.max_external_table_cache_num = 1000;
+        Config.max_meta_object_cache_num = 1000;
+        Config.max_filter_hive_partition_table_cache_num = 1000;
+        Config.max_hive_partition_table_cache_num = 1000;
+        Config.max_external_table_row_count_cache_num = 1000;
+        Config.max_external_file_cache_num = 1000;
+        Config.max_external_schema_cache_num = 1000;
         mgr = Env.getCurrentEnv().getCatalogMgr();
         resourceMgr = Env.getCurrentEnv().getResourceMgr();
         externalMetaCacheMgr = Env.getCurrentEnv().getExtMetaCacheMgr();

@@ -43,6 +43,7 @@ public class HttpDialectUtils {
 
     public static String convertSql(String targetURL, String originStmt, String dialect) {
         ConvertRequest convertRequest = new ConvertRequest(originStmt, dialect);
+        MetricRepo.init();
         MetricRepo.COUNTER_SQL_CONVERT_ALL.increase(1L);
 
         HttpURLConnection connection = null;

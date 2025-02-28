@@ -235,6 +235,11 @@ public class HiveScanNode extends FileQueryScanNode {
         return resPartitions;
     }
 
+    private boolean isUpdateFileListRecently() {
+        return hmsTable.getUpdateTime() + 180 * Config.external_cache_expire_time_minutes_after_access
+                > System.currentTimeMillis();
+    }
+
     @Override
     public List<Split> getSplits() throws UserException {
         long start = System.currentTimeMillis();
@@ -248,7 +253,7 @@ public class HiveScanNode extends FileQueryScanNode {
             String bindBrokerName = hmsTable.getCatalog().bindBrokerName();
             List<Split> allFiles = Lists.newArrayList();
             List<HivePartition> outdatedPartition = Lists.newArrayList();
-            boolean withCache = true;
+            boolean withCache = prunedPartitions.size() < Config.max_partition_num_for_single_hive_table_without_filter;
             if (!hmsTable.getPartitionColumns().isEmpty()) {
                 for (HivePartition partition : prunedPartitions) {
                     if (hmsTable.getPartitionUpdateTime() < partition.getLastModifiedTime()) {
@@ -257,16 +262,15 @@ public class HiveScanNode extends FileQueryScanNode {
                     }
                 }
             } else {
-                if (hmsTable.getSchemaUpdateTime() + Config.external_cache_expire_time_minutes_after_access * 60
-                        > System.currentTimeMillis()) {
+                if (isUpdateFileListRecently()) {
                     cache.invalidateFileCacheAsync(hmsTable.getDbName(), hmsTable.getName(), outdatedPartition);
-                    withCache = false;
                 }
             }
             if (!outdatedPartition.isEmpty()) {
                 cache.invalidateFileCacheAsync(hmsTable.getDbName(), hmsTable.getName(), outdatedPartition);
                 withCache = false;
             }
+            withCache = withCache && !isUpdateFileListRecently();
             getFileSplitByPartitions(cache, prunedPartitions, allFiles, bindBrokerName, withCache);
             if (ConnectContext.get().getExecutor() != null) {
                 ConnectContext.get().getExecutor().getSummaryProfile().setGetPartitionFilesFinishTime();
@@ -312,7 +316,7 @@ public class HiveScanNode extends FileQueryScanNode {
                     try {
                         List<Split> allFiles = Lists.newArrayList();
                         getFileSplitByPartitions(cache, Collections.singletonList(partition), allFiles, bindBrokerName,
-                                true);
+                                false);
                         if (allFiles.size() > numSplitsPerPartition.get()) {
                             numSplitsPerPartition.set(allFiles.size());
                         }

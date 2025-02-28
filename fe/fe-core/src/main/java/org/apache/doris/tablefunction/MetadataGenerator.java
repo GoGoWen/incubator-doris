@@ -1262,7 +1262,7 @@ public class MetadataGenerator {
 
         HiveMetaStoreCache cache = Env.getCurrentEnv().getExtMetaCacheMgr()
                 .getMetaStoreCache((HMSExternalCatalog) tbl.getCatalog());
-        HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValues(
+        HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValuesWithoutCache(
                 tbl.getDbName(), tbl.getName(), tbl.getPartitionColumnTypes());
         Map<Long, List<String>> valuesMap = hivePartitionValues.getPartitionValuesMap();
         List<TRow> dataBatch = Lists.newArrayList();
