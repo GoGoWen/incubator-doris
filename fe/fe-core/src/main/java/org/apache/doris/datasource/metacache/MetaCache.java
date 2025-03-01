@@ -48,13 +48,6 @@ public class MetaCache<T> {
             CacheLoader<Pair<String, String>, Optional<T>> metaObjCacheLoader,
             RemovalListener<Pair<String, String>, Optional<T>> removalListener) {
         this.name = name;
-
-        // ATTN:
-        // The refreshAfterWriteSec is only used for metaObjCache, not for namesCache.
-        // Because namesCache need to be refreshed at interval so that user can get the latest meta list.
-        // But metaObjCache does not need to be refreshed at interval, because the object is actually not
-        // from remote datasource, it is just a local generated object to represent the meta info.
-        // So it only need to be expired after specified duration.
         CacheFactory namesCacheFactory = new CacheFactory(
                 expireAfterWriteSec,
                 refreshAfterWriteSec,
@@ -63,7 +56,7 @@ public class MetaCache<T> {
                 null);
         CacheFactory objCacheFactory = new CacheFactory(
                 expireAfterWriteSec,
-                OptionalLong.empty(),
+                refreshAfterWriteSec,
                 maxSize,
                 true,
                 null);

@@ -155,14 +155,14 @@ public class HiveScanNode extends FileQueryScanNode {
                 HiveMetaStoreCache.HivePartitionValues hivePartitionValues;
                 if (hmsTable.isViewBased()) {
                     long startTime = System.currentTimeMillis();
-                    hivePartitionValues = cache.getPartitionValuesFromView(
+                    hivePartitionValues = cache.getPartitionValuesFromViewWithoutCache(
                         hmsTable.getDbName(), hmsTable.getName(), partitionColumnTypes);
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("[ViewBased] hive partition values for table from view {}.{} cost: {} ms",
                                   hmsTable.getDbName(), hmsTable.getName(), (System.currentTimeMillis() - startTime));
                     }
                 } else {
-                    hivePartitionValues = cache.getPartitionValues(
+                    hivePartitionValues = cache.getPartitionValuesWithoutCache(
                         hmsTable.getDbName(), hmsTable.getName(), partitionColumnTypes);
                 }
                 Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
@@ -236,7 +236,7 @@ public class HiveScanNode extends FileQueryScanNode {
     }
 
     private boolean isUpdateFileListRecently() {
-        return hmsTable.getUpdateTime() + 180 * Config.external_cache_expire_time_minutes_after_access
+        return hmsTable.getUpdateTime() * 1000 + 180 * Config.external_cache_expire_time_minutes_after_access
                 > System.currentTimeMillis();
     }
 

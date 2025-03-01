@@ -509,6 +509,11 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         return Optional.of(new HMSSchemaCacheValue(columns, partitionColumns));
     }
 
+    @Override
+    public List<Column> getFullSchema() {
+        return initSchema().map(SchemaCacheValue::getSchema).orElse(null);
+    }
+
     private List<Column> getIcebergSchema() {
         return IcebergUtils.getSchema(catalog, dbName, name);
     }
