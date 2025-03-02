@@ -2091,7 +2091,7 @@ public class Config extends ConfigBase {
      * For file meta cache.
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static long external_file_cache_expire_time_minutes_after_write = 1440; // 1440 mins
+    public static long external_file_cache_expire_time_minutes_after_write = 60; // 60 mins
 
     /**
      * Github workflow test type, for setting some session variables

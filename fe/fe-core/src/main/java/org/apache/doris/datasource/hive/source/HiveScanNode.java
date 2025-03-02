@@ -252,23 +252,13 @@ public class HiveScanNode extends FileQueryScanNode {
                     .getMetaStoreCache((HMSExternalCatalog) hmsTable.getCatalog());
             String bindBrokerName = hmsTable.getCatalog().bindBrokerName();
             List<Split> allFiles = Lists.newArrayList();
-            List<HivePartition> outdatedPartition = Lists.newArrayList();
             boolean withCache = prunedPartitions.size() < Config.max_partition_num_for_single_hive_table_without_filter;
             if (!hmsTable.getPartitionColumns().isEmpty()) {
                 for (HivePartition partition : prunedPartitions) {
                     if (hmsTable.getPartitionUpdateTime() < partition.getLastModifiedTime()) {
                         hmsTable.setPartitionUpdateTime(partition.getLastModifiedTime());
-                        outdatedPartition.add(partition);
                     }
                 }
-            } else {
-                if (isUpdateFileListRecently()) {
-                    cache.invalidateFileCacheAsync(hmsTable.getDbName(), hmsTable.getName(), outdatedPartition);
-                }
-            }
-            if (!outdatedPartition.isEmpty()) {
-                cache.invalidateFileCacheAsync(hmsTable.getDbName(), hmsTable.getName(), outdatedPartition);
-                withCache = false;
             }
             withCache = withCache && !isUpdateFileListRecently();
             getFileSplitByPartitions(cache, prunedPartitions, allFiles, bindBrokerName, withCache);

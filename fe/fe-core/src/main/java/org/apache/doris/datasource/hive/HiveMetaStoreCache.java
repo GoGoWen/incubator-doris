@@ -231,7 +231,7 @@ public class HiveMetaStoreCache {
 
         CacheFactory fileCacheFactory = new CacheFactory(OptionalLong.of(
                 fileMetaCacheTtlSecond >= HMSExternalCatalog.FILE_META_CACHE_TTL_DISABLE_CACHE ? fileMetaCacheTtlSecond
-                        : 28800L), OptionalLong.of(Config.external_file_cache_expire_time_minutes_after_write * 60L),
+                        : 14400L), OptionalLong.of(Config.external_file_cache_expire_time_minutes_after_write * 60L),
                 true, Config.max_external_file_cache_num, new Weigher<FileCacheKey, FileCacheValue>() {
                     @Override
                     public @NonNegative int weigh(@NotNull FileCacheKey fileCacheKey,
