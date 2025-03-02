@@ -771,6 +771,16 @@ primaryExpression
             RIGHT_PAREN                                                                        #arrayRange
     | name=CURRENT_DATE                                                                        #currentDate
     | name=SYSDATE                                                                             #sysDate
+    | name=WEEK_AND_YEAR LEFT_PAREN dateStr=valueExpression
+        (COMMA formatStr=valueExpression
+        (COMMA firstDay=valueExpression
+        (COMMA minDays=valueExpression)?)?)?
+        RIGHT_PAREN                                                                            #weekAndYear
+    | name=YEAR_AND_WEEK LEFT_PAREN dateStr=valueExpression
+        (COMMA formatStr=valueExpression
+        (COMMA firstDay=valueExpression
+        (COMMA minDays=valueExpression)?)?)?
+        RIGHT_PAREN                                                                            #yearAndWeek
     | name=CURRENT_TIME                                                                        #currentTime
     | name=CURRENT_TIMESTAMP                                                                   #currentTimestamp
     | name=LOCALTIME                                                                           #localTime

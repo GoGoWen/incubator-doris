@@ -439,6 +439,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.UuidNumeric;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.UuidtoInt;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Version;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Week;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekAndYear;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekCeil;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekFloor;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekOfYear;
@@ -918,6 +919,10 @@ public interface ScalarFunctionVisitor<R, C> {
 
     default R visitCurrentTime(CurrentTime currentTime, C context) {
         return visitScalarFunction(currentTime, context);
+    }
+
+    default R visitWeekAndYear(WeekAndYear weekAndYear, C context) {
+        return visitScalarFunction(weekAndYear, context);
     }
 
     default R visitCurrentUser(CurrentUser currentUser, C context) {

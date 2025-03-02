@@ -320,6 +320,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.SecondsAdd;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SecondsDiff;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SecondsSub;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SysDate;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekAndYear;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekCeil;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekFloor;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeeksAdd;
@@ -3684,5 +3685,33 @@ public class LogicalPlanBuilder extends DorisParserBaseVisitor<Object> {
         }
         return ctx.catalog != null ? new UseCommand(ctx.catalog.getText(), ctx.database.getText())
                 : new UseCommand(ctx.database.getText());
+    }
+
+    @Override
+    public Expression visitWeekAndYear(DorisParser.WeekAndYearContext ctx) {
+        return buildWeekAndYearFunction(ctx.dateStr, ctx.formatStr, ctx.firstDay, ctx.minDays);
+    }
+
+    @Override
+    public Expression visitYearAndWeek(DorisParser.YearAndWeekContext ctx) {
+        return buildWeekAndYearFunction(ctx.dateStr, ctx.formatStr, ctx.firstDay, ctx.minDays);
+    }
+
+    private Expression buildWeekAndYearFunction(ParserRuleContext dateStr, ParserRuleContext formatStr,
+                                              ParserRuleContext firstDay, ParserRuleContext minDays) {
+        Expression dateStrExpr = (Expression) visit(dateStr);
+        Expression formatStrExpr = formatStr != null ? (Expression) visit(formatStr) : null;
+        Expression firstDayExpr = firstDay != null ? (Expression) visit(firstDay) : null;
+        Expression minDaysExpr = minDays != null ? (Expression) visit(minDays) : null;
+
+        if (formatStrExpr == null) {
+            return new WeekAndYear(dateStrExpr);
+        } else if (firstDayExpr == null) {
+            return new WeekAndYear(dateStrExpr, formatStrExpr);
+        } else if (minDaysExpr == null) {
+            return new WeekAndYear(dateStrExpr, formatStrExpr, firstDayExpr);
+        } else {
+            return new WeekAndYear(dateStrExpr, formatStrExpr, firstDayExpr, minDaysExpr);
+        }
     }
 }

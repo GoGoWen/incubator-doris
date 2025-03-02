@@ -442,6 +442,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.UuidNumeric;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.UuidtoInt;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Version;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Week;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekAndYear;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekCeil;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekFloor;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekOfYear;
@@ -583,6 +584,7 @@ public class BuiltinScalarFunctions implements FunctionHelper {
             scalar(CurrentCatalog.class, "current_catalog"),
             scalar(CurrentDate.class, "curdate", "current_date"),
             scalar(SysDate.class, "sysdate"),
+            scalar(WeekAndYear.class, "week_and_year"),
             scalar(CurrentTime.class, "curtime", "current_time"),
             scalar(CurrentUser.class, "current_user"),
             scalar(CutIpv6.class, "cut_ipv6"),

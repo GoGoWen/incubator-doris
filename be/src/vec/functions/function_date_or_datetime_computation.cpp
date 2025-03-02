@@ -108,6 +108,14 @@ struct CurrentDateFunctionName {
     static constexpr auto name = "current_date";
 };
 
+struct WeekAndYearFunctionName {
+    static constexpr auto name = "week_and_year";
+};
+
+struct YearAndWeekFunctionName {
+    static constexpr auto name = "year_and_week";
+};
+
 
 FunctionBuilderPtr createCurrentDateFunctionBuilderFunction() {
     return std::make_shared<CurrentDateFunctionBuilder<CurrentDateFunctionName>>();
@@ -128,6 +136,8 @@ struct CurrentTimeFunctionName {
     static constexpr auto name = "current_time";
 };
 
+using FunctionWeekAndYear = FunctionCurrentDateOrDateTime<WeekAndYearImpl<WeekAndYearFunctionName>>;
+using FunctionYearAndWeek = FunctionCurrentDateOrDateTime<WeekAndYearImpl<YearAndWeekFunctionName>>;
 using FunctionSysDate = FunctionCurrentDateOrDateTime<SysDateImpl<SysDateFunctionName>>;
 using FunctionCurTime = FunctionCurrentDateOrDateTime<CurrentTimeImpl<CurTimeFunctionName>>;
 using FunctionCurrentTime = FunctionCurrentDateOrDateTime<CurrentTimeImpl<CurrentTimeFunctionName>>;
@@ -184,6 +194,8 @@ void register_function_date_time_computation(SimpleFunctionFactory& factory) {
                               &createCurrentDateFunctionBuilderFunction);
     factory.register_function(CurDateFunctionName::name, &createCurDateFunctionBuilderFunction);
     factory.register_function<FunctionSysDate>();
+    factory.register_function<FunctionWeekAndYear>();
+    factory.register_function<FunctionYearAndWeek>();
     factory.register_function<FunctionCurTime>();
     factory.register_function<FunctionCurrentTime>();
     factory.register_function<FunctionUtcTimeStamp>();

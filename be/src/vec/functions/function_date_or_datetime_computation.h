@@ -26,6 +26,7 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <ctime>
 
 #include "common/compiler_util.h"
 #include "common/exception.h"
@@ -1077,6 +1078,375 @@ struct SysDateImpl {
         return Status::OK();
     }
 };
+
+template <typename FunctionName>
+struct WeekAndYearImpl {
+public:
+    using ReturnType = DataTypeString;
+    static constexpr auto name = FunctionName::name;
+    static constexpr auto is_nullable = true;
+
+    struct YearAndWeek {
+        int year;
+        int week;
+        std::string getWeekStr() const {
+            return (week < 10 ? "0" + std::to_string(week) : std::to_string(week));
+        }
+    };
+
+    // Given a year, first day of week and minimal days, compute the start date of
+    // week 1. The algorithm is as follows:
+    // 1. Create a tm for January 1 of the given year.
+    // 2. Find the first day (the candidate) for the week containing Jan 1 by
+    // “backing up”
+    //    to the day matching firstOfWeek (using Java’s convention: SUNDAY=1,
+    //    MONDAY=2, …, SATURDAY=7).
+    // 3. Count how many days in that 7‑day block fall in the new year.
+    //    If that number is at least minimalDays, then that candidate is the start
+    //    of week 1; otherwise, week 1 starts 7 days later.
+    static std::tm getWeekStartDate(int year, int firstOfWeek, int minimalDays) {
+        std::tm jan1 = {};
+        jan1.tm_year = year - 1900;
+        jan1.tm_mon = 0; // January
+        jan1.tm_mday = 1;
+        mktime(&jan1); // fill in tm_wday etc.
+
+        // In tm, tm_wday: 0 = Sunday, 1 = Monday, …, 6 = Saturday.
+        // Adjust so that Sunday = 1, Monday = 2, …, Saturday = 7.
+        int jan1Dow = (jan1.tm_wday == 0 ? 1 : jan1.tm_wday + 1);
+
+        // Calculate how many days since the week started (using our firstOfWeek).
+        // For example, if jan1 is a Wednesday (dow==4) and firstOfWeek is Monday
+        // (2), then diff = (4-2) = 2.
+        int diff = (jan1Dow - firstOfWeek + 7) % 7;
+
+        // The candidate start date is Jan 1 minus 'diff' days.
+        time_t t = mktime(&jan1);
+        t -= diff * 24 * 3600;
+        std::tm candidate = *localtime(&t);
+
+        // Count how many days in candidate's week (candidate .. candidate+6) fall
+        // in the new year.
+        int daysInNewYear = 0;
+        for (int i = 0; i < 7; i++) {
+            time_t ct = t + i * 24 * 3600;
+            std::tm ct_tm = *localtime(&ct);
+            if (ct_tm.tm_year + 1900 == year)
+                daysInNewYear++;
+        }
+        if (daysInNewYear >= minimalDays) {
+            return candidate;
+        } else {
+            // Otherwise, week 1 starts on candidate + 7 days.
+            t += 7 * 24 * 3600;
+            return *localtime(&t);
+        }
+    }
+
+    // Compute the total number of weeks in a year using our rule.
+    static int weeksInYear(int year, int firstOfWeek, int minimalDays) {
+        std::tm week1 = getWeekStartDate(year, firstOfWeek, minimalDays);
+        std::tm week1Next = getWeekStartDate(year + 1, firstOfWeek, minimalDays);
+        time_t t1 = mktime(&week1);
+        time_t t2 = mktime(&week1Next);
+        int diffDays = static_cast<int>((t2 - t1) / (24 * 3600));
+        return diffDays / 7;
+    }
+
+    // The calculate function mimics the Java method.
+    // It parses a date string ("yyyy-MM-dd"), uses the provided firstOfWeek and
+    // minimalDaysInFirstWeek parameters, and then computes the week number.
+    // Finally, it applies adjustments similar to the Java code:
+    //    - if the month is January and week number >= 52, subtract one from the
+    //    year,
+    //    - if the month is September and week number is 1, add one to the year.
+    static YearAndWeek calculate(const string &dateStr, int firstOfWeek, int minimalDaysInFirstWeek) {
+        // Validate firstOfWeek range
+        if (firstOfWeek < 1 || firstOfWeek > 7) {
+            firstOfWeek = 2; // default to MONDAY if out of range
+        }
+        
+        YearAndWeek yw;
+        
+        // Parse input date
+        int year, month, day;
+        if (sscanf(dateStr.c_str(), "%d-%d-%d", &year, &month, &day) != 3) {
+            return yw;
+        }
+        
+        // Thread-local cache to avoid locking
+        struct CacheKey {
+            int year;
+            int firstOfWeek;
+            int minimalDays;
+            
+            bool operator==(const CacheKey& other) const {
+                return year == other.year && 
+                    firstOfWeek == other.firstOfWeek && 
+                    minimalDays == other.minimalDays;
+            }
+        };
+        
+        struct CacheKeyHash {
+            size_t operator()(const CacheKey& key) const {
+                // Simple hash combining function
+                size_t h = key.year;
+                h = h * 31 + key.firstOfWeek;
+                h = h * 31 + key.minimalDays;
+                return h;
+            }
+        };
+        
+        // Thread-local cache using custom key
+        static thread_local std::unordered_map<CacheKey, std::pair<time_t, int>, CacheKeyHash> year_week1_cache;
+        
+        // Create thread-local time structures to avoid lock contention
+        static thread_local std::tm date_tm;
+        date_tm.tm_year = year - 1900;
+        date_tm.tm_mon = month - 1;
+        date_tm.tm_mday = day;
+        date_tm.tm_hour = 12;
+        date_tm.tm_min = 0;
+        date_tm.tm_sec = 0;
+        date_tm.tm_isdst = -1;
+        
+        time_t t_date = mktime(&date_tm);
+        
+        // Current year's cache key
+        CacheKey cache_key{year, firstOfWeek, minimalDaysInFirstWeek};
+        
+        auto it = year_week1_cache.find(cache_key);
+        time_t t_week1;
+        int total_weeks;
+        
+        if (it != year_week1_cache.end()) {
+            t_week1 = it->second.first;
+            total_weeks = it->second.second;
+        } else {
+            // Calculate week 1 start date
+            static thread_local std::tm jan1;
+            jan1.tm_year = year - 1900;
+            jan1.tm_mon = 0;
+            jan1.tm_mday = 1;
+            jan1.tm_hour = 12;
+            jan1.tm_min = 0;
+            jan1.tm_sec = 0;
+            jan1.tm_isdst = -1;
+            
+            time_t t_jan1 = mktime(&jan1);
+            
+            // In tm, tm_wday: 0 = Sunday, 1 = Monday, …, 6 = Saturday.
+            // Adjust so that Sunday = 1, Monday = 2, …, Saturday = 7.
+            int jan1Dow = (jan1.tm_wday == 0 ? 1 : jan1.tm_wday + 1);
+            int diff = (jan1Dow - firstOfWeek + 7) % 7;
+            t_week1 = t_jan1 - diff * 24 * 3600;
+            
+            int daysInNewYear = 0;
+            static thread_local std::tm week_day;
+            
+            for (int i = 0; i < 7; i++) {
+                time_t day_time = t_week1 + i * 24 * 3600;
+                localtime_r(&day_time, &week_day);
+                if (week_day.tm_year + 1900 == year)
+                    daysInNewYear++;
+            }
+            
+            if (daysInNewYear < minimalDaysInFirstWeek) {
+                // Week 1 starts 7 days later
+                t_week1 += 7 * 24 * 3600;
+            }
+            
+            static thread_local std::tm week1Next;
+            week1Next.tm_year = (year + 1) - 1900;
+            week1Next.tm_mon = 0;
+            week1Next.tm_mday = 1;
+            week1Next.tm_hour = 12;
+            week1Next.tm_min = 0;
+            week1Next.tm_sec = 0;
+            week1Next.tm_isdst = -1;
+            
+            time_t t_jan1_next = mktime(&week1Next);
+            int jan1Next_dow = (week1Next.tm_wday == 0 ? 1 : week1Next.tm_wday + 1);
+            int diff_next = (jan1Next_dow - firstOfWeek + 7) % 7;
+            time_t t_week1_next = t_jan1_next - diff_next * 24 * 3600;
+            
+            // Count days in new year for next year's week 1
+            int daysInNextNewYear = 0;
+            for (int i = 0; i < 7; i++) {
+                time_t day_time = t_week1_next + i * 24 * 3600;
+                localtime_r(&day_time, &week_day);
+                if (week_day.tm_year + 1900 == year + 1)
+                    daysInNextNewYear++;
+            }
+            
+            if (daysInNextNewYear < minimalDaysInFirstWeek) {
+                t_week1_next += 7 * 24 * 3600;
+            }
+            
+            int diffDays = static_cast<int>((t_week1_next - t_week1) / (24 * 3600));
+            total_weeks = diffDays / 7;
+            
+            // Cache the results
+            year_week1_cache[cache_key] = {t_week1, total_weeks};
+        }
+        
+        // 5. CALCULATE WEEK NUMBER
+        int diffDays = static_cast<int>((t_date - t_week1) / (24 * 3600));
+        int week;
+        
+        if (diffDays < 0) {
+            // Given date is before week 1 of the year
+            CacheKey prev_key{year - 1, firstOfWeek, minimalDaysInFirstWeek};
+            auto prev_it = year_week1_cache.find(prev_key);
+            if (prev_it != year_week1_cache.end()) {
+                week = prev_it->second.second;
+            } else {
+                // Calculate for previous year if not cached
+                static thread_local std::tm prev_year_tm;
+                prev_year_tm.tm_year = (year - 1) - 1900;
+                prev_year_tm.tm_mon = 11;  // December
+                prev_year_tm.tm_mday = 31;
+                prev_year_tm.tm_hour = 12;
+                prev_year_tm.tm_min = 0;
+                prev_year_tm.tm_sec = 0;
+                prev_year_tm.tm_isdst = -1;
+                
+                // This is a recursive call, but it will only happen once per year
+                // and the result will be cached
+                YearAndWeek prev_yw = calculate(std::to_string(year-1) + "-12-31", 
+                                            firstOfWeek, minimalDaysInFirstWeek);
+                week = prev_yw.week;
+            }
+            year -= 1;
+        } else {
+            week = diffDays / 7 + 1;
+            if (week > total_weeks) {
+                week = 1;
+                year += 1;
+            }
+        }
+        
+        yw.year = year;
+        yw.week = week;
+        return yw;
+    }
+    
+
+    static Status execute(FunctionContext* context, Block& block, const ColumnNumbers& arguments,
+                          size_t result, size_t input_rows_count) {
+        auto res_col = ColumnString::create();
+        ColumnString::Chars& res_buff = res_col->get_chars();
+        ColumnString::Offsets& res_offsets = res_col->get_offsets();
+        res_offsets.resize(input_rows_count);
+
+        auto null_map = ColumnUInt8::create(input_rows_count, 0);
+        auto& null_map_data = null_map->get_data();
+
+        const auto& arg_col = block.get_by_position(arguments[0]).column;
+        const ColumnString* date_str_col = nullptr;
+        const ColumnNullable* nullable_col = nullptr;
+
+        if ((nullable_col = typeid_cast<const ColumnNullable*>(arg_col.get()))) {
+            date_str_col = assert_cast<const ColumnString*>(nullable_col->get_nested_column_ptr().get());
+            const auto& input_null_map = nullable_col->get_null_map_data();
+            memcpy(null_map_data.data(), input_null_map.data(), input_rows_count);
+        } else {
+            date_str_col = assert_cast<const ColumnString*>(arg_col.get());
+        }
+        
+        std::string format = "%s年第%s周";
+        int first_day_of_week = 2; // Monday
+        int minimal_days = 4;
+        
+        if (arguments.size() > 1) {
+            const auto& format_col = block.get_by_position(arguments[1]).column;
+            const auto* const_col = typeid_cast<const ColumnConst*>(format_col.get());
+            if (const_col) {
+                format = const_col->get_value<String>();
+                if (format.empty()) {
+                    format = "%s年第%s周";
+                }
+            } else {
+                const auto& format_str = assert_cast<const ColumnString&>(*format_col);
+                StringRef format_ref = format_str.get_data_at(0);
+                if (format_ref.size > 0) {
+                    format = std::string(format_ref.data, format_ref.size);
+                }
+            }
+        }
+        
+        if (arguments.size() > 2) {
+            const auto& first_day_col = block.get_by_position(arguments[2]).column;
+            const auto* const_col = typeid_cast<const ColumnConst*>(first_day_col.get());
+            if (const_col) {
+                first_day_of_week = const_col->get_int(0);
+            } else {
+                const auto& first_day_data = assert_cast<const ColumnInt32&>(*first_day_col);
+                first_day_of_week = first_day_data.get_element(0);
+            }
+            
+            if (first_day_of_week < 1 || first_day_of_week > 7) {
+                return Status::InvalidArgument("Invalid first day of week");
+            }
+        }
+        
+        if (arguments.size() > 3) {
+            const auto& min_days_col = block.get_by_position(arguments[3]).column;
+            const auto* const_col = typeid_cast<const ColumnConst*>(min_days_col.get());
+            if (const_col) {
+                minimal_days = const_col->get_int(0);
+            } else {
+                const auto& min_days_data = assert_cast<const ColumnInt32&>(*min_days_col);
+                minimal_days = min_days_data.get_element(0);
+            }
+            
+            if (minimal_days < 1 || minimal_days > 7) {
+                return Status::InvalidArgument("Invalid minimal days value");
+            }
+        }
+        
+        char buf[32 + SAFE_FORMAT_STRING_MARGIN];
+        
+        for (size_t row = 0; row < input_rows_count; ++row) {
+            if (null_map_data[row]) {
+                res_offsets[row] = res_buff.size();
+                continue;
+            }
+
+            StringRef date_ref = date_str_col->get_data_at(row);
+            std::string date_string(date_ref.data, date_ref.size);
+            
+            VecDateTimeValue dt;
+            if (!dt.from_date_str(date_string.c_str(), date_string.size())) {
+                null_map_data[row] = 1;
+                res_offsets[row] = res_buff.size();
+                continue;
+            }
+ 
+            YearAndWeek yw = calculate(date_string, first_day_of_week, minimal_days);
+            
+            std::string year_str = std::to_string(yw.year);
+            std::string week_str = yw.getWeekStr();
+            
+            int written = snprintf(buf, sizeof(buf), format.c_str(), year_str.c_str(), week_str.c_str());
+            
+            size_t old_size = res_buff.size();
+            res_buff.resize(old_size + written);
+            memcpy(res_buff.data() + old_size, buf, written);
+            res_offsets[row] = res_buff.size();
+        }
+        LOG(INFO) << "Debug: WeekAndYear builtin function called.";
+        const auto is_nullable = block.get_by_position(result).type->is_nullable();
+        if (is_nullable) {
+            auto nullable_result = ColumnNullable::create(std::move(res_col), std::move(null_map));
+            block.replace_by_position(result, std::move(nullable_result));
+        } else {
+            block.replace_by_position(result, std::move(res_col));
+        }
+        return Status::OK();
+    }
+};
+
 
 struct TimeToSecImpl {
     using ReturnType = DataTypeInt32;

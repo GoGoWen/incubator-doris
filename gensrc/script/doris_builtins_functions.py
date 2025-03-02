@@ -1250,7 +1250,11 @@ visible_functions = {
         [['day_ceil'], 'DATEV2', ['DATEV2'], 'ALWAYS_NULLABLE'],
         [['day_ceil'], 'DATEV2', ['DATEV2', 'DATEV2'], 'ALWAYS_NULLABLE'],
         [['day_ceil'], 'DATEV2', ['DATEV2', 'INT'], 'ALWAYS_NULLABLE'],
-        [['day_ceil'], 'DATEV2', ['DATEV2', 'INT', 'DATEV2'], 'ALWAYS_NULLABLE']
+        [['day_ceil'], 'DATEV2', ['DATEV2', 'INT', 'DATEV2'], 'ALWAYS_NULLABLE'],
+        [['week_and_year', 'year_and_week'], 'STRING', ['STRING'], 'ALWAYS_NULLABLE'],
+        [['week_and_year', 'year_and_week'], 'STRING', ['STRING', 'VARCHAR'], 'ALWAYS_NULLABLE'],
+        [['week_and_year', 'year_and_week'], 'STRING', ['STRING', 'VARCHAR', 'INT'], 'ALWAYS_NULLABLE'],
+        [['week_and_year', 'year_and_week'], 'STRING', ['STRING', 'VARCHAR', 'INT', 'INT'], 'ALWAYS_NULLABLE']
     ],
 
 
