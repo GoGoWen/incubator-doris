@@ -66,7 +66,7 @@ public class JdbcQueryTableValueFunction extends QueryTableValueFunction {
             }
         }
 
-        JdbcTable jdbcTable = new JdbcTable(1, desc.getTable().getName(), desc.getTable().getFullSchema(),
+        JdbcTable jdbcTable = new JdbcTable(catalog.getId(), desc.getTable().getName(), desc.getTable().getFullSchema(),
                 TableType.JDBC);
         catalog.configureJdbcTable(jdbcTable, desc.getTable().getName());
         desc.setTable(jdbcTable);
