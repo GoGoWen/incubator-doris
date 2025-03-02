@@ -33,6 +33,9 @@ import org.apache.doris.datasource.ExternalTable;
 import org.apache.doris.datasource.InternalCatalog;
 import org.apache.doris.datasource.hive.HMSExternalDatabase;
 import org.apache.doris.datasource.hive.HMSExternalTable;
+import org.apache.doris.nereids.analyzer.UnboundRelation;
+import org.apache.doris.nereids.parser.NereidsParser;
+import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.persist.OperationType;
 import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.DdlExecutor;
@@ -45,6 +48,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -227,6 +231,25 @@ public class RefreshManager {
         if (table instanceof HMSExternalTable && updateTime > 0) {
             ((HMSExternalTable) table).setEventUpdateTime(updateTime);
         }
+        if (table instanceof HMSExternalTable && ((HMSExternalTable) table).isView()) {
+            LogicalPlan logicalPlan = new NereidsParser().parseForCreateView(((HMSExternalTable) table).getViewText());
+            Set<UnboundRelation> relations = logicalPlan.collect(UnboundRelation.class::isInstance);
+            for (UnboundRelation relation : relations) {
+                String[] parts = relation.getTableName().split("\\.");
+                String dbName = parts[0];
+                String tableName = parts[1];
+                DatabaseIf dbRelation = catalog.getDbNullable(dbName);
+                if (dbRelation == null) {
+                    continue;
+                }
+                TableIf tableRelation = db.getTableNullable(tableName);
+                if (tableRelation == null) {
+                    continue;
+                }
+                refreshTableInternal(catalog, dbRelation, tableRelation, 0);
+            }
+        }
+
         LOG.info("refresh table {} from db {} in catalog {}", table.getName(), db.getFullName(), catalog.getName());
     }
 
