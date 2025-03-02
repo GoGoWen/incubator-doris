@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 
 public class HiveViewSqlTransformer {
 
-    private static final Pattern QUOTE_PATTERN = Pattern.compile("(\"[^\"]*\"|'[^\"]*')");
+    private static final Pattern QUOTE_PATTERN = Pattern.compile("(\"[^\"]*\"|'[^']*')");
 
     public static String format(String input) {
         Matcher quoteMatcher = QUOTE_PATTERN.matcher(input);

@@ -33,5 +33,14 @@ public class HiveViewSqlTransformerTest {
                 + "where COL3 = \"TEST\" and COL4='YES'";
         Assert.assertEquals("select count(col1), sum(col2), col3, col4 from test_db.test_table group by "
                 + "col3, col4 where col3 = \"TEST\" and col4='YES'", HiveViewSqlTransformer.format(sql3));
+        String sql4 = "SELECT COL1, COL2 from TEST_DB.TEST_TABLE where COL1 = 'TEST' and COL2='YES'";
+        Assert.assertEquals("select col1, col2 from test_db.test_table where col1 = 'TEST' and col2='YES'",
+                HiveViewSqlTransformer.format(sql4));
+        String sql5 = "SELECT COL1, COL2 from TEST_DB.TEST_TABLE where COL1 = \"TEST\" and COL2=\"YES\"";
+        Assert.assertEquals("select col1, col2 from test_db.test_table where col1 = \"TEST\" and col2=\"YES\"",
+                HiveViewSqlTransformer.format(sql5));
+        String sql6 = "SELECT COL1, COL2 from TEST_DB.TEST_TABLE where COL1 = 'TEST' and COL2=\"YES\"";
+        Assert.assertEquals("select col1, col2 from test_db.test_table where col1 = 'TEST' and col2=\"YES\"",
+                HiveViewSqlTransformer.format(sql6));
     }
 }
