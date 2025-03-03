@@ -259,6 +259,16 @@ public abstract class ExternalDatabase<T extends ExternalTable>
         }
     }
 
+    public Optional<T> getTableForReplay(String hadoopUsername, String tableName) {
+        if (extCatalog.getUseMetaCache().get()) {
+            if (!isInitialized()) {
+                return Optional.empty();
+            }
+            return metaCache.getMetaObjByNameForReplay(hadoopUsername == null ? "" : hadoopUsername, tableName);
+        }
+        return Optional.empty();
+    }
+
     @Override
     public void readLock() {
         this.rwLock.readLock().lock();

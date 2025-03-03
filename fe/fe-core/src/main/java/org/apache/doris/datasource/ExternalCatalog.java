@@ -667,6 +667,16 @@ public abstract class ExternalCatalog
         }
     }
 
+    public Optional<ExternalDatabase<? extends ExternalTable>> getDbForReplay(String hadoopUsername, String dbName) {
+        if (useMetaCache.get()) {
+            if (!isInitialized()) {
+                return Optional.empty();
+            }
+            return metaCache.getMetaObjByNameForReplay(hadoopUsername == null ? "" : hadoopUsername, dbName);
+        }
+        return Optional.empty();
+    }
+
     protected ExternalDatabase<? extends ExternalTable> buildDbForInit(String dbName, long dbId,
             InitCatalogLog.Type logType) {
         if (dbName.equals(InfoSchemaDb.DATABASE_NAME)) {

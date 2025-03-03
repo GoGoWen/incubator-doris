@@ -31,6 +31,7 @@ import org.apache.doris.datasource.ExternalDatabase;
 import org.apache.doris.datasource.ExternalObjectLog;
 import org.apache.doris.datasource.ExternalTable;
 import org.apache.doris.datasource.InternalCatalog;
+import org.apache.doris.datasource.hive.HMSExternalCatalog;
 import org.apache.doris.datasource.hive.HMSExternalDatabase;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.nereids.analyzer.UnboundRelation;
@@ -142,6 +143,7 @@ public class RefreshManager {
 
     public void refreshTable(String catalogName, String dbName, String tableName, boolean ignoreIfNotExists)
             throws DdlException {
+        String hadoopUsername = "";
         Env env = Env.getCurrentEnv();
         CatalogIf catalog = catalogName != null ? env.getCatalogMgr().getCatalog(catalogName) : env.getCurrentCatalog();
         if (catalog == null) {
@@ -150,33 +152,34 @@ public class RefreshManager {
         if (!(catalog instanceof ExternalCatalog)) {
             throw new DdlException("Only support refresh ExternalCatalog Tables");
         }
-
-        DatabaseIf db = catalog.getDbNullable(dbName);
-        if (db == null) {
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            hadoopUsername = BDPAuthContext.get().getHadoopUserName();
+        }
+        Optional<ExternalDatabase<? extends ExternalTable>> db =
+                ((ExternalCatalog) catalog).getDbForReplay(hadoopUsername, dbName);
+        if (!db.isPresent()) {
             if (!ignoreIfNotExists) {
                 throw new DdlException("Database " + dbName + " does not exist in catalog " + catalog.getName());
             }
             return;
         }
 
-        TableIf table = db.getTableNullable(tableName);
-        if (table == null) {
+        Optional<? extends ExternalTable> table = db.get().getTableForReplay(hadoopUsername, tableName);
+        if (!table.isPresent()) {
             if (!ignoreIfNotExists) {
                 throw new DdlException("Table " + tableName + " does not exist in db " + dbName);
             }
             return;
         }
-        refreshTableInternal(catalog, db, table, 0);
+
+        refreshTableInternal(hadoopUsername, catalog, db.get(), table.get(), 0);
 
         ExternalObjectLog log = new ExternalObjectLog();
         log.setCatalogId(catalog.getId());
-        log.setDbId(db.getId());
-        log.setTableId(table.getId());
-        if (db instanceof HMSExternalDatabase) {
-            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-            String hadoopUsername = BDPAuthContext.get().getHadoopUserName();
-            log.setHadoopUserName(hadoopUsername);
-        }
+        log.setDbId(db.get().getId());
+        log.setTableId(table.get().getId());
+        log.setHadoopUserName(hadoopUsername);
         Env.getCurrentEnv().getEditLog().logRefreshExternalTable(log);
     }
 
@@ -198,7 +201,7 @@ public class RefreshManager {
             LOG.warn("failed to find table replaying refresh table {}", log.getTableId());
             return;
         }
-        refreshTableInternal(catalog, db.get(), table.get(), log.getLastUpdateTime());
+        refreshTableInternal(log.getHadoopUserName(), catalog, db.get(), table.get(), log.getLastUpdateTime());
     }
 
     public void refreshExternalTableFromEvent(String catalogName, String dbName, String tableName,
@@ -219,10 +222,31 @@ public class RefreshManager {
         if (table == null) {
             return;
         }
-        refreshTableInternal(catalog, db, table, updateTime);
+        refreshTableInternal("", catalog, db, table, updateTime);
     }
 
-    private void refreshTableInternal(CatalogIf catalog, DatabaseIf db, TableIf table, long updateTime) {
+    private void refreshTableInternal(String hadoopUsername, CatalogIf catalog, DatabaseIf db, TableIf table,
+            long updateTime) {
+        if (table instanceof HMSExternalTable && ((HMSExternalTable) table).isView()) {
+            LogicalPlan logicalPlan = new NereidsParser().parseForCreateView(((HMSExternalTable) table).getViewText());
+            Set<UnboundRelation> relations = logicalPlan.collect(UnboundRelation.class::isInstance);
+            for (UnboundRelation relation : relations) {
+                String[] parts = relation.getTableName().split("\\.");
+                String dbName = parts[0];
+                String tableName = parts[1];
+                Optional<ExternalDatabase<? extends ExternalTable>> dbRelation =
+                        ((ExternalCatalog) catalog).getDbForReplay(hadoopUsername, dbName);
+                if (!dbRelation.isPresent()) {
+                    continue;
+                }
+                Optional<? extends ExternalTable> tableRelation = dbRelation.get().getTableForReplay(hadoopUsername,
+                        tableName);
+                if (!tableRelation.isPresent()) {
+                    continue;
+                }
+                refreshTableInternal(hadoopUsername, catalog, dbRelation.get(), tableRelation.get(), 0);
+            }
+        }
         if (table instanceof ExternalTable) {
             ((ExternalTable) table).unsetObjectCreated();
         }
@@ -231,25 +255,6 @@ public class RefreshManager {
         if (table instanceof HMSExternalTable && updateTime > 0) {
             ((HMSExternalTable) table).setEventUpdateTime(updateTime);
         }
-        if (table instanceof HMSExternalTable && ((HMSExternalTable) table).isView()) {
-            LogicalPlan logicalPlan = new NereidsParser().parseForCreateView(((HMSExternalTable) table).getViewText());
-            Set<UnboundRelation> relations = logicalPlan.collect(UnboundRelation.class::isInstance);
-            for (UnboundRelation relation : relations) {
-                String[] parts = relation.getTableName().split("\\.");
-                String dbName = parts[0];
-                String tableName = parts[1];
-                DatabaseIf dbRelation = catalog.getDbNullable(dbName);
-                if (dbRelation == null) {
-                    continue;
-                }
-                TableIf tableRelation = db.getTableNullable(tableName);
-                if (tableRelation == null) {
-                    continue;
-                }
-                refreshTableInternal(catalog, dbRelation, tableRelation, 0);
-            }
-        }
-
         LOG.info("refresh table {} from db {} in catalog {}", table.getName(), db.getFullName(), catalog.getName());
     }
 
