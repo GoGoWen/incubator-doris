@@ -154,8 +154,8 @@ public class HiveMetaStoreCache {
      **/
     private void init() {
         CacheFactory partitionNumCacheFactory = new CacheFactory(
-                OptionalLong.of(28800L),
-                OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60L),
+                OptionalLong.of(Config.external_partition_num_cache_expire_time_minutes_after_write * 60L),
+                OptionalLong.empty(),
                 Config.max_hive_partition_count_cache_num,
                 true,
                 null);
@@ -163,8 +163,8 @@ public class HiveMetaStoreCache {
                 refreshExecutor);
 
         CacheFactory filterPartitionValuesCacheFactory = new CacheFactory(
-                OptionalLong.of(28800L),
-                OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60L),
+                OptionalLong.of(Config.external_partition_values_cache_expire_time_minutes_after_write * 60L),
+                OptionalLong.empty(),
                 true,
                 Config.max_filter_hive_partition_table_cache_num
                         * Config.max_partition_num_for_single_hive_table_without_filter,
@@ -180,8 +180,8 @@ public class HiveMetaStoreCache {
         filterPartitionValuesCache = filterPartitionValuesCacheFactory.buildCache(key -> loadFilterPartitionValues(key),
                 null, refreshExecutor);
         CacheFactory partitionValuesCacheFactory = new CacheFactory(
-                OptionalLong.of(28800L),
-                OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60L),
+                OptionalLong.of(Config.external_partition_values_cache_expire_time_minutes_after_write * 60L),
+                OptionalLong.empty(),
                 true,
                 Config.max_hive_partition_table_cache_num
                 * Config.max_partition_num_for_single_hive_table_without_filter,
@@ -198,8 +198,8 @@ public class HiveMetaStoreCache {
                 null,
                 refreshExecutor);
         CacheFactory partitionCacheFactory = new CacheFactory(
-                OptionalLong.of(28800L),
-                OptionalLong.of(Config.external_cache_expire_time_minutes_after_access * 60L),
+                OptionalLong.of(Config.external_partition_cache_expire_time_minutes_after_write * 60L),
+                OptionalLong.empty(),
                 Config.max_hive_partition_cache_num,
                 true,
                 null);
@@ -231,7 +231,7 @@ public class HiveMetaStoreCache {
 
         CacheFactory fileCacheFactory = new CacheFactory(OptionalLong.of(
                 fileMetaCacheTtlSecond >= HMSExternalCatalog.FILE_META_CACHE_TTL_DISABLE_CACHE ? fileMetaCacheTtlSecond
-                        : 14400L), OptionalLong.of(Config.external_file_cache_expire_time_minutes_after_write * 60L),
+                        : Config.external_file_cache_expire_time_minutes_after_write * 60L), OptionalLong.empty(),
                 true, Config.max_external_file_cache_num, new Weigher<FileCacheKey, FileCacheValue>() {
                     @Override
                     public @NonNegative int weigh(@NotNull FileCacheKey fileCacheKey,

@@ -236,7 +236,7 @@ public class HiveScanNode extends FileQueryScanNode {
     }
 
     private boolean isUpdateFileListRecently() {
-        return hmsTable.getUpdateTime() * 1000 + 180 * Config.external_cache_expire_time_minutes_after_access
+        return hmsTable.getUpdateTime() * 1000 + 120 * Config.external_file_cache_expire_time_minutes_after_write
                 > System.currentTimeMillis();
     }
 

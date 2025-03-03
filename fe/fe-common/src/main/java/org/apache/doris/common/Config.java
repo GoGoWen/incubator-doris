@@ -2063,13 +2063,43 @@ public class Config extends ConfigBase {
     @ConfField(mutable = false, masterOnly = false)
     public static long external_schema_cache_expire_time_minutes_after_write = 3; // 3 mins
 
+    /**
+     * The expiration time of a table cache object after last write of it.
+     * For external schema cache or table cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_table_cache_expire_time_minutes_after_write = 1; // 1 mins
 
     /**
      * The expiration time of a cache object after last write of it.
      * For external db cache.
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static long external_db_cache_expire_time_minutes_after_write = 1440; // 1440 mins
+    public static long external_db_cache_expire_time_minutes_after_write = 43200; // 30 days
+
+
+    /**
+     * The expiration time of partition num cache object after last access of it.
+     * For hive meta cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_partition_num_cache_expire_time_minutes_after_write = 60; // 60 mins
+
+
+    /**
+     * The expiration time of partition values cache object after last access of it.
+     * For hive meta cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_partition_values_cache_expire_time_minutes_after_write = 30; // 30 mins
+
+
+    /**
+     * The expiration time of partition cache object after last access of it.
+     * For hive meta cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_partition_cache_expire_time_minutes_after_write = 10; // 10 mins
 
     /**
      * The expiration time of a cache object after last access of it.
@@ -2091,7 +2121,7 @@ public class Config extends ConfigBase {
      * For file meta cache.
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static long external_file_cache_expire_time_minutes_after_write = 60; // 60 mins
+    public static long external_file_cache_expire_time_minutes_after_write = 30; // 30 mins
 
     /**
      * Github workflow test type, for setting some session variables

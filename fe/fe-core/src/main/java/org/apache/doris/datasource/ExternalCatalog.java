@@ -241,8 +241,8 @@ public abstract class ExternalCatalog
                 if (metaCache == null) {
                     metaCache = Env.getCurrentEnv().getExtMetaCacheMgr().buildMetaCache(
                             name,
-                            OptionalLong.of(86400L),
                             OptionalLong.of(Config.external_db_cache_expire_time_minutes_after_write * 60L),
+                            OptionalLong.empty(),
                             Config.max_meta_object_cache_num,
                             ignored -> getFilteredDatabaseNames(),
                             key -> Optional.ofNullable(
