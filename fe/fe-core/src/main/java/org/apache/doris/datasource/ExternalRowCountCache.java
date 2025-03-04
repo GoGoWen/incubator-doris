@@ -105,8 +105,10 @@ public class ExternalRowCountCache {
     public long getCachedRowCount(long catalogId, long dbId, long tableId) {
         RowCountKey key = new RowCountKey(catalogId, dbId, tableId);
         try {
-            CompletableFuture<Optional<Long>> f = rowCountCache.get(key);
-            return f.get(Config.wait_to_get_rowcount_time_ms, TimeUnit.MILLISECONDS).orElse(0L);
+            CompletableFuture<Optional<Long>> f = rowCountCache.get(key)
+                    .completeOnTimeout(Optional.of(0L), Config.wait_to_get_rowcount_time_ms,
+                            TimeUnit.MILLISECONDS);
+            return f.join().get();
         } catch (Exception e) {
             LOG.warn("Unexpected exception while returning row count", e);
         }
