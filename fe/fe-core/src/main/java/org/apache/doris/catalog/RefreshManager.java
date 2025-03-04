@@ -156,29 +156,28 @@ public class RefreshManager {
             Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
             hadoopUsername = BDPAuthContext.get().getHadoopUserName();
         }
-        Optional<ExternalDatabase<? extends ExternalTable>> db =
-                ((ExternalCatalog) catalog).getDbForReplay(hadoopUsername, dbName);
-        if (!db.isPresent()) {
+        DatabaseIf db = catalog.getDbNullable(dbName);
+        if (db == null) {
             if (!ignoreIfNotExists) {
                 throw new DdlException("Database " + dbName + " does not exist in catalog " + catalog.getName());
             }
             return;
         }
 
-        Optional<? extends ExternalTable> table = db.get().getTableForReplay(hadoopUsername, tableName);
-        if (!table.isPresent()) {
+        TableIf table = db.getTableNullable(tableName);
+        if (table == null) {
             if (!ignoreIfNotExists) {
                 throw new DdlException("Table " + tableName + " does not exist in db " + dbName);
             }
             return;
         }
 
-        refreshTableInternal(hadoopUsername, catalog, db.get(), table.get(), 0);
+        refreshTableInternal(hadoopUsername, catalog, db, table, 0);
 
         ExternalObjectLog log = new ExternalObjectLog();
         log.setCatalogId(catalog.getId());
-        log.setDbId(db.get().getId());
-        log.setTableId(table.get().getId());
+        log.setDbId(db.getId());
+        log.setTableId(table.getId());
         log.setHadoopUserName(hadoopUsername);
         Env.getCurrentEnv().getEditLog().logRefreshExternalTable(log);
     }

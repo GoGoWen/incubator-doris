@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class ExternalRowCountCache {
 
@@ -43,7 +44,7 @@ public class ExternalRowCountCache {
         // 2. set refreshAfterWrite to 10min(default), so that the cache will be refreshed after 10min
         CacheFactory rowCountCacheFactory = new CacheFactory(
                 OptionalLong.of(86400L),
-                OptionalLong.of(Config.external_row_count_cache_expire_time_minutes_after_write * 60),
+                OptionalLong.of(Config.external_row_count_cache_refresh_time_minutes_after_write * 60),
                 Config.max_external_table_row_count_cache_num,
                 false,
                 null);
@@ -105,9 +106,7 @@ public class ExternalRowCountCache {
         RowCountKey key = new RowCountKey(catalogId, dbId, tableId);
         try {
             CompletableFuture<Optional<Long>> f = rowCountCache.get(key);
-            if (f.isDone()) {
-                return f.get().orElse(0L);
-            }
+            return f.get(Config.wait_to_get_rowcount_time_ms, TimeUnit.MILLISECONDS).orElse(0L);
         } catch (Exception e) {
             LOG.warn("Unexpected exception while returning row count", e);
         }

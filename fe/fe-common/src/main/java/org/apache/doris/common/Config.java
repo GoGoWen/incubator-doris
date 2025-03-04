@@ -2026,7 +2026,7 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = false, masterOnly = false, description = {"外表行数缓存最大数量",
         "Max cache number of external table row count"})
-    public static long max_external_table_row_count_cache_num = 10000;
+    public static long max_external_table_row_count_cache_num = 100000;
 
     /**
      * Max cache loader thread-pool size.
@@ -2114,7 +2114,14 @@ public class Config extends ConfigBase {
      * For hive meta cache.
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static long external_row_count_cache_expire_time_minutes_after_write = 60; // 60 mins
+    public static long external_row_count_cache_refresh_time_minutes_after_write = 60; // 60 mins
+
+    /**
+     * The wait time of get a row count result from cache.
+     *
+     */
+    @ConfField(mutable = true, masterOnly = false)
+    public static long wait_to_get_rowcount_time_ms = 100; // 100ms
 
     /**
      * The expiration time of a file cache after last write of it.
