@@ -331,6 +331,11 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         return remoteTable.isSetViewOriginalText() || remoteTable.isSetViewExpandedText();
     }
 
+    public boolean isViewWithoutCheckInitialized() {
+        // already check isInitialized outside
+        return remoteTable.isSetViewOriginalText() || remoteTable.isSetViewExpandedText();
+    }
+
     @Override
     public String getComment() {
         return "";

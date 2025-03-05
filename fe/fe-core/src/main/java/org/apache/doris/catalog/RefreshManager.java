@@ -191,12 +191,12 @@ public class RefreshManager {
         Optional<ExternalDatabase<? extends ExternalTable>> db = catalog.getDbForReplay(log.getHadoopUserName(),
                 log.getDbId());
         // See comment in refreshDbInternal for why db and table may be null.
-        if (!db.isPresent()) {
+        if (!db.isPresent() || !db.get().isInitialized()) {
             LOG.warn("failed to find db replaying refresh table {}", log.getDbId());
             return;
         }
         Optional<? extends ExternalTable> table = db.get().getTableForReplay(log.getHadoopUserName(), log.getTableId());
-        if (!table.isPresent()) {
+        if (!table.isPresent() || !table.get().isObjectCreated()) {
             LOG.warn("failed to find table replaying refresh table {}", log.getTableId());
             return;
         }
@@ -226,7 +226,7 @@ public class RefreshManager {
 
     private void refreshTableInternal(String hadoopUsername, CatalogIf catalog, DatabaseIf db, TableIf table,
             long updateTime) {
-        if (table instanceof HMSExternalTable && ((HMSExternalTable) table).isView()) {
+        if (table instanceof HMSExternalTable && ((HMSExternalTable) table).isViewWithoutCheckInitialized()) {
             LogicalPlan logicalPlan = new NereidsParser().parseForCreateView(((HMSExternalTable) table).getViewText());
             Set<UnboundRelation> relations = logicalPlan.collect(UnboundRelation.class::isInstance);
             for (UnboundRelation relation : relations) {
