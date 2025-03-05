@@ -348,6 +348,10 @@ suite("fold_constant_numeric_arithmatic") {
     testFoldConst("SELECT 5 ^ 3 AS xor_case_1") //5 XOR 3 = 6
     testFoldConst("SELECT 0 ^ 1 AS xor_case_2") //0 XOR 1 = 1
     testFoldConst("SELECT 255 ^ 128 AS xor_case_3") //255 XOR 128
+
+    // ensure divide for decimal v3 could return correct type when divider is 0
+    sql """ select if(random() > 0.5, cast(random() as decimal(38,10)), cast(0 as decimal(30, 10)) / cast(0 as decimal(30,10)))"""
+
 //Exception: XOR on non-integer types (if applicable)
 test {
     sql "SELECT 'a' ^ 1 AS xor_case_exception"
