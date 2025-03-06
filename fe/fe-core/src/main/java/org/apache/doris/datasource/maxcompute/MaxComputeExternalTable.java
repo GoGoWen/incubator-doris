@@ -62,7 +62,7 @@ public class MaxComputeExternalTable extends ExternalTable {
     }
 
     @Override
-    protected synchronized void makeSureInitialized() {
+    public final synchronized void makeSureInitialized() {
         super.makeSureInitialized();
         if (!objectCreated) {
             objectCreated = true;

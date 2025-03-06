@@ -114,7 +114,7 @@ public class ExternalTable implements TableIf, Writable, GsonPostProcessable {
         return false;
     }
 
-    protected void makeSureInitialized() {
+    public void makeSureInitialized() {
         try {
             // getDbOrAnalysisException will call makeSureInitialized in ExternalCatalog.
             ExternalDatabase db = catalog.getDbOrAnalysisException(dbName);

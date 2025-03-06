@@ -44,7 +44,7 @@ public class IcebergExternalTable extends ExternalTable {
         return ((IcebergExternalCatalog) catalog).getIcebergCatalogType();
     }
 
-    protected synchronized void makeSureInitialized() {
+    public final synchronized void makeSureInitialized() {
         super.makeSureInitialized();
         if (!objectCreated) {
             objectCreated = true;

@@ -60,7 +60,7 @@ public class PaimonExternalTable extends ExternalTable {
         return ((PaimonExternalCatalog) catalog).getCatalogType();
     }
 
-    protected synchronized void makeSureInitialized() {
+    public final synchronized void makeSureInitialized() {
         super.makeSureInitialized();
         if (!objectCreated) {
             objectCreated = true;

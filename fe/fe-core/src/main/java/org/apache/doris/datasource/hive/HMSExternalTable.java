@@ -193,7 +193,8 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         }
     }
 
-    protected synchronized void makeSureInitialized() {
+    @Override
+    public final synchronized void makeSureInitialized() {
         super.makeSureInitialized();
         if (!objectCreated) {
             if (isViewBased) {

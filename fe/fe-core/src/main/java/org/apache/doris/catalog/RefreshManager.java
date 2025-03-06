@@ -152,10 +152,6 @@ public class RefreshManager {
         if (!(catalog instanceof ExternalCatalog)) {
             throw new DdlException("Only support refresh ExternalCatalog Tables");
         }
-        if (catalog instanceof HMSExternalCatalog) {
-            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-            hadoopUsername = BDPAuthContext.get().getHadoopUserName();
-        }
         DatabaseIf db = catalog.getDbNullable(dbName);
         if (db == null) {
             if (!ignoreIfNotExists) {
@@ -172,6 +168,16 @@ public class RefreshManager {
             return;
         }
 
+        if (catalog instanceof HMSExternalCatalog) {
+            Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
+            hadoopUsername = BDPAuthContext.get().getHadoopUserName();
+            if (db instanceof HMSExternalDatabase) {
+                ((HMSExternalDatabase) db).makeSureInitialized();
+            }
+            if (table instanceof HMSExternalTable) {
+                ((HMSExternalTable) table).makeSureInitialized();
+            }
+        }
         refreshTableInternal(hadoopUsername, catalog, db, table, 0);
 
         ExternalObjectLog log = new ExternalObjectLog();
