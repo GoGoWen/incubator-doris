@@ -219,6 +219,12 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
                 }
             }
             objectCreated = true;
+            // try to use transient_lastDdlTime from hms client
+            schemaUpdateTime = MapUtils.isNotEmpty(remoteTable.getParameters())
+                    && remoteTable.getParameters().containsKey(TBL_PROP_TRANSIENT_LAST_DDL_TIME)
+                    ? Long.parseLong(remoteTable.getParameters().get(TBL_PROP_TRANSIENT_LAST_DDL_TIME)) * 1000
+                    // use current timestamp if lastDdlTime does not exist (hive views don't have this prop)
+                    : System.currentTimeMillis();
         }
     }
 
@@ -713,6 +719,10 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
     // get the max value of `schemaUpdateTime` and `eventUpdateTime`
     // eventUpdateTime will be refreshed after processing events with hms event listener enabled
     public long getUpdateTime() {
+        makeSureInitialized();
+        if (dlaType.equals(DLAType.HUDI) || dlaType.equals(DLAType.ICEBERG)) {
+            return System.currentTimeMillis();
+        }
         return Math.max(Math.max(this.schemaUpdateTime, this.eventUpdateTime), this.partitionUpdateTime);
     }
 
