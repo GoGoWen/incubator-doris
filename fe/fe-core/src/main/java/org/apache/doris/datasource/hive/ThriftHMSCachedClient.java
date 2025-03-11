@@ -69,18 +69,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.PriorityQueue;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -149,7 +138,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_GET_ALL_TABLES.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_GET_ALL_TABLES.update(duration);
+                logIfSlowHmsCall(duration, dbName, null);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get all tables for db %s", e, dbName);
@@ -176,8 +167,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
     @Override
     public void createTable(TableMetadata tbl, boolean ignoreIfExists) {
         if (tableExists(tbl.getDbName(), tbl.getTableName())) {
-            throw new HMSClientException("Table '" + tbl.getTableName()
-                    + "' has existed in '" + tbl.getDbName() + "'.");
+            throw new HMSClientException(String.format("Table '%s' has existed in '%s'.",
+                tbl.getTableName(), tbl.getDbName()));
+
         }
         try (ThriftHMSClient client = getClient()) {
             try {
@@ -291,7 +283,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS.update(duration);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to list partitions in table '%s.%s'.", e, dbName, tblName);
@@ -312,8 +306,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES_FROM_VIEW.update(
-                        System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES_FROM_VIEW.update(duration);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to list partition names for table %s in db %s", e, tblName, dbName);
@@ -334,7 +329,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_NAMES.update(duration);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to list partition names for table %s in db %s", e, tblName, dbName);
@@ -351,7 +348,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITION_FROM_VIEW.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITION_FROM_VIEW.update(duration);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
@@ -369,11 +368,13 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITION.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITION.update(duration);
+                logIfSlowHmsCall(duration,dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
-                    dbName, partitionValues);
+                dbName, partitionValues);
         }
     }
 
@@ -390,7 +391,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITIONS_FROM_VIEW.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITIONS_FROM_VIEW.update(duration);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
@@ -410,11 +413,13 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITIONS.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_GET_PARTITIONS.update(duration);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
-                    dbName, partitionNames);
+                dbName, partitionNames);
         }
     }
 
@@ -463,7 +468,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_GET_TABLE.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_GET_TABLE.update(duration);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get table %s in db %s from hms client", e, tblName, dbName);
@@ -480,7 +487,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_GET_TABLE_FROM_VIEW.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_GET_TABLE_FROM_VIEW.update(duration);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get table %s in db %s from hms client", e, tblName, dbName);
@@ -542,7 +551,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
         } catch (Exception e) {
             LOG.warn("Failed to fetch current notification event id", e);
             throw new MetastoreNotificationFetchException(
-                    "Failed to get current notification event id. msg: " + e.getMessage());
+                "Failed to get current notification event id. msg: " + e.getMessage());
         }
     }
 
@@ -561,8 +570,8 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
         } catch (Exception e) {
             LOG.warn("Failed to get next notification based on last event id {}", lastEventId, e);
             throw new MetastoreNotificationFetchException(
-                    "Failed to get next notification based on last event id: " + lastEventId + ". msg: " + e
-                            .getMessage());
+                "Failed to get next notification based on last event id: " + lastEventId + ". msg: " + e
+                    .getMessage());
         }
     }
 
@@ -615,8 +624,8 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 long lockId = response.getLockid();
                 if (System.currentTimeMillis() - start > timeoutMs) {
                     throw new RuntimeException(
-                            "acquire lock timeout for txn " + txnId + " of query " + queryId + ", timeout(ms): "
-                                    + timeoutMs);
+                        "acquire lock timeout for txn " + txnId + " of query " + queryId + ", timeout(ms): "
+                            + timeoutMs);
                 }
                 response = checkLock(lockId);
             }
@@ -708,17 +717,17 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
             this.readyToClose = false;
             if (HMSProperties.DLF_TYPE.equalsIgnoreCase(type)) {
                 client = RetryingMetaStoreClient.getProxy(hiveConf, DUMMY_HOOK_LOADER,
-                        ProxyMetaStoreClient.class.getName());
+                    ProxyMetaStoreClient.class.getName());
             } else if (HMSProperties.GLUE_TYPE.equalsIgnoreCase(type)) {
                 client = RetryingMetaStoreClient.getProxy(hiveConf, DUMMY_HOOK_LOADER,
-                        AWSCatalogMetastoreClient.class.getName());
+                    AWSCatalogMetastoreClient.class.getName());
             } else {
                 UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
                         null, bdpAuthContext.getUserToken());
                 client = ugi.doAs((PrivilegedAction<IMetaStoreClient>) () -> {
                     try {
                         return RetryingMetaStoreClient.getProxy(hiveConf, DUMMY_HOOK_LOADER,
-                                HiveMetaStoreClient.class.getName());
+                            HiveMetaStoreClient.class.getName());
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -773,7 +782,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 ThriftHMSClient client = null;
                 synchronized (clientPool) {
                     client = clientPool.get(bdpAuthContext.getHmsClientCacheKey()).stream()
-                            .findFirst().orElse(null);
+                        .findFirst().orElse(null);
                     if (client != null) {
                         clientPool.remove(bdpAuthContext.getHmsClientCacheKey(), client);
                         Iterator<Pair<String, Long>> iterator = priorityQueue.iterator();
@@ -801,7 +810,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                     client.client.setMetaConf("USER_TYPE", bdpAuthContext.getUserType());
                     client.client.setMetaConf("BUSINESS_LINE", bdpAuthContext.getBusinessLine());
                 }
-                MetricRepo.HISTO_HMS_CREATE_CLIENT.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_CREATE_CLIENT.update(duration);
+                logIfSlowHmsCall(duration, null, null);
                 return client;
             } catch (Exception e) {
                 LOG.warn("failed to get hive client", e);
@@ -924,8 +935,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER_FROM_VIEW
-                    .update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER_FROM_VIEW.update(duration);
+                logIfSlowHmsCall(duration, dbName, tableName);
             }
         } catch (Exception e) {
             throw new RuntimeException("failed to list partitions by filter for " + dbName + "." + tableName, e);
@@ -944,7 +956,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 client.setThrowable(e);
                 throw e;
             } finally {
-                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER.update(System.currentTimeMillis() - start);
+                long duration = System.currentTimeMillis() - start;
+                MetricRepo.HISTO_HMS_API_CALL_LIST_PARTITIONS_BY_FILTER.update(duration);
+                logIfSlowHmsCall(duration, dbName, tableName);
             }
         } catch (Exception e) {
             throw new RuntimeException("failed to list partitions by filter for " + dbName + "." + tableName, e);
@@ -957,5 +971,25 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
             .stream()
             .mapToLong(Collection::size)
             .sum();
+    }
+
+    private static void logIfSlowHmsCall(long duration, String dbName, String tableName) {
+        if (duration <= Config.log_slow_hms_time_ms) {
+            return;
+        }
+
+        BDPAuthContext context = BDPAuthContext.get();
+        String db = (dbName != null) ? dbName : "N/A";
+        String tbl = (tableName != null) ? tableName : "N/A";
+        String logMsg = "Duration exceeds {} ms, dbName {}, tableName {}, HMS client information: {}";
+
+        Object[] params = {
+            Config.log_slow_hms_time_ms,
+            db,
+            tbl,
+            (context != null) ? context : "N/A"
+        };
+
+        LOG.warn(logMsg, params);
     }
 }

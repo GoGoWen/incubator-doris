@@ -2938,4 +2938,8 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"聚合函数支持将字符参数转换为数字类型",
         "aggregate function supports casting character parameters to numeric types"})
     public static boolean support_character_cast_for_numeric_agg_function = false;
+
+    @ConfField(mutable = true, description = {"连接HMS超过指定时间打印慢调用日志",
+        "print a warning when the duration exceeds the specified time."})
+    public static long log_slow_hms_time_ms = 5000;
 }
