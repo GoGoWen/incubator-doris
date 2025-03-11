@@ -69,7 +69,18 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.security.PrivilegedAction;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.PriorityQueue;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -370,7 +381,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
             } finally {
                 long duration = System.currentTimeMillis() - start;
                 MetricRepo.HISTO_HMS_API_CALL_GET_PARTITION.update(duration);
-                logIfSlowHmsCall(duration,dbName, tblName);
+                logIfSlowHmsCall(duration, dbName, tblName);
             }
         } catch (Exception e) {
             throw new HMSClientException("failed to get partition for table %s in db %s with value %s", e, tblName,
