@@ -90,8 +90,7 @@ public class JvmStats {
         int threadsWaiting = 0;
         int threadsTimedWaiting = 0;
         int threadsTerminated = 0;
-        long[] threadIds = threadMXBean.getAllThreadIds();
-        for (ThreadInfo threadInfo : threadMXBean.getThreadInfo(threadIds, 0)) {
+        for (ThreadInfo threadInfo : threadMXBean.dumpAllThreads(false, false)) {
             if (threadInfo == null) {
                 continue; // race protection
             }
