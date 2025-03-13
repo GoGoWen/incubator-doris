@@ -49,7 +49,6 @@ public class CheckPolicy implements AnalysisRuleFactory {
                         logicalCheckPolicy(any().when(child -> !(child instanceof UnboundRelation))).thenApply(ctx -> {
                             LogicalCheckPolicy<Plan> checkPolicy = ctx.root;
                             LogicalFilter<Plan> upperFilter = null;
-
                             Plan child = checkPolicy.child();
                             // Because the unique table will automatically include a filter condition
                             if (child instanceof LogicalFilter && child.bound() && child
@@ -63,7 +62,6 @@ public class CheckPolicy implements AnalysisRuleFactory {
                             }
                             LogicalRelation relation = (LogicalRelation) child;
                             Set<Expression> combineFilter = new LinkedHashSet<>();
-
                             // replace incremental params as AND expression
                             if (relation instanceof LogicalHudiScan) {
                                 LogicalHudiScan hudiScan = (LogicalHudiScan) relation;
@@ -72,7 +70,6 @@ public class CheckPolicy implements AnalysisRuleFactory {
                                             hudiScan.getLogicalProperties().getOutput()));
                                 }
                             }
-
                             RelatedPolicy relatedPolicy = checkPolicy.findPolicy(relation, ctx.cascadesContext);
                             relatedPolicy.rowPolicyFilter.ifPresent(expression -> combineFilter.addAll(
                                             ExpressionUtils.extractConjunctionToSet(expression)));

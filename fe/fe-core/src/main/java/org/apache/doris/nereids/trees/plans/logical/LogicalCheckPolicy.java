@@ -18,6 +18,8 @@
 package org.apache.doris.nereids.trees.plans.logical;
 
 import org.apache.doris.analysis.UserIdentity;
+import org.apache.doris.datasource.hive.HMSExternalDatabase;
+import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.mysql.privilege.AccessControllerManager;
 import org.apache.doris.mysql.privilege.DataMaskPolicy;
 import org.apache.doris.mysql.privilege.RowFilterPolicy;
@@ -132,19 +134,19 @@ public class LogicalCheckPolicy<CHILD_TYPE extends Plan> extends LogicalUnary<CH
         if (!(logicalRelation instanceof CatalogRelation)) {
             return RelatedPolicy.NO_POLICY;
         }
-
         ConnectContext connectContext = cascadesContext.getConnectContext();
         AccessControllerManager accessManager = connectContext.getEnv().getAccessManager();
         UserIdentity currentUserIdentity = connectContext.getCurrentUserIdentity();
-        if (currentUserIdentity.isRootUser() || currentUserIdentity.isAdminUser()) {
+
+        CatalogRelation catalogRelation = (CatalogRelation) logicalRelation;
+        if ((currentUserIdentity.isRootUser() || currentUserIdentity.isAdminUser())
+                && !(catalogRelation.getDatabase() instanceof HMSExternalDatabase)) {
             return RelatedPolicy.NO_POLICY;
         }
 
-        CatalogRelation catalogRelation = (CatalogRelation) logicalRelation;
         String ctlName = catalogRelation.getDatabase().getCatalog().getName();
         String dbName = catalogRelation.getDatabase().getFullName();
         String tableName = catalogRelation.getTable().getName();
-
         NereidsParser nereidsParser = new NereidsParser();
         ImmutableList.Builder<NamedExpression> dataMasks
                 = ImmutableList.builderWithExpectedSize(logicalRelation.getOutput().size());
@@ -173,17 +175,44 @@ public class LogicalCheckPolicy<CHILD_TYPE extends Plan> extends LogicalUnary<CH
                 sqlCacheContext.get().addDataMaskPolicy(ctlName, dbName, tableName, slot.getName(), dataMaskPolicy);
             }
         }
+        List<? extends RowFilterPolicy> rowPolicies = getRowFilterPolicies(catalogRelation, currentUserIdentity,
+                accessManager, ctlName, dbName, tableName);
 
-        List<? extends RowFilterPolicy> rowPolicies = accessManager.evalRowFilterPolicies(
-                currentUserIdentity, ctlName, dbName, tableName);
         if (sqlCacheContext.isPresent()) {
             sqlCacheContext.get().setRowFilterPolicy(ctlName, dbName, tableName, rowPolicies);
         }
-
         return new RelatedPolicy(
                 Optional.ofNullable(CollectionUtils.isEmpty(rowPolicies) ? null : mergeRowPolicy(rowPolicies)),
                 hasDataMask ? Optional.of(dataMasks.build()) : Optional.empty()
         );
+    }
+
+    /**
+     * get row filter policy for logicalRelation.
+     *
+     */
+    public List<? extends RowFilterPolicy> getRowFilterPolicies(CatalogRelation catalogRelation,
+            UserIdentity currentUserIdentity, AccessControllerManager accessManager, String ctlName,
+            String dbName, String tableName) {
+        List<? extends RowFilterPolicy> rowPolicies = accessManager.evalRowFilterPolicies(
+                currentUserIdentity, ctlName, dbName, tableName);
+        if (catalogRelation.getTable() instanceof HMSExternalTable) {
+            HMSExternalTable hmsExternalTable = (HMSExternalTable) catalogRelation.getTable();
+            if (hmsExternalTable.getRowPolicy() != null) {
+                ((List<RowFilterPolicy>) rowPolicies).add(new RowFilterPolicy() {
+                    @Override
+                    public Expression getFilterExpression() {
+                        return hmsExternalTable.getRowPolicy();
+                    }
+
+                    @Override
+                    public String getPolicyIdent() {
+                        return "custom policy: " + hmsExternalTable.getRowPolicy().toSql();
+                    }
+                });
+            }
+        }
+        return rowPolicies;
     }
 
     private Expression mergeRowPolicy(List<? extends RowFilterPolicy> policies) {

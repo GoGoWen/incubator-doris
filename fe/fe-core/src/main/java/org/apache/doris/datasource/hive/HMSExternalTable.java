@@ -37,6 +37,8 @@ import org.apache.doris.mtmv.MTMVRelatedTableIf;
 import org.apache.doris.mtmv.MTMVSnapshotIf;
 import org.apache.doris.mtmv.MTMVTimestampSnapshot;
 import org.apache.doris.nereids.exceptions.NotSupportedException;
+import org.apache.doris.nereids.parser.NereidsParser;
+import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.qe.GlobalVariable;
 import org.apache.doris.statistics.AnalysisInfo;
 import org.apache.doris.statistics.BaseAnalysisTask;
@@ -49,6 +51,7 @@ import org.apache.doris.thrift.THiveTable;
 import org.apache.doris.thrift.TTableDescriptor;
 import org.apache.doris.thrift.TTableType;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -99,6 +102,8 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
     private static final String TBL_PROP_TRANSIENT_LAST_DDL_TIME = "transient_lastDdlTime";
 
     private static final String NUM_ROWS = "numRows";
+
+    private static final String ROW_POLICY = "row_policy";
 
     private static final String SPARK_COL_STATS = "spark.sql.statistics.colStats.";
     private static final String SPARK_STATS_MAX = ".max";
@@ -191,6 +196,11 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
             LOG.warn("Not supported hms table, message: {}", e.getMessage());
             return false;
         }
+    }
+
+    @VisibleForTesting
+    public void setRemoteTable(org.apache.hadoop.hive.metastore.api.Table remoteTable) {
+        this.remoteTable = remoteTable;
     }
 
     @Override
@@ -933,6 +943,17 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
             partitionValues = cache.getPartitionValues(dbName, name, partitionColumnTypes);
         }
         return partitionValues;
+    }
+
+    public Expression getRowPolicy() {
+        makeSureInitialized();
+        if (remoteTable.getParameters() != null) {
+            String rowPolicy = remoteTable.getParameters().get(ROW_POLICY);
+            if (rowPolicy != null) {
+                return new NereidsParser().parseExpression(rowPolicy);
+            }
+        }
+        return null;
     }
 
     // Get all files related to given partition values
