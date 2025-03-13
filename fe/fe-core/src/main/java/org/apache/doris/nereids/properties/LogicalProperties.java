@@ -20,17 +20,22 @@ package org.apache.doris.nereids.properties;
 import org.apache.doris.common.Id;
 import org.apache.doris.nereids.trees.expressions.ExprId;
 import org.apache.doris.nereids.trees.expressions.Slot;
+import org.apache.doris.nereids.trees.expressions.SlotReference;
 
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import org.apache.hive.common.util.Constants;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Logical properties used for analysis and optimize in Nereids.
@@ -101,11 +106,17 @@ public class LogicalProperties {
     }
 
     public List<Slot> getOutput() {
-        return outputSupplier.get();
+        return filterSlots(outputSupplier.get());
     }
 
     public Set<Slot> getOutputSet() {
-        return outputSetSupplier.get();
+        return new HashSet<>(filterSlots(outputSetSupplier.get()));
+    }
+
+    private List<Slot> filterSlots(Collection<Slot> slots) {
+        return slots.stream()
+            .filter(this::hasColumnPermission)
+            .collect(Collectors.toList());
     }
 
     public Map<Slot, Slot> getOutputMap() {
@@ -165,5 +176,15 @@ public class LogicalProperties {
             hashCode = Objects.hash(outputExprIdSetSupplier.get());
         }
         return hashCode;
+    }
+
+    private boolean hasColumnPermission(Slot slot) {
+        if (slot instanceof SlotReference) {
+            SlotReference slotReference = (SlotReference) slot;
+            return slotReference.getColumn()
+                .map(column -> !column.getComment().contains(Constants.JD_SHIELDING_COLUMN))
+                .orElse(true);
+        }
+        return true;
     }
 }

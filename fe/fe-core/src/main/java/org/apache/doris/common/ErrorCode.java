@@ -1313,7 +1313,9 @@ public enum ErrorCode {
     ERR_PARSE_EXCEPTION(9076, new byte[]{'4', '2', '0', '0', '0'},
         "ParseException"),
     ERR_MetaException(9077, new byte[]{'4', '2', '0', '0', '0'},
-        "failed to get table %s");
+        "failed to get table %s"),
+    ERR_COLUMN_PERMISSION_EXCEPTION(9078, new byte[]{'4', '2', '0', '0', '0'},
+        "has no permission on column : %s ");
 
     // This is error code
     private final int code;
