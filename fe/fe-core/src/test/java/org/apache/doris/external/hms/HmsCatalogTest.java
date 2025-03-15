@@ -138,6 +138,10 @@ public class HmsCatalogTest extends AnalyzeCheckTestBase {
                 tbl.getDlaType();
                 minTimes = 0;
                 result = DLAType.HIVE;
+
+                tbl.getRowPolicy();
+                minTimes = 0;
+                result = null;
             }
         };
 

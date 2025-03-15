@@ -19,6 +19,10 @@ package org.apache.doris.common;
 
 import com.google.common.base.Strings;
 import junit.framework.AssertionFailedError;
+import org.junit.Assert;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
 
 public class ExceptionChecker {
 
@@ -34,7 +38,10 @@ public class ExceptionChecker {
         try {
             runnable.run();
         } catch (Throwable e) {
-            e.printStackTrace();
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            e.printStackTrace(pw);
+            Assert.assertEquals("", sw.toString());
             throw new AssertionFailedError(e.getMessage());
         }
     }

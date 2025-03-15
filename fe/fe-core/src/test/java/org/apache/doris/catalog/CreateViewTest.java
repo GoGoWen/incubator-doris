@@ -169,8 +169,7 @@ public class CreateViewTest {
     @Test
     public void testAlterView() throws Exception {
         String originStmt = "select k1 as kc1, sum(k2) as kc2 from test.tbl1 group by kc1";
-        ExceptionChecker.expectThrowsNoException(
-                () -> createView("create view test.alter1 as " + originStmt));
+        ExceptionChecker.expectThrowsNoException(() -> createView("create view test.alter1 as " + originStmt));
         Database db = Env.getCurrentInternalCatalog().getDbOrDdlException("test");
         View alter1 = (View) db.getTableOrDdlException("alter1");
         Assert.assertEquals(

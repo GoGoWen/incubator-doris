@@ -730,7 +730,7 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
     // eventUpdateTime will be refreshed after processing events with hms event listener enabled
     public long getUpdateTime() {
         makeSureInitialized();
-        if (dlaType.equals(DLAType.HUDI) || dlaType.equals(DLAType.ICEBERG)) {
+        if (DLAType.HUDI.equals(dlaType) || DLAType.ICEBERG.equals(dlaType)) {
             return System.currentTimeMillis();
         }
         return Math.max(Math.max(this.schemaUpdateTime, this.eventUpdateTime), this.partitionUpdateTime);

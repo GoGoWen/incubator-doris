@@ -87,7 +87,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hive.common.util.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -102,7 +101,6 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -1164,12 +1162,6 @@ public class Analyzer {
                 continue;
             }
             Column col = desc.getTable().getColumn(colName);
-            boolean hasNoPermission = Optional.ofNullable(col.getComment())
-                    .map(comment -> comment.contains(Constants.JD_SHIELDING_COLUMN))
-                    .orElse(false);
-            if (hasNoPermission) {
-                ErrorReport.reportAnalysisException(ErrorCode.ERR_COLUMN_PERMISSION_EXCEPTION, colName);
-            }
             if (col != null) {
                 if (result != null) {
                     if (result != desc) {

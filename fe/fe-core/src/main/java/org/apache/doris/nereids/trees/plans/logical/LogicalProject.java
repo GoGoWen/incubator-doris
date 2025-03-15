@@ -28,7 +28,6 @@ import org.apache.doris.nereids.trees.expressions.BoundStar;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Slot;
-import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Uuid;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.PlanType;
@@ -37,12 +36,10 @@ import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.ExpressionUtils;
 import org.apache.doris.nereids.util.Utils;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableSet;
-import org.apache.hive.common.util.Constants;
 import org.json.JSONObject;
 
 import java.util.HashMap;
@@ -50,7 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Logical project plan.
@@ -98,8 +94,8 @@ public class LogicalProject<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_
                 "projects can not be empty when child plan is unbound");
         this.projects = projects.isEmpty()
                 ? ImmutableList.of(ExpressionUtils.selectMinimumColumn(child.get(0).getOutput()))
-                : filterColumns(projects);
-        this.excepts = Utils.fastToImmutableList(filterColumns(excepts));
+                : projects;
+        this.excepts = Utils.fastToImmutableList(excepts);
         this.isDistinct = isDistinct;
         this.canEliminate = canEliminate;
     }
@@ -116,28 +112,6 @@ public class LogicalProject<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_
 
     public List<NamedExpression> getExcepts() {
         return excepts;
-    }
-
-    private List<NamedExpression> filterColumns(List<NamedExpression> list) {
-        return list.stream()
-            .filter(this::hasColumnPermission)
-            .collect(Collectors.toList());
-    }
-
-    /**
-     * Check whether the current Hadoop user has permission on the column
-     * @param slot param
-     * @return boolean
-     */
-    @VisibleForTesting
-    public boolean hasColumnPermission(NamedExpression slot) {
-        if (slot instanceof SlotReference) {
-            SlotReference slotReference = (SlotReference) slot;
-            return slotReference.getColumn()
-                .map(column -> !column.getComment().contains(Constants.JD_SHIELDING_COLUMN))
-                .orElse(true);
-        }
-        return true;
     }
 
     @Override

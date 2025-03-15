@@ -162,6 +162,17 @@ public class HmsQueryCacheTest extends AnalyzeCheckTestBase {
                 tbl.getDatabase();
                 minTimes = 0;
                 result = db;
+
+                tbl.makeSureInitialized();
+                minTimes = 0;
+
+                tbl.getRowPolicy();
+                minTimes = 0;
+                result = null;
+
+                tbl.getRowPolicy();
+                minTimes = 0;
+                result = null;
             }
         };
 
@@ -209,6 +220,13 @@ public class HmsQueryCacheTest extends AnalyzeCheckTestBase {
                 tbl2.getDatabase();
                 minTimes = 0;
                 result = db;
+
+                tbl2.makeSureInitialized();
+                minTimes = 0;
+
+                tbl2.getRowPolicy();
+                minTimes = 0;
+                result = null;
             }
         };
 
@@ -427,15 +445,12 @@ public class HmsQueryCacheTest extends AnalyzeCheckTestBase {
         init((HMSExternalCatalog) mgr.getCatalog(HMS_CATALOG));
         StatementBase parseStmt = analyzeAndGetStmtByNereids("select * from hms_ctl.hms_db.hms_tbl2", connectContext);
         List<ScanNode> scanNodes = Arrays.asList(hiveScanNode4);
-
         // invoke initSchemaAndUpdateTime first and init schemaUpdateTime
         tbl2.initSchemaAndUpdateTime();
-
         CacheAnalyzer ca = new CacheAnalyzer(connectContext, parseStmt, scanNodes);
         ca.checkCacheModeForNereids(System.currentTimeMillis() + Config.cache_last_version_interval_second * 1000L * 2);
         Assert.assertEquals(CacheAnalyzer.CacheMode.Sql, ca.getCacheMode());
         SqlCache sqlCache1 = (SqlCache) ca.getCache();
-
         // latestTime is equals to the schema update time if not set partition update time
         Assert.assertEquals(tbl2.getSchemaUpdateTime(), sqlCache1.getLatestTime());
 
