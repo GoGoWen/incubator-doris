@@ -678,7 +678,7 @@ public:
     const std::string& getName() const override { return _file_name; }
 
     void beforeReadStripe(std::unique_ptr<orc::StripeInformation> current_strip_information,
-                          std::vector<bool> selected_columns) override;
+                          std::vector<bool>& selected_columns) override;
 
     void set_all_tiny_stripes() { _is_all_tiny_stripes = true; }
 

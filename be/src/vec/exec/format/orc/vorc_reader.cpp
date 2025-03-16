@@ -2624,7 +2624,7 @@ MutableColumnPtr OrcReader::_convert_dict_column_to_string_column(
 
 void ORCFileInputStream::beforeReadStripe(
         std::unique_ptr<orc::StripeInformation> current_strip_information,
-        std::vector<bool> selected_columns) {
+        std::vector<bool>& selected_columns) {
     if (_is_all_tiny_stripes) {
         return;
     }
