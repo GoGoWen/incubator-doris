@@ -531,9 +531,15 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         return Optional.of(new HMSSchemaCacheValue(columns, partitionColumns));
     }
 
+    public List<Column> getFullSchemaWithoutPermission() {
+        return initSchema().map(SchemaCacheValue::getSchema).orElse(null);
+    }
+
     @Override
     public List<Column> getFullSchema() {
-        return initSchema().map(SchemaCacheValue::getSchema).orElse(null);
+        return initSchema().map(SchemaCacheValue::getSchema)
+            .map(cols -> cols.stream().filter(Column::hasPermission).collect(Collectors.toList()))
+            .orElse(Collections.emptyList());
     }
 
     private List<Column> getIcebergSchema() {
@@ -949,7 +955,7 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         makeSureInitialized();
         if (remoteTable.getParameters() != null) {
             String rowPolicy = remoteTable.getParameters().get(ROW_POLICY);
-            if (rowPolicy != null) {
+            if (StringUtils.isNotEmpty(rowPolicy)) {
                 return new NereidsParser().parseExpression(rowPolicy);
             }
         }

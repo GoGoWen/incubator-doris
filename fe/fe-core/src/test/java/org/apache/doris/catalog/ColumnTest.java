@@ -21,9 +21,11 @@ import org.apache.doris.common.DdlException;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.jmockit.Deencapsulation;
 
+import org.apache.hive.common.util.Constants;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -149,5 +151,23 @@ public class ColumnTest {
         Column newColumn = new Column("a", ArrayType.create(Type.INT, true), false, null, true, "0", "");
         oldColumn.checkSchemaChangeAllowed(newColumn);
         Assert.fail("No exception throws.");
+    }
+
+    @Test
+    public void testWithNoPermissionColumn() {
+        Column column = new Column();
+        column.setComment(Constants.JD_SHIELDING_COLUMN);
+        Assertions.assertFalse(column.hasPermission());
+    }
+
+    @Test
+    public void testWithPermissionColumn() {
+        Column column = new Column();
+        column.setComment(null);
+        Assertions.assertTrue(column.hasPermission());
+        column.setComment("");
+        Assertions.assertTrue(column.hasPermission());
+        column.setComment("comment");
+        Assertions.assertTrue(column.hasPermission());
     }
 }

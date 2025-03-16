@@ -17,6 +17,7 @@
 
 package org.apache.doris.datasource.hive;
 
+import org.apache.doris.catalog.Column;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.LessThan;
 
@@ -25,10 +26,13 @@ import mockit.Expectations;
 import mockit.Injectable;
 import mockit.Mock;
 import mockit.MockUp;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class HMSExternalTableTest {
@@ -38,6 +42,30 @@ public class HMSExternalTableTest {
             {
                 remoteTable.getParameters();
                 result = null;
+            }
+        };
+
+        new MockUp<HMSExternalTable>() {
+            @Mock
+            public final synchronized void makeSureInitialized() {
+            }
+        };
+
+        HMSExternalTable hmsExternalTable = new HMSExternalTable(1, "test", "test",
+                new HMSExternalCatalog());
+        hmsExternalTable.setRemoteTable(remoteTable);
+        Expression policy = hmsExternalTable.getRowPolicy();
+        Assertions.assertNull(policy);
+    }
+
+    @Test
+    public void testGetEmptyParamters(@Injectable Table remoteTable) {
+        Map<String, String> map = Maps.newHashMap();
+        map.put("row_policy", "");
+        new Expectations() {
+            {
+                remoteTable.getParameters();
+                result = map;
             }
         };
 
@@ -100,5 +128,40 @@ public class HMSExternalTableTest {
         Expression policy = hmsExternalTable.getRowPolicy();
         Assertions.assertTrue(policy instanceof LessThan);
         Assertions.assertEquals("(id < 1)", policy.toSql());
+    }
+
+    @Test
+    public void testGetTableSchemas(@Injectable Table remoteTable) {
+        List<FieldSchema> list = new ArrayList<>();
+        FieldSchema fieldSchema1 = new FieldSchema();
+        fieldSchema1.setName("name1");
+        fieldSchema1.setComment("comment");
+        fieldSchema1.setType("int");
+        list.add(fieldSchema1);
+        FieldSchema fieldSchema2 = new FieldSchema();
+        fieldSchema2.setName("name2");
+        fieldSchema2.setComment("name2|无权限查看当前列");
+        fieldSchema2.setType("int");
+        list.add(fieldSchema2);
+        new Expectations() {
+            {
+                remoteTable.getSd().getCols();
+                result = list;
+            }
+        };
+
+        new MockUp<HMSExternalTable>() {
+            @Mock
+            public final synchronized void makeSureInitialized() {
+            }
+        };
+
+        HMSExternalTable hmsExternalTable = new HMSExternalTable(1, "test", "test",
+                new HMSExternalCatalog());
+        hmsExternalTable.setRemoteTable(remoteTable);
+        List<Column> baseSchema = hmsExternalTable.getBaseSchema();
+        List<Column> fullSchema = hmsExternalTable.getFullSchemaWithoutPermission();
+        Assertions.assertEquals(1, baseSchema.size());
+        Assertions.assertEquals(2, fullSchema.size());
     }
 }

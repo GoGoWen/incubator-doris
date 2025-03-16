@@ -38,6 +38,7 @@ import org.apache.doris.thrift.TColumnType;
 import com.google.common.base.Strings;
 import com.google.gson.annotations.SerializedName;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hive.common.util.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -398,6 +399,10 @@ public class Column implements Writable, GsonPostProcessable {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    public boolean hasPermission() {
+        return StringUtils.isEmpty(comment) || !comment.contains(Constants.JD_SHIELDING_COLUMN);
     }
 
     public void setIsVisible(boolean isVisible) {

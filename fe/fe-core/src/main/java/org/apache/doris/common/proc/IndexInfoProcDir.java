@@ -23,6 +23,7 @@ import org.apache.doris.catalog.MaterializedIndexMeta;
 import org.apache.doris.catalog.OlapTable;
 import org.apache.doris.catalog.TableIf;
 import org.apache.doris.common.AnalysisException;
+import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.qe.SessionVariable;
 
 import com.google.common.base.Joiner;
@@ -133,7 +134,11 @@ public class IndexInfoProcDir implements ProcDirInterface {
                     return new RemoteIndexSchemaProcDir(table, schema, bfColumns);
                 }
             } else {
-                schema = table.getBaseSchema();
+                if (table instanceof HMSExternalTable) {
+                    schema = ((HMSExternalTable) table).getFullSchemaWithoutPermission();
+                } else {
+                    schema = table.getBaseSchema();
+                }
             }
             return new IndexSchemaProcNode(schema, bfColumns);
         } finally {
