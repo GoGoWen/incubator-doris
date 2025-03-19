@@ -150,7 +150,7 @@ public class LogicalPlanDeepCopier extends DefaultPlanRewriter<DeepCopierContext
         List<NamedExpression> outputExpressions = aggregate.getOutputExpressions().stream()
                 .map(o -> (NamedExpression) ExpressionDeepCopier.INSTANCE.deepCopy(o, context))
                 .collect(ImmutableList.toImmutableList());
-        return new LogicalAggregate<>(groupByExpressions, outputExpressions, child);
+        return aggregate.withChildGroupByAndOutput(groupByExpressions, outputExpressions, child);
     }
 
     @Override
@@ -370,7 +370,7 @@ public class LogicalPlanDeepCopier extends DefaultPlanRewriter<DeepCopierContext
         List<Slot> generatorOutput = generate.getGeneratorOutput().stream()
                 .map(o -> (Slot) ExpressionDeepCopier.INSTANCE.deepCopy(o, context))
                 .collect(ImmutableList.toImmutableList());
-        return new LogicalGenerate<>(generators, generatorOutput, child);
+        return new LogicalGenerate<>(generators, generatorOutput, generate.getExpandColumnAlias(), child);
     }
 
     @Override
@@ -379,7 +379,7 @@ public class LogicalPlanDeepCopier extends DefaultPlanRewriter<DeepCopierContext
         List<NamedExpression> windowExpressions = window.getWindowExpressions().stream()
                 .map(w -> (NamedExpression) ExpressionDeepCopier.INSTANCE.deepCopy(w, context))
                 .collect(ImmutableList.toImmutableList());
-        return new LogicalWindow<>(windowExpressions, child);
+        return new LogicalWindow<>(windowExpressions, window.isChecked(), child);
     }
 
     @Override
