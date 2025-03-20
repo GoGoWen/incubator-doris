@@ -531,15 +531,15 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         return Optional.of(new HMSSchemaCacheValue(columns, partitionColumns));
     }
 
-    public List<Column> getFullSchemaWithoutPermission() {
-        return initSchema().map(SchemaCacheValue::getSchema).orElse(null);
+    public List<Column> getFullSchemaWithPermission() {
+        return initSchema().map(SchemaCacheValue::getSchema)
+            .map(cols -> cols.stream().filter(Column::hasPermission).collect(Collectors.toList()))
+            .orElse(Collections.emptyList());
     }
 
     @Override
     public List<Column> getFullSchema() {
-        return initSchema().map(SchemaCacheValue::getSchema)
-            .map(cols -> cols.stream().filter(Column::hasPermission).collect(Collectors.toList()))
-            .orElse(Collections.emptyList());
+        return initSchema().map(SchemaCacheValue::getSchema).orElse(null);
     }
 
     private List<Column> getIcebergSchema() {

@@ -142,6 +142,10 @@ public class HmsCatalogTest extends AnalyzeCheckTestBase {
                 tbl.getRowPolicy();
                 minTimes = 0;
                 result = null;
+
+                tbl.getFullSchemaWithPermission();
+                minTimes = 0;
+                result = schema;
             }
         };
 

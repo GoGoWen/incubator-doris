@@ -170,9 +170,9 @@ public class HmsQueryCacheTest extends AnalyzeCheckTestBase {
                 minTimes = 0;
                 result = null;
 
-                tbl.getRowPolicy();
+                tbl.getFullSchemaWithPermission();
                 minTimes = 0;
-                result = null;
+                result = schema;
             }
         };
 
@@ -227,6 +227,10 @@ public class HmsQueryCacheTest extends AnalyzeCheckTestBase {
                 tbl2.getRowPolicy();
                 minTimes = 0;
                 result = null;
+
+                tbl2.getFullSchemaWithPermission();
+                minTimes = 0;
+                result = schema;
             }
         };
 
@@ -281,6 +285,10 @@ public class HmsQueryCacheTest extends AnalyzeCheckTestBase {
                 view1.getDatabase();
                 minTimes = 0;
                 result = db;
+
+                view1.getFullSchemaWithPermission();
+                minTimes = 0;
+                result = schema;
             }
         };
 
@@ -334,6 +342,10 @@ public class HmsQueryCacheTest extends AnalyzeCheckTestBase {
                 view2.getDatabase();
                 minTimes = 0;
                 result = db;
+
+                view2.getFullSchemaWithPermission();
+                minTimes = 0;
+                result = schema;
             }
         };
 

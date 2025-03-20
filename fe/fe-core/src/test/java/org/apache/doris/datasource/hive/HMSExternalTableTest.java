@@ -149,19 +149,17 @@ public class HMSExternalTableTest {
                 result = list;
             }
         };
-
         new MockUp<HMSExternalTable>() {
             @Mock
             public final synchronized void makeSureInitialized() {
             }
         };
-
         HMSExternalTable hmsExternalTable = new HMSExternalTable(1, "test", "test",
                 new HMSExternalCatalog());
         hmsExternalTable.setRemoteTable(remoteTable);
         List<Column> baseSchema = hmsExternalTable.getBaseSchema();
-        List<Column> fullSchema = hmsExternalTable.getFullSchemaWithoutPermission();
-        Assertions.assertEquals(1, baseSchema.size());
-        Assertions.assertEquals(2, fullSchema.size());
+        List<Column> fullSchema = hmsExternalTable.getFullSchemaWithPermission();
+        Assertions.assertEquals(2, baseSchema.size());
+        Assertions.assertEquals(1, fullSchema.size());
     }
 }

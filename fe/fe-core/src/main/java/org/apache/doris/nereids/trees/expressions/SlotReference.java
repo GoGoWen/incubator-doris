@@ -20,6 +20,7 @@ package org.apache.doris.nereids.trees.expressions;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.TableIf;
 import org.apache.doris.common.Pair;
+import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.nereids.exceptions.UnboundException;
 import org.apache.doris.nereids.trees.expressions.visitor.ExpressionVisitor;
 import org.apache.doris.nereids.types.DataType;
@@ -305,7 +306,11 @@ public class SlotReference extends Slot {
     }
 
     public boolean isVisible() {
-        return column == null || column.isVisible();
+        boolean visible = column == null || column.isVisible();
+        if (column != null && table instanceof HMSExternalTable) {
+            return visible && column.hasPermission();
+        }
+        return visible;
     }
 
     public List<String> getSubPath() {
@@ -331,5 +336,13 @@ public class SlotReference extends Slot {
 
     public String getQualifiedNameWithBackquote() throws UnboundException {
         return Utils.qualifiedNameWithBackquote(getQualifier(), getName());
+    }
+
+    public boolean hasPermission() {
+        if (table instanceof HMSExternalTable) {
+            return column != null && column.hasPermission();
+        } else {
+            return true;
+        }
     }
 }

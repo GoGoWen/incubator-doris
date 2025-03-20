@@ -33,8 +33,10 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalCatalogRelation;
 import org.apache.doris.nereids.trees.plans.logical.LogicalRelation;
 import org.apache.doris.nereids.trees.plans.logical.LogicalTVFRelation;
 import org.apache.doris.nereids.trees.plans.logical.LogicalView;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 
 import java.util.LinkedHashMap;
@@ -80,7 +82,14 @@ public class CheckPrivileges extends ColumnPruning {
         return super.visitLogicalRelation(relation, context);
     }
 
-    private Set<String> computeUsedColumns(Plan plan, Set<Slot> requiredSlots) {
+    /**
+     * compute used columns
+     * @param plan plan
+     * @param requiredSlots requiredSlots
+     * @return Set
+     */
+    @VisibleForTesting
+    public Set<String> computeUsedColumns(Plan plan, Set<Slot> requiredSlots) {
         List<Slot> outputs = plan.getOutput();
         Map<Integer, Slot> idToSlot = new LinkedHashMap<>(outputs.size());
         for (Slot output : outputs) {
@@ -90,9 +99,13 @@ public class CheckPrivileges extends ColumnPruning {
         Set<String> usedColumns = Sets.newLinkedHashSetWithExpectedSize(requiredSlots.size());
         for (Slot requiredSlot : requiredSlots) {
             Slot slot = idToSlot.get(requiredSlot.getExprId().asInt());
-            if (slot != null) {
+            if (slot != null && slot instanceof SlotReference) {
+                if (!((SlotReference) slot).hasPermission()) {
+                    throw new AnalysisException(String.format("%s has no permission on column [%s]",
+                        BDPAuthContext.get().getHadoopUserName(), slot.getName()));
+                }
                 // don't check privilege for hidden column, e.g. __DORIS_DELETE_SIGN__
-                if (slot instanceof SlotReference && ((SlotReference) slot).getColumn().isPresent()
+                if (((SlotReference) slot).getColumn().isPresent()
                         && !((SlotReference) slot).getColumn().get().isVisible()) {
                     continue;
                 }

@@ -43,6 +43,7 @@ import org.apache.doris.common.TreeNode;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.SqlUtils;
 import org.apache.doris.common.util.ToSqlContext;
+import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.mysql.privilege.PrivPredicate;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.rewrite.ExprRewriter;
@@ -1265,7 +1266,10 @@ public class SelectStmt extends QueryStmt {
      * refs for each column to selectListExprs.
      */
     private void expandStar(TableName tblName, TupleDescriptor desc) throws AnalysisException {
-        for (Column col : desc.getTable().getBaseSchema()) {
+        TableIf table = desc.getTable();
+        List<Column> columns = table instanceof HMSExternalTable
+                ? ((HMSExternalTable) table).getFullSchemaWithPermission() : table.getBaseSchema();
+        for (Column col : columns) {
             SlotRef slot = new SlotRef(tblName, col.getName());
             slot.setTable(desc.getTable());
             slot.setTupleId(desc.getId());
