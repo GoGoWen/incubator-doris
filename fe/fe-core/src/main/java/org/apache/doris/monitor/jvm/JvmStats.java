@@ -28,7 +28,6 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryUsage;
 import java.lang.management.RuntimeMXBean;
-import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,42 +82,7 @@ public class JvmStats {
         }
         Mem mem = new Mem(heapCommitted, heapUsed, heapMax, nonHeapCommitted, nonHeapUsed,
                 Collections.unmodifiableList(pools));
-
-        int threadsNew = 0;
-        int threadsRunnable = 0;
-        int threadsBlocked = 0;
-        int threadsWaiting = 0;
-        int threadsTimedWaiting = 0;
-        int threadsTerminated = 0;
-        for (ThreadInfo threadInfo : threadMXBean.dumpAllThreads(false, false)) {
-            if (threadInfo == null) {
-                continue; // race protection
-            }
-            switch (threadInfo.getThreadState()) {
-                case NEW:
-                    threadsNew++;
-                    break;
-                case RUNNABLE:
-                    threadsRunnable++;
-                    break;
-                case BLOCKED:
-                    threadsBlocked++;
-                    break;
-                case WAITING:
-                    threadsWaiting++;
-                    break;
-                case TIMED_WAITING:
-                    threadsTimedWaiting++;
-                    break;
-                case TERMINATED:
-                    threadsTerminated++;
-                    break;
-                default:
-                    break;
-            }
-        }
-        Threads threads = new Threads(threadMXBean.getThreadCount(), threadMXBean.getPeakThreadCount(), threadsNew,
-                threadsRunnable, threadsBlocked, threadsWaiting, threadsTimedWaiting, threadsTerminated);
+        Threads threads = new Threads(threadMXBean.getThreadCount(), threadMXBean.getPeakThreadCount());
 
         List<GarbageCollectorMXBean> gcMxBeans = ManagementFactory.getGarbageCollectorMXBeans();
         GarbageCollector[] collectors = new GarbageCollector[gcMxBeans.size()];
@@ -306,23 +270,10 @@ public class JvmStats {
 
         private final int count;
         private final int peakCount;
-        private final int threadsNewCount;
-        private final int threadsRunnableCount;
-        private final int threadsBlockedCount;
-        private final int threadsWaitingCount;
-        private final int threadsTimedWaitingCount;
-        private final int threadsTerminatedCount;
 
-        public Threads(int count, int peakCount, int threadsNewCount, int threadsRunnableCount, int threadsBlockedCount,
-                       int threadsWaitingCount, int threadsTimedWaitingCount, int threadsTerminatedCount) {
+        public Threads(int count, int peakCount) {
             this.count = count;
             this.peakCount = peakCount;
-            this.threadsNewCount = threadsNewCount;
-            this.threadsRunnableCount = threadsRunnableCount;
-            this.threadsBlockedCount = threadsBlockedCount;
-            this.threadsWaitingCount = threadsWaitingCount;
-            this.threadsTimedWaitingCount = threadsTimedWaitingCount;
-            this.threadsTerminatedCount = threadsTerminatedCount;
         }
 
         public int getCount() {
@@ -331,30 +282,6 @@ public class JvmStats {
 
         public int getPeakCount() {
             return peakCount;
-        }
-
-        public int getThreadsNewCount() {
-            return threadsNewCount;
-        }
-
-        public int getThreadsRunnableCount() {
-            return threadsRunnableCount;
-        }
-
-        public int getThreadsBlockedCount() {
-            return threadsBlockedCount;
-        }
-
-        public int getThreadsWaitingCount() {
-            return threadsWaitingCount;
-        }
-
-        public int getThreadsTimedWaitingCount() {
-            return threadsTimedWaitingCount;
-        }
-
-        public int getThreadsTerminatedCount() {
-            return threadsTerminatedCount;
         }
 
         @Override
