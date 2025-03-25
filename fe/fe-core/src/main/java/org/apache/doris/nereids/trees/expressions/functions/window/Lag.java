@@ -90,7 +90,7 @@ public class Lag extends WindowFunction implements TernaryExpression, Explicitly
             return;
         }
         if (children().size() >= 2) {
-            checkValidParams(getOffset(), true);
+            checkValidParams(getOffset());
             if (getOffset() instanceof Literal) {
                 if (((Literal) getOffset()).getDouble() < 0) {
                     throw new AnalysisException(
@@ -99,9 +99,6 @@ public class Lag extends WindowFunction implements TernaryExpression, Explicitly
             } else {
                 throw new AnalysisException(
                     "The offset parameter of LAG must be a constant positive integer: " + this.toSql());
-            }
-            if (children().size() >= 3) {
-                checkValidParams(getDefaultValue(), false);
             }
         }
     }
