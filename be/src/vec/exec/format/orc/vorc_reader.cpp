@@ -32,6 +32,7 @@
 #include <map>
 #include <ostream>
 #include <tuple>
+#include <utility>
 #include <variant>
 
 #include "cctz/civil_time.h"
@@ -670,8 +671,8 @@ bool OrcReader::_check_rest_children_can_push_down(const VExprSPtr& expr) {
 
     bool at_least_one_child_can_push_down = false;
     for (size_t i = 1; i < expr->children().size(); ++i) {
-        if (_check_literal_can_push_down(expr, i)) {
-            at_least_one_child_can_push_down = true;
+        if (!_check_literal_can_push_down(expr, i)) {
+            return false;
         }
     }
     return at_least_one_child_can_push_down;
@@ -777,17 +778,12 @@ void OrcReader::_build_filter_in(const VExprSPtr& expr,
     for (size_t i = 1; i < expr->children().size(); ++i) {
         DCHECK(expr->children()[i]->is_literal());
         const auto* literal = static_cast<const VLiteral*>(expr->children()[i].get());
-        if (_vliteral_to_orc_literal.contains(literal)) {
-            auto orc_literal = _vliteral_to_orc_literal.find(literal)->second;
-            literals.emplace_back(orc_literal);
-        }
+        DCHECK(_vliteral_to_orc_literal.contains(literal));
+        auto orc_literal = _vliteral_to_orc_literal.find(literal)->second;
+        literals.emplace_back(orc_literal);
     }
     DCHECK(!literals.empty());
-    if (literals.size() == 1) {
-        builder->equals(slot_ref->expr_name(), predicate_type, literals[0]);
-    } else {
-        builder->in(slot_ref->expr_name(), predicate_type, literals);
-    }
+    builder->in(slot_ref->expr_name(), predicate_type, literals);
 }
 
 void OrcReader::_build_is_null(const VExprSPtr& expr,
@@ -950,7 +946,7 @@ Status OrcReader::set_fill_columns(
                     visit_slot(child.get());
                 }
             } else if (VInPredicate* in_predicate = typeid_cast<VInPredicate*>(filter_impl)) {
-                if (in_predicate->children().size() > 0) {
+                if (!in_predicate->children().empty()) {
                     visit_slot(in_predicate->children()[0].get());
                 }
             } else {
@@ -1186,7 +1182,8 @@ Status OrcReader::_fill_partition_columns(
         if (num_deserialized != rows) {
             return Status::InternalError(
                     "Failed to fill partition column: {}={} ."
-                    "Number of rows expected to be written : {}, number of rows actually written : "
+                    "Number of rows expected to be written : {}, number of rows actually "
+                    "written : "
                     "{}",
                     slot_desc->col_name(), value, num_deserialized, rows);
         }
