@@ -40,6 +40,7 @@ import org.apache.doris.nereids.trees.expressions.InPredicate;
 import org.apache.doris.nereids.trees.expressions.IntegralDivide;
 import org.apache.doris.nereids.trees.expressions.Mod;
 import org.apache.doris.nereids.trees.expressions.Multiply;
+import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.SubqueryExpr;
 import org.apache.doris.nereids.trees.expressions.Subtract;
 import org.apache.doris.nereids.trees.expressions.TimestampArithmetic;
@@ -961,10 +962,15 @@ public class TypeCoercionUtils {
                 .processCharacterLiteralInBinaryOperator(comparisonPredicate, left, right);
         left = comparisonPredicate.left();
         right = comparisonPredicate.right();
-
-        Optional<DataType> commonType = findWiderTypeForTwoForComparison(
-                left.getDataType(), right.getDataType(), false);
-
+        Optional<DataType> commonType;
+        if (left instanceof Slot && !(right instanceof Slot)) {
+            commonType = Optional.of(left.getDataType());
+        } else if (!(left instanceof Slot) && right instanceof Slot) {
+            commonType = Optional.of(right.getDataType());
+        } else {
+            commonType = findWiderTypeForTwoForComparison(
+                    left.getDataType(), right.getDataType(), false);
+        }
         if (commonType.isPresent()) {
             commonType = Optional.of(downgradeDecimalAndDateLikeType(
                     commonType.get(),
