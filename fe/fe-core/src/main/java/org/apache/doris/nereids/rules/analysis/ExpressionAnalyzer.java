@@ -84,6 +84,7 @@ import org.apache.doris.nereids.types.ArrayType;
 import org.apache.doris.nereids.types.BigIntType;
 import org.apache.doris.nereids.types.BooleanType;
 import org.apache.doris.nereids.types.DataType;
+import org.apache.doris.nereids.util.BooleanUtils;
 import org.apache.doris.nereids.util.TypeCoercionUtils;
 import org.apache.doris.nereids.util.Utils;
 import org.apache.doris.qe.ConnectContext;
@@ -576,7 +577,8 @@ public class ExpressionAnalyzer extends SubExprAnalyzer<ExpressionRewriteContext
     public Expression visitInPredicate(InPredicate inPredicate, ExpressionRewriteContext context) {
         List<Expression> rewrittenChildren = inPredicate.children().stream()
                 .map(e -> e.accept(this, context)).collect(Collectors.toList());
-        InPredicate newInPredicate = inPredicate.withChildren(rewrittenChildren);
+        InPredicate newInPredicate = inPredicate.withChildren(
+                BooleanUtils.processInPredicateChildren(rewrittenChildren));
         return TypeCoercionUtils.processInPredicate(newInPredicate);
     }
 

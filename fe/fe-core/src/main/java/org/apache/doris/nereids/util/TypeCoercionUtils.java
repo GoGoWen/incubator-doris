@@ -963,9 +963,9 @@ public class TypeCoercionUtils {
         left = comparisonPredicate.left();
         right = comparisonPredicate.right();
         Optional<DataType> commonType;
-        if (left instanceof Slot && !(right instanceof Slot)) {
+        if (left instanceof Slot && left.getDataType() instanceof CharacterType && !(right instanceof Slot)) {
             commonType = Optional.of(left.getDataType());
-        } else if (!(left instanceof Slot) && right instanceof Slot) {
+        } else if (!(left instanceof Slot) && right instanceof Slot && right.getDataType() instanceof CharacterType) {
             commonType = Optional.of(right.getDataType());
         } else {
             commonType = findWiderTypeForTwoForComparison(
