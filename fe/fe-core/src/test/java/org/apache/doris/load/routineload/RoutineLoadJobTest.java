@@ -23,6 +23,7 @@ import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.catalog.Database;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.Table;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.InternalErrorCode;
 import org.apache.doris.common.LoadException;
 import org.apache.doris.common.Pair;
@@ -381,6 +382,14 @@ public class RoutineLoadJobTest {
                 + ");";
         System.out.println(showCreateInfo);
         Assert.assertEquals(expect, showCreateInfo);
+    }
+
+    @Test
+    public void testGetTimeout() {
+        RoutineLoadJob job = new KafkaRoutineLoadJob();
+        Assert.assertEquals(RoutineLoadJob.DEFAULT_MAX_INTERVAL_SECOND, job.getMaxBatchIntervalS());
+        Assert.assertEquals(RoutineLoadJob.DEFAULT_MAX_INTERVAL_SECOND
+                        * Config.routine_load_task_timeout_multiplier, job.getTimeout());
     }
 
 }
