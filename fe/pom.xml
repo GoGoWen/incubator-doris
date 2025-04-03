@@ -232,6 +232,7 @@ under the License.
         <gcs.dependency.scope>compile</gcs.dependency.scope>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <doris.hive.catalog.shade.version>2.1.0-jd-SNAPSHOT</doris.hive.catalog.shade.version>
+        <doris.hadoop.shade.version>2.1.0-jd-SNAPSHOT</doris.hadoop.shade.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <!--plugin parameters-->
@@ -605,6 +606,11 @@ under the License.
                 <groupId>org.apache.doris</groupId>
                 <artifactId>hive-catalog-shade</artifactId>
                 <version>${doris.hive.catalog.shade.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.doris</groupId>
+                <artifactId>hadoop-shade</artifactId>
+                <version>${doris.hadoop.shade.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kerby</groupId>

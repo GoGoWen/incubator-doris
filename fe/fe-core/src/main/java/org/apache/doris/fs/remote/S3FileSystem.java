@@ -26,9 +26,9 @@ import org.apache.doris.fs.remote.dfs.DFSFileSystem;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -39,6 +39,8 @@ import java.util.Map;
 public class S3FileSystem extends ObjFileSystem {
 
     private static final Logger LOG = LogManager.getLogger(S3FileSystem.class);
+
+    protected volatile s3.org.apache.hadoop.fs.FileSystem dfsS3FileSystem = null;
 
     public S3FileSystem(Map<String, String> properties) {
         super(StorageBackend.StorageType.S3.name(), StorageBackend.StorageType.S3, new S3ObjStorage(properties));
@@ -60,7 +62,7 @@ public class S3FileSystem extends ObjFileSystem {
         if (dfsFileSystem == null) {
             synchronized (this) {
                 if (dfsFileSystem == null) {
-                    Configuration conf = DFSFileSystem.getHdfsConf(ifNotSetFallbackToSimpleAuth());
+                    Configuration conf = new HdfsConfiguration();
                     System.setProperty("com.amazonaws.services.s3.enableV4", "true");
                     // the entry value in properties may be null, and
                     PropertyConverter.convertToHadoopFSProperties(properties).entrySet().stream()
@@ -77,17 +79,41 @@ public class S3FileSystem extends ObjFileSystem {
         return dfsFileSystem;
     }
 
+    protected s3.org.apache.hadoop.fs.FileSystem nativeS3FileSystem(String remotePath) throws UserException {
+        if (dfsS3FileSystem == null) {
+            synchronized (this) {
+                if (dfsS3FileSystem == null) {
+                    s3.org.apache.hadoop.conf.Configuration conf = new s3.org.apache.hadoop.hdfs.HdfsConfiguration();
+                    conf.set(DFSFileSystem.PROP_ALLOW_FALLBACK_TO_SIMPLE_AUTH, "true");
+                    System.setProperty("com.amazonaws.services.s3.enableV4", "true");
+                    // the entry value in properties may be null, and
+                    PropertyConverter.convertToHadoopFSProperties(properties).entrySet().stream()
+                            .filter(entry -> entry.getKey() != null && entry.getValue() != null)
+                            .forEach(entry -> conf.set(entry.getKey(), entry.getValue()));
+                    try {
+                        dfsS3FileSystem = new s3.org.apache.hadoop.fs.s3a.S3AFileSystem();
+                        s3.org.apache.hadoop.util.ReflectionUtils.setConf(dfsS3FileSystem, conf);
+                        dfsS3FileSystem.initialize(new s3.org.apache.hadoop.fs.Path(remotePath).toUri(), conf);
+                    } catch (Throwable e) {
+                        throw new UserException("Failed to get S3 FileSystem for " + e.getMessage(), e);
+                    }
+                }
+            }
+        }
+        return dfsS3FileSystem;
+    }
+
     // broker file pattern glob is too complex, so we use hadoop directly
     @Override
     public Status globList(String remotePath, List<RemoteFile> result, boolean fileNameOnly) {
         try {
-            FileSystem s3AFileSystem = nativeFileSystem(remotePath);
-            Path pathPattern = new Path(remotePath);
-            FileStatus[] files = s3AFileSystem.globStatus(pathPattern);
+            s3.org.apache.hadoop.fs.FileSystem s3AFileSystem = nativeS3FileSystem(remotePath);
+            s3.org.apache.hadoop.fs.Path pathPattern = new s3.org.apache.hadoop.fs.Path(remotePath);
+            s3.org.apache.hadoop.fs.FileStatus[] files = s3AFileSystem.globStatus(pathPattern);
             if (files == null) {
                 return Status.OK;
             }
-            for (FileStatus fileStatus : files) {
+            for (s3.org.apache.hadoop.fs.FileStatus fileStatus : files) {
                 RemoteFile remoteFile = new RemoteFile(
                         fileNameOnly ? fileStatus.getPath().getName() : fileStatus.getPath().toString(),
                         !fileStatus.isDirectory(), fileStatus.isDirectory() ? -1 : fileStatus.getLen(),

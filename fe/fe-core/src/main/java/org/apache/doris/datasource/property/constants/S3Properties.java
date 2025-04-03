@@ -21,17 +21,12 @@ import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.credentials.CloudCredential;
 import org.apache.doris.common.credentials.CloudCredentialWithEndpoint;
-import org.apache.doris.common.credentials.DataLakeAWSCredentialsProvider;
 import org.apache.doris.datasource.property.PropertyConverter;
 import org.apache.doris.thrift.TS3StorageParam;
 
-import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
-import com.amazonaws.auth.InstanceProfileCredentialsProvider;
-import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
-import com.amazonaws.auth.WebIdentityTokenCredentialsProvider;
-import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
+import s3.org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -64,12 +59,7 @@ public class S3Properties extends BaseProperties {
             ROOT_PATH, BUCKET, MAX_CONNECTIONS, REQUEST_TIMEOUT_MS, CONNECTION_TIMEOUT_MS);
 
     public static final List<String> AWS_CREDENTIALS_PROVIDERS = Arrays.asList(
-            DataLakeAWSCredentialsProvider.class.getName(),
-            EnvironmentVariableCredentialsProvider.class.getName(),
-            SystemPropertiesCredentialsProvider.class.getName(),
-            ProfileCredentialsProvider.class.getName(),
-            InstanceProfileCredentialsProvider.class.getName(),
-            WebIdentityTokenCredentialsProvider.class.getName());
+            SimpleAWSCredentialsProvider.class.getName());
 
     private static final Pattern IPV4_PORT_PATTERN = Pattern.compile("((?:\\d{1,3}\\.){3}\\d{1,3}:\\d{1,5})");
 
