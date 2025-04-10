@@ -25,6 +25,7 @@ import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SqlModeHelper;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class ExpressionParserTest extends ParserTestBase {
@@ -311,5 +312,36 @@ public class ExpressionParserTest extends ParserTestBase {
                 + "where (a match 'hello' or a match_any 'world') "
                 + "and b match_all 'yes ok' or c match_phrase 'nice day';";
         assertSql(sql);
+    }
+
+    @Test
+    public void testParseSequenceFunction() {
+        String sql1 = "sequence(5)";
+        String sql2 = "sequence(1, 5)";
+        String sql3 = "sequence(1, 5, 1)";
+        String sql4 = "SEQUENCE('2024-05-15 00:00:00', '2024-05-17 00:00:00', INTERVAL 1 DAY)";
+        String sql5 = "SEQUENCE('2024-05-15 00:00:00', '2024-05-17 00:00:00', INTERVAL 1 MONTH)";
+        String sql6 = "SEQUENCE('2024-05-15 00:00:00', '2024-05-17 00:00:00', INTERVAL 1 WEEK)";
+        String sql7 = "SEQUENCE('2024-05-15 00:00:00', '2024-05-17 00:00:00', INTERVAL 1 YEAR)";
+        String sql8 = "SEQUENCE('2024-05-15 00:00:00', '2024-05-17 00:00:00', INTERVAL 1 SECOND)";
+        String sql9 = "SEQUENCE('2024-05-15 00:00:00', '2024-05-17 00:00:00', INTERVAL 1 MINUTE)";
+        String sql10 = "SEQUENCE('2024-05-15 00:00:00', '2024-05-17 00:00:00', INTERVAL 1 HOUR)";
+        Assertions.assertEquals(sql1, parseExpression(sql1).getExpression().toSql());
+        Assertions.assertEquals(sql2, parseExpression(sql2).getExpression().toSql());
+        Assertions.assertEquals(sql3, parseExpression(sql3).getExpression().toSql());
+        Assertions.assertEquals("sequence_day_unit('2024-05-15 00:00:00', '2024-05-17 00:00:00', 1)",
+                parseExpression(sql4).getExpression().toSql());
+        Assertions.assertEquals("sequence_month_unit('2024-05-15 00:00:00', '2024-05-17 00:00:00', 1)",
+                parseExpression(sql5).getExpression().toSql());
+        Assertions.assertEquals("sequence_week_unit('2024-05-15 00:00:00', '2024-05-17 00:00:00', 1)",
+                parseExpression(sql6).getExpression().toSql());
+        Assertions.assertEquals("sequence_year_unit('2024-05-15 00:00:00', '2024-05-17 00:00:00', 1)",
+                parseExpression(sql7).getExpression().toSql());
+        Assertions.assertEquals("sequence_second_unit('2024-05-15 00:00:00', '2024-05-17 00:00:00', 1)",
+                parseExpression(sql8).getExpression().toSql());
+        Assertions.assertEquals("sequence_minute_unit('2024-05-15 00:00:00', '2024-05-17 00:00:00', 1)",
+                parseExpression(sql9).getExpression().toSql());
+        Assertions.assertEquals("sequence_hour_unit('2024-05-15 00:00:00', '2024-05-17 00:00:00', 1)",
+                parseExpression(sql10).getExpression().toSql());
     }
 }

@@ -49,5 +49,5 @@ public abstract class ParserTestBase implements MemoPatternMatchSupported {
     public ExpressionParseChecker parseExpression(String sql) {
         return new ExpressionParseChecker(sql);
     }
-
 }
+

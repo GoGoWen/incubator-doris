@@ -762,13 +762,20 @@ primaryExpression
                 (INTERVAL unitsAmount=valueExpression  unit=datetimeUnit
                 | unitsAmount=valueExpression)
             RIGHT_PAREN                                                                        #dateCeil
-    | name =(ARRAY_RANGE | SEQUENCE)
+    | name =ARRAY_RANGE
             LEFT_PAREN
                 start=valueExpression COMMA
                 end=valueExpression COMMA
                 (INTERVAL unitsAmount=valueExpression unit=datetimeUnit
                 | unitsAmount=valueExpression)
             RIGHT_PAREN                                                                        #arrayRange
+    | name =SEQUENCE
+                LEFT_PAREN
+                    start=valueExpression COMMA
+                    end=valueExpression COMMA
+                    (INTERVAL unitsAmount=valueExpression unit=datetimeUnit
+                    | unitsAmount=valueExpression)
+                RIGHT_PAREN                                                                    #sequence
     | name=CURRENT_DATE                                                                        #currentDate
     | name=SYSDATE                                                                             #sysDate
     | name=WEEK_AND_YEAR LEFT_PAREN dateStr=valueExpression

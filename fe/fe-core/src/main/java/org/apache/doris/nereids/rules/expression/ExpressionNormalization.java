@@ -25,6 +25,7 @@ import org.apache.doris.nereids.rules.expression.rules.InPredicateDedup;
 import org.apache.doris.nereids.rules.expression.rules.InPredicateToEqualToRule;
 import org.apache.doris.nereids.rules.expression.rules.MergeDateTrunc;
 import org.apache.doris.nereids.rules.expression.rules.NormalizeBinaryPredicatesRule;
+import org.apache.doris.nereids.rules.expression.rules.SequenceFunctionRewrite;
 import org.apache.doris.nereids.rules.expression.rules.SimplifyArithmeticComparisonRule;
 import org.apache.doris.nereids.rules.expression.rules.SimplifyArithmeticRule;
 import org.apache.doris.nereids.rules.expression.rules.SimplifyCastRule;
@@ -52,6 +53,7 @@ public class ExpressionNormalization extends ExpressionRewrite {
                 FoldConstantRule.INSTANCE,
                 SimplifyCastRule.INSTANCE,
                 DigitalMaskingConvert.INSTANCE,
+                SequenceFunctionRewrite.INSTANCE,
                 SimplifyArithmeticComparisonRule.INSTANCE,
                 ConvertAggStateCast.INSTANCE,
                 MergeDateTrunc.INSTANCE,

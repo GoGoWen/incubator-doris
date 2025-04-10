@@ -167,6 +167,7 @@ import org.apache.doris.nereids.DorisParser.SampleContext;
 import org.apache.doris.nereids.DorisParser.SelectClauseContext;
 import org.apache.doris.nereids.DorisParser.SelectColumnClauseContext;
 import org.apache.doris.nereids.DorisParser.SelectHintContext;
+import org.apache.doris.nereids.DorisParser.SequenceContext;
 import org.apache.doris.nereids.DorisParser.SetOperationContext;
 import org.apache.doris.nereids.DorisParser.ShowConstraintContext;
 import org.apache.doris.nereids.DorisParser.ShowCreateMTMVContext;
@@ -319,6 +320,14 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.SecondFloor;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SecondsAdd;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SecondsDiff;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SecondsSub;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Sequence;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SequenceDayUnit;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SequenceHourUnit;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SequenceMinuteUnit;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SequenceMonthUnit;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SequenceSecondUnit;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SequenceWeekUnit;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.SequenceYearUnit;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.SysDate;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekAndYear;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.WeekCeil;
@@ -1866,6 +1875,40 @@ public class LogicalPlanBuilder extends DorisParserBaseVisitor<Object> {
             return new ArrayRange(start, end);
         } else {
             return new ArrayRange(start);
+        }
+    }
+
+    @Override
+    public Expression visitSequence(SequenceContext ctx) {
+        Expression start = (Expression) visit(ctx.start);
+        Expression end = (Expression) visit(ctx.end);
+        Expression step = (Expression) visit(ctx.unitsAmount);
+
+        String unit = ctx.unit == null ? null : ctx.unit.getText();
+        if (unit != null && !unit.isEmpty()) {
+            if ("Year".equalsIgnoreCase(unit)) {
+                return new SequenceYearUnit(start, end, step);
+            } else if ("Month".equalsIgnoreCase(unit)) {
+                return new SequenceMonthUnit(start, end, step);
+            } else if ("Week".equalsIgnoreCase(unit)) {
+                return new SequenceWeekUnit(start, end, step);
+            } else if ("Day".equalsIgnoreCase(unit)) {
+                return new SequenceDayUnit(start, end, step);
+            } else if ("Hour".equalsIgnoreCase(unit)) {
+                return new SequenceHourUnit(start, end, step);
+            } else if ("Minute".equalsIgnoreCase(unit)) {
+                return new SequenceMinuteUnit(start, end, step);
+            } else if ("Second".equalsIgnoreCase(unit)) {
+                return new SequenceSecondUnit(start, end, step);
+            }
+            throw new ParseException("Unsupported time unit: " + ctx.unit
+                    + ", supported time unit: YEAR/MONTH/DAY/HOUR/MINUTE/SECOND", ctx);
+        } else if (ctx.unitsAmount != null) {
+            return new Sequence(start, end, step);
+        } else if (ctx.end != null) {
+            return new Sequence(start, end);
+        } else {
+            return new Sequence(start);
         }
     }
 
