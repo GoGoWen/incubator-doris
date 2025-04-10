@@ -1416,6 +1416,19 @@ public:
             StringRef date_ref = date_str_col->get_data_at(row);
             std::string date_string(date_ref.data, date_ref.size);
             
+            if (date_string.empty()) {
+                std::string year_str = "0";
+                std::string week_str = "00";
+                
+                int written = snprintf(buf, sizeof(buf), format.c_str(), year_str.c_str(), week_str.c_str());
+                
+                size_t old_size = res_buff.size();
+                res_buff.resize(old_size + written);
+                memcpy(res_buff.data() + old_size, buf, written);
+                res_offsets[row] = res_buff.size();
+                continue;
+            }
+            
             VecDateTimeValue dt;
             if (!dt.from_date_str(date_string.c_str(), date_string.size())) {
                 null_map_data[row] = 1;

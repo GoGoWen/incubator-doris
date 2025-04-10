@@ -34,6 +34,7 @@ TEST(DateTimeFunctionTest, year_and_week_test) {
             {{std::string("2023-01-01"), std::string("%s-%s")}, std::string("2022-52")},
             {{std::string("2023-01-02"), std::string("%s-%s")}, std::string("2023-01")},
             {{std::string("2023-12-31"), std::string("%s-%s")}, std::string("2023-52")},
+            {{std::string(""), std::string("%s-%s")}, std::string("0-00")},
             {{Null(), std::string("Year %s Week %s")}, Null()},
             {{std::string("2023-01-01"), Null()}, Null()}
         };
