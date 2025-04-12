@@ -150,6 +150,14 @@ public class Avg extends NullableAggregateFunction
     }
 
     @Override
+    public FunctionSignature searchSignature(List<FunctionSignature> signatures) {
+        if (getArgument(0).getDataType().isCharacterType()) {
+            return FunctionSignature.ret(DoubleType.INSTANCE).args(DoubleType.INSTANCE);
+        }
+        return ExplicitlyCastableSignature.super.searchSignature(signatures);
+    }
+
+    @Override
     public <R, C> R accept(ExpressionVisitor<R, C> visitor, C context) {
         return visitor.visitAvg(this, context);
     }

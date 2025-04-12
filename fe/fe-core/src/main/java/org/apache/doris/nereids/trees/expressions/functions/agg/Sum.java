@@ -126,7 +126,7 @@ public class Sum extends NullableAggregateFunction
         if (getArgument(0).getDataType() instanceof FloatType) {
             return FunctionSignature.ret(DoubleType.INSTANCE).args(FloatType.INSTANCE);
         }
-        if (getArgument(0).getDataType().isCharacterType() && supportCharacterCastForNumeric()) {
+        if (getArgument(0).getDataType().isCharacterType()) {
             return FunctionSignature.ret(DoubleType.INSTANCE).args(DoubleType.INSTANCE);
         }
         return ExplicitlyCastableSignature.super.searchSignature(signatures);
