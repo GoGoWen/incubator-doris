@@ -270,7 +270,7 @@ public class PropertyConverterTest extends TestWithFeService {
         Assertions.assertEquals(13, properties.size());
 
         Map<String, String> hdProps = catalog.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(15, hdProps.size());
+        Assertions.assertEquals(21, hdProps.size());
     }
 
     @Test
@@ -288,7 +288,7 @@ public class PropertyConverterTest extends TestWithFeService {
         Assertions.assertEquals(12, properties.size());
 
         Map<String, String> hdProps = catalog.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(14, hdProps.size());
+        Assertions.assertEquals(20, hdProps.size());
     }
 
     @Test
@@ -440,7 +440,7 @@ public class PropertyConverterTest extends TestWithFeService {
         Assertions.assertEquals("s3.us-east-1.amazonaws.com", properties.get(S3Properties.ENDPOINT));
 
         Map<String, String> hdProps = catalog.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(23, hdProps.size());
+        Assertions.assertEquals(29, hdProps.size());
 
         String query = "create catalog hms_glue properties (\n"
                 + "    'type'='hms',\n"
@@ -504,8 +504,21 @@ public class PropertyConverterTest extends TestWithFeService {
                 + "    'obs.access_key' = 'akk',\n"
                 + "    'obs.secret_key' = 'skk'\n"
                 + ");";
-        testS3CompatibleCatalogProperties(catalogName3, ObsProperties.OBS_PREFIX,
-                "obs.cn-north-4.myhuaweicloud.com", query3, 12, 17);
+
+        Env.getCurrentEnv().getCatalogMgr().dropCatalog(new DropCatalogStmt(true, catalogName));
+        CreateCatalogStmt analyzedStmt = createStmt(query3);
+        HMSExternalCatalog catalog = createAndGetCatalog(analyzedStmt, catalogName3);
+        Map<String, String> properties = catalog.getCatalogProperty().getProperties();
+        Assertions.assertEquals(12, properties.size());
+
+        Map<String, String> hdProps = catalog.getCatalogProperty().getHadoopProperties();
+        Assertions.assertEquals(18, hdProps.size());
+
+        Map<String, String> expectedMetaProperties = new HashMap<>();
+        expectedMetaProperties.put("endpoint", "obs.cn-north-4.myhuaweicloud.com");
+        expectedMetaProperties.put("AWS_ENDPOINT", "obs.cn-north-4.myhuaweicloud.com");
+        expectedMetaProperties.putAll(expectedCredential);
+        checkExpectedProperties(ObsProperties.OBS_PREFIX, properties, expectedMetaProperties);
     }
 
     private void testS3CompatibleCatalogProperties(String catalogName, String prefix,
