@@ -27,6 +27,7 @@ import org.apache.doris.common.PatternMatcher;
 import org.apache.doris.common.PatternMatcherWrapper;
 import org.apache.doris.common.VariableAnnotation;
 import org.apache.doris.common.util.ProfileManager;
+import org.apache.doris.nereids.parser.Dialect;
 import org.apache.doris.thrift.TQueryOptions;
 import org.apache.doris.utframe.TestWithFeService;
 
@@ -167,5 +168,13 @@ public class SessionVariablesTest extends TestWithFeService {
 
         Assertions.assertEquals("test",
                 sessionVariableClone.getSessionOriginValue().get(txIsolationSessionVariableField));
+    }
+
+    @Test
+    public void testDecimalSessionVariables() {
+        sessionVariable.setSqlDialect(Dialect.PRESTO.getDialectName());
+        Assertions.assertTrue(sessionVariable.isEnableDecimal256());
+        sessionVariable.setSqlDialect(Dialect.DORIS.getDialectName());
+        Assertions.assertFalse(sessionVariable.isEnableDecimal256());
     }
 }
