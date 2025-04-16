@@ -458,7 +458,7 @@ public class PropertyConverterTest extends TestWithFeService {
         Assertions.assertEquals("s3.us-east-1.amazonaws.com.cn", propertiesNew.get(S3Properties.ENDPOINT));
 
         Map<String, String> hdPropsNew = catalogNew.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(23, hdPropsNew.size());
+        Assertions.assertEquals(29, hdPropsNew.size());
     }
 
     @Test
@@ -472,7 +472,7 @@ public class PropertyConverterTest extends TestWithFeService {
                     + "    'cos.secret_key' = 'skk'\n"
                     + ");";
         testS3CompatibleCatalogProperties(catalogName0, CosProperties.COS_PREFIX,
-                "cos.ap-beijing.myqcloud.com", query0, 12, 18);
+                "cos.ap-beijing.myqcloud.com", query0, 12, 17);
 
         String catalogName1 = "hms_oss";
         String query1 = "create catalog " + catalogName1 + " properties (\n"
@@ -494,7 +494,7 @@ public class PropertyConverterTest extends TestWithFeService {
                 + "    'minio.secret_key' = 'skk'\n"
                 + ");";
         testS3CompatibleCatalogProperties(catalogName2, MinioProperties.MINIO_PREFIX,
-                "http://127.0.0.1", query2, 12, 14);
+                "http://127.0.0.1", query2, 12, 20);
 
         String catalogName3 = "hms_obs";
         String query3 = "create catalog hms_obs properties (\n"
@@ -505,14 +505,14 @@ public class PropertyConverterTest extends TestWithFeService {
                 + "    'obs.secret_key' = 'skk'\n"
                 + ");";
 
-        Env.getCurrentEnv().getCatalogMgr().dropCatalog(new DropCatalogStmt(true, catalogName));
+        Env.getCurrentEnv().getCatalogMgr().dropCatalog(new DropCatalogStmt(true, catalogName3));
         CreateCatalogStmt analyzedStmt = createStmt(query3);
         HMSExternalCatalog catalog = createAndGetCatalog(analyzedStmt, catalogName3);
         Map<String, String> properties = catalog.getCatalogProperty().getProperties();
         Assertions.assertEquals(12, properties.size());
 
         Map<String, String> hdProps = catalog.getCatalogProperty().getHadoopProperties();
-        Assertions.assertEquals(18, hdProps.size());
+        Assertions.assertEquals(16, hdProps.size());
 
         Map<String, String> expectedMetaProperties = new HashMap<>();
         expectedMetaProperties.put("endpoint", "obs.cn-north-4.myhuaweicloud.com");
