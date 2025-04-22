@@ -53,8 +53,14 @@ public class DateSupplementTest {
     public void testEvaluateWithInvalidInput() {
         // Test with invalid date formats - should return input as is
         Assert.assertEquals("invalid-date", dateSupplement.evaluate("invalid-date"));
-        Assert.assertEquals("2023/10/05", dateSupplement.evaluate("2023/10/05"));
         Assert.assertEquals("20231005", dateSupplement.evaluate("20231005"));
         Assert.assertEquals("2023-13-45", dateSupplement.evaluate("2023-13-45")); // Invalid month and day
+        Assert.assertEquals("", dateSupplement.evaluate(""));
+    }
+
+    @Test
+    public void testEvaluateWithNewDateInput() {
+        Assert.assertEquals("2023/10/05", dateSupplement.evaluate("2023-10-05 00:00:00"));
+        Assert.assertEquals("2023/10/05 01:02:33", dateSupplement.evaluate("2023-10-05 01:02:33"));
     }
 }

@@ -43,6 +43,9 @@ public class DateSupplement extends UDF {
     }
 
     private String formatDateTime(String inputDate) {
+        if (inputDate.contains("/")) {
+            inputDate = inputDate.replace('/', '-');
+        }
         if (inputDate.contains("-")) {
             long dashCount = inputDate.chars().filter(c -> c == '-').count();
             LocalDate date = parseDate(inputDate, dashCount);
