@@ -1207,7 +1207,7 @@ public class ConnectContext {
 
     public boolean supportCharacterCastForNumeric() {
         return Config.support_character_cast_for_numeric_agg_function
-            && Optional.ofNullable(getSessionVariable())
+            || Optional.ofNullable(getSessionVariable())
             .map(SessionVariable::getSqlDialect)
             .map("presto"::equals)
             .orElse(false);
