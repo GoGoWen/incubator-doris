@@ -1159,17 +1159,20 @@ public class ShowExecutor {
                 .getCatalogOrAnalysisException(showStmt.getTableName().getCtl())
                 .getDbOrAnalysisException(showStmt.getDbName());
         if (db instanceof Database) {
-            OlapTable table = db.getOlapTableOrAnalysisException(showStmt.getTableName().getTbl());
-            table.readLock();
-            try {
-                List<Index> indexes = table.getIndexes();
-                for (Index index : indexes) {
-                    rows.add(Lists.newArrayList(showStmt.getTableName().toString(), "", index.getIndexName(),
-                            "", String.join(",", index.getColumns()), "", "", "", "",
-                            "", index.getIndexType().name(), index.getComment(), index.getPropertiesString()));
+            TableIf tableIf = db.getTableOrAnalysisException(showStmt.getTableName().getTbl());
+            if (tableIf instanceof OlapTable) {
+                OlapTable table = (OlapTable) tableIf;
+                table.readLock();
+                try {
+                    List<Index> indexes = table.getIndexes();
+                    for (Index index : indexes) {
+                        rows.add(Lists.newArrayList(showStmt.getTableName().toString(), "",
+                                index.getIndexName(), "", String.join(",", index.getColumns()), "", "", "", "",
+                                "", index.getIndexType().name(), index.getComment(), index.getPropertiesString()));
+                    }
+                } finally {
+                    table.readUnlock();
                 }
-            } finally {
-                table.readUnlock();
             }
         }
         resultSet = new ShowResultSet(showStmt.getMetaData(), rows);

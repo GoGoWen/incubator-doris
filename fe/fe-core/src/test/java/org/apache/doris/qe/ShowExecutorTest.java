@@ -22,6 +22,7 @@ import org.apache.doris.analysis.Analyzer;
 import org.apache.doris.analysis.DbName;
 import org.apache.doris.analysis.DescribeStmt;
 import org.apache.doris.analysis.HelpStmt;
+import org.apache.doris.analysis.IndexDef;
 import org.apache.doris.analysis.SetType;
 import org.apache.doris.analysis.ShowAuthorStmt;
 import org.apache.doris.analysis.ShowColumnStmt;
@@ -29,6 +30,7 @@ import org.apache.doris.analysis.ShowCreateDbStmt;
 import org.apache.doris.analysis.ShowCreateTableStmt;
 import org.apache.doris.analysis.ShowDbStmt;
 import org.apache.doris.analysis.ShowEnginesStmt;
+import org.apache.doris.analysis.ShowIndexStmt;
 import org.apache.doris.analysis.ShowProcedureStmt;
 import org.apache.doris.analysis.ShowSqlBlockRuleStmt;
 import org.apache.doris.analysis.ShowTableStmt;
@@ -39,15 +41,19 @@ import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.Database;
 import org.apache.doris.catalog.Env;
+import org.apache.doris.catalog.HashDistributionInfo;
+import org.apache.doris.catalog.Index;
 import org.apache.doris.catalog.KeysType;
 import org.apache.doris.catalog.MaterializedIndex;
 import org.apache.doris.catalog.OlapTable;
 import org.apache.doris.catalog.Partition;
+import org.apache.doris.catalog.PartitionInfo;
 import org.apache.doris.catalog.PrimitiveType;
 import org.apache.doris.catalog.RandomDistributionInfo;
 import org.apache.doris.catalog.SinglePartitionInfo;
 import org.apache.doris.catalog.Table;
 import org.apache.doris.catalog.TableIf.TableType;
+import org.apache.doris.catalog.TableIndexes;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.PatternMatcher;
 import org.apache.doris.common.UserException;
@@ -72,6 +78,7 @@ import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
@@ -167,6 +174,33 @@ public class ShowExecutorTest {
                 result = table;
             }
         };
+        List<Index> indexesIndex = new ArrayList<>();
+        Index indexBitmap = new Index(1, "bitmap_index", Lists.newArrayList("col1"),
+                IndexDef.IndexType.BITMAP, null, "bitmap index on col1");
+        indexesIndex.add(indexBitmap);
+        OlapTable tableIndex = new OlapTable(
+                1,
+                "ts_olap_index_tbl",
+                Lists.newArrayList(new Column("col1", PrimitiveType.BIGINT)),
+                KeysType.UNIQUE_KEYS,
+                new PartitionInfo(),
+                new HashDistributionInfo(),
+                new TableIndexes(indexesIndex)
+        );
+        Database dbIndex = new Database();
+        new Expectations(dbIndex) {
+            {
+                dbIndex.readLock();
+                minTimes = 0;
+
+                dbIndex.readUnlock();
+                minTimes = 0;
+
+                dbIndex.getTableOrAnalysisException(anyString);
+                minTimes = 0;
+                result = tableIndex;
+            }
+        };
 
         // mock auth
         AccessControllerManager accessManager = AccessTestUtil.fetchAdminAccess();
@@ -182,6 +216,10 @@ public class ShowExecutorTest {
                 catalog.getDbNullable("emptyDb");
                 minTimes = 0;
                 result = null;
+
+                catalog.getDbNullable("testdbIndex");
+                minTimes = 0;
+                result = dbIndex;
             }
         };
 
@@ -551,6 +589,51 @@ public class ShowExecutorTest {
         ShowResultSet resultSet = executor.execute();
 
         Assert.assertFalse(resultSet.next());
+    }
+
+    @Test
+    public void testShowIndexOnTableWithIndex() throws AnalysisException {
+        ShowIndexStmt showStmt = new ShowIndexStmt(
+                "",
+                new TableName(internalCtl, "testdbIndex", "ts_olap_index_tbl")
+        );
+        ShowExecutor executor = new ShowExecutor(ctx, showStmt);
+
+        ShowResultSet resultSet = executor.execute();
+        List<List<String>> rows = resultSet.getResultRows();
+        Assert.assertEquals(1, rows.size());
+        Assert.assertEquals("testdbIndex.ts_olap_index_tbl", rows.get(0).get(0));
+        Assert.assertEquals("bitmap_index", rows.get(0).get(2));
+        Assert.assertEquals("col1", rows.get(0).get(4));
+        Assert.assertEquals("bitmap index on col1", rows.get(0).get(11));
+    }
+
+    @Test
+    public void testShowIndexOnTableNoIndex() throws AnalysisException {
+        ShowIndexStmt showStmt = new ShowIndexStmt(
+                "",
+                new TableName(internalCtl, "testDb", "ts_olap_no_index_tbl")
+        );
+        ShowExecutor executor = new ShowExecutor(ctx, showStmt);
+        // Validate the results
+        ShowResultSet resultSet = executor.execute();
+        List<List<String>> rows = resultSet.getResultRows();
+        Assert.assertEquals(0, rows.size());
+    }
+
+    @Test
+    public void testShowIndexOnView() throws AnalysisException {
+        ctx.setEnv(env);
+        ctx.setQualifiedUser("testUser");
+        ShowIndexStmt showStmt = new ShowIndexStmt(
+                "",
+                new TableName(internalCtl, "testDb", "ts_view_index_tbl")
+        );
+        ShowExecutor executor = new ShowExecutor(ctx, showStmt);
+        // Validate the results
+        ShowResultSet resultSet = executor.execute();
+        List<List<String>> rows = resultSet.getResultRows();
+        Assert.assertEquals(0, rows.size());
     }
 
     @Test
