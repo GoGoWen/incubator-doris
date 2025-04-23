@@ -29,6 +29,7 @@ import org.apache.doris.catalog.FunctionGenTable;
 import org.apache.doris.catalog.HdfsResource;
 import org.apache.doris.catalog.TableIf;
 import org.apache.doris.common.AnalysisException;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.NotImplementedException;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.BrokerUtil;
@@ -550,6 +551,19 @@ public abstract class FileQueryScanNode extends FileScanNode {
 
     @Override
     public int getNumInstances() {
+        if (Config.enable_adaptive_generate_num_instances) {
+            if (selectedSplitNum < Config.selected_split_num_to_decide_num_instances[0]) {
+                return 1;
+            } else if (selectedSplitNum < Config.selected_split_num_to_decide_num_instances[1]) {
+                return 2;
+            } else if (selectedSplitNum < Config.selected_split_num_to_decide_num_instances[2]) {
+                return 4;
+            } else if (selectedSplitNum < Config.selected_split_num_to_decide_num_instances[3]) {
+                return 8;
+            } else {
+                return 16;
+            }
+        }
         if (ConnectContext.get() != null
                 && ConnectContext.get().getSessionVariable().getEnablePipelineXEngine()
                 && ConnectContext.get().getSessionVariable().isIgnoreStorageDataDistribution()) {

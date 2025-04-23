@@ -2946,6 +2946,14 @@ public class Config extends ConfigBase {
     public static boolean support_character_cast_for_numeric_agg_function = false;
 
     @ConfField(mutable = true, description = {"连接HMS超过指定时间打印慢调用日志",
-        "print a warning when the duration exceeds the specified time."})
+        "print a warning when the duration exceeds the specified time"})
     public static long log_slow_hms_time_ms = 5000;
+
+    @ConfField(mutable = true, description = {"是否支持自适应生成运行实例并发数",
+            "whether to enable generate num of instances adaptively"})
+    public static boolean enable_adaptive_generate_num_instances = true;
+
+    @ConfField(mutable = true, description = {"根据文件切分数量大小范围来决定实例并发数",
+            "selected split num to decide num of instances"})
+    public static long[] selected_split_num_to_decide_num_instances = { 5000, 20000, 40000, 60000 };
 }
