@@ -88,6 +88,9 @@ DECLARE_String(custom_config_dir);
 // Dir of jdbc drivers
 DECLARE_String(jdbc_drivers_dir);
 
+// proxy for error load url
+DECLARE_String(proxy_for_errurl);
+
 // cluster id
 DECLARE_Int32(cluster_id);
 // port on which BackendService is exported

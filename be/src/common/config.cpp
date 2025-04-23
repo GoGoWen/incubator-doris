@@ -53,6 +53,9 @@ DEFINE_String(custom_config_dir, "${DORIS_HOME}/conf");
 // Dir of jdbc drivers
 DEFINE_String(jdbc_drivers_dir, "${DORIS_HOME}/jdbc_drivers");
 
+// proxy for error load url
+DEFINE_String(proxy_for_errurl, "http://api.easy-olap.jd.com/easyolap/v2/proxy?target=");
+
 // cluster id
 DEFINE_Int32(cluster_id, "-1");
 // port on which BackendService is exported
