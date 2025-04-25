@@ -61,7 +61,6 @@ import org.apache.doris.nereids.types.TimeType;
 import org.apache.doris.nereids.types.TimeV2Type;
 import org.apache.doris.nereids.types.TinyIntType;
 import org.apache.doris.nereids.types.VarcharType;
-import org.apache.doris.nereids.types.coercion.CharacterType;
 import org.apache.doris.nereids.types.coercion.IntegralType;
 
 import com.google.common.collect.ImmutableList;
@@ -788,21 +787,13 @@ public class TypeCoercionUtilsTest {
         Assertions.assertEquals(DecimalV2Type.createDecimalV2Type(16, 7), decimalDowngrade.left().getDataType());
         Assertions.assertEquals(DecimalV2Type.createDecimalV2Type(16, 7), decimalDowngrade.right().getDataType());
 
-        decimalDowngrade = new EqualTo(
-                new DecimalV3Literal(BigDecimal.valueOf(12345.1234567)),
-                new SlotReference("c1", DecimalV2Type.createDecimalV2Type(15, 6))
-        );
-        decimalDowngrade = (EqualTo) TypeCoercionUtils.processComparisonPredicate(decimalDowngrade);
-        Assertions.assertEquals(DecimalV2Type.createDecimalV2Type(16, 7), decimalDowngrade.left().getDataType());
-        Assertions.assertEquals(DecimalV2Type.createDecimalV2Type(16, 7), decimalDowngrade.right().getDataType());
-
         // DateV1 slot vs DateV2 literal (this case cover right slot vs left literal)
         EqualTo dateDowngrade = new EqualTo(
                 new DateV2Literal(2024, 4, 12),
                 new SlotReference("c1", VarcharType.createVarcharType(9))
         );
         dateDowngrade = (EqualTo) TypeCoercionUtils.processComparisonPredicate(dateDowngrade);
-        Assertions.assertTrue(dateDowngrade.left().getDataType() instanceof CharacterType);
+        Assertions.assertTrue(dateDowngrade.left().getDataType() instanceof DateTimeV2Type);
 
         // DatetimeV1 slot vs DateLike literal
         EqualTo datetimeDowngrade = new EqualTo(
@@ -810,7 +801,7 @@ public class TypeCoercionUtilsTest {
                 new DateTimeV2Literal(2024, 4, 12, 18, 25, 30, 0)
         );
         datetimeDowngrade = (EqualTo) TypeCoercionUtils.processComparisonPredicate(datetimeDowngrade);
-        Assertions.assertTrue(datetimeDowngrade.left().getDataType() instanceof CharacterType);
+        Assertions.assertTrue(datetimeDowngrade.left().getDataType() instanceof DateTimeV2Type);
     }
 
     @Test

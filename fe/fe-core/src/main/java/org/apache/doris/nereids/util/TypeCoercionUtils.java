@@ -40,7 +40,6 @@ import org.apache.doris.nereids.trees.expressions.InPredicate;
 import org.apache.doris.nereids.trees.expressions.IntegralDivide;
 import org.apache.doris.nereids.trees.expressions.Mod;
 import org.apache.doris.nereids.trees.expressions.Multiply;
-import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.SubqueryExpr;
 import org.apache.doris.nereids.trees.expressions.Subtract;
 import org.apache.doris.nereids.trees.expressions.TimestampArithmetic;
@@ -103,7 +102,6 @@ import org.apache.doris.nereids.types.VarcharType;
 import org.apache.doris.nereids.types.VariantType;
 import org.apache.doris.nereids.types.coercion.AnyDataType;
 import org.apache.doris.nereids.types.coercion.CharacterType;
-import org.apache.doris.nereids.types.coercion.DateLikeType;
 import org.apache.doris.nereids.types.coercion.FollowToAnyDataType;
 import org.apache.doris.nereids.types.coercion.FractionalType;
 import org.apache.doris.nereids.types.coercion.IntegralType;
@@ -963,17 +961,10 @@ public class TypeCoercionUtils {
                 .processCharacterLiteralInBinaryOperator(comparisonPredicate, left, right);
         left = comparisonPredicate.left();
         right = comparisonPredicate.right();
-        Optional<DataType> commonType;
-        if (left instanceof Slot && left.getDataType() instanceof CharacterType && !(right instanceof Slot)
-                && right.getDataType() instanceof DateLikeType) {
-            commonType = Optional.of(left.getDataType());
-        } else if (!(left instanceof Slot) && left.getDataType() instanceof DateLikeType
-                && right instanceof Slot && right.getDataType() instanceof CharacterType) {
-            commonType = Optional.of(right.getDataType());
-        } else {
-            commonType = findWiderTypeForTwoForComparison(
-                    left.getDataType(), right.getDataType(), false);
-        }
+
+        Optional<DataType> commonType = findWiderTypeForTwoForComparison(
+                left.getDataType(), right.getDataType(), false);
+
         if (commonType.isPresent()) {
             commonType = Optional.of(downgradeDecimalAndDateLikeType(
                     commonType.get(),
