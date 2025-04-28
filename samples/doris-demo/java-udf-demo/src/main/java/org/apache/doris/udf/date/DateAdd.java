@@ -40,17 +40,23 @@ public class DateAdd extends UDF {
      */
     public String evaluate(String dateStr, Integer days) {
         try {
-            LocalDate date = LocalDate.parse(dateStr, DateUtils.DATE_FORMATTER);
-            LocalDate localDate = date.plusDays(days);
-            return localDate.format(DateUtils.DATE_FORMATTER);
-        } catch (Exception e) {
-            try {
-                LocalDateTime dateTime = LocalDateTime.parse(dateStr, DateUtils.DATE_TIME_FORMATTER);
-                LocalDateTime localDateTime = dateTime.plusDays(days);
-                return localDateTime.format(DateUtils.DATE_TIME_FORMATTER);
-            } catch (Exception e1) {
+            if (StringUtils.isEmpty(dateStr)) {
                 return null;
             }
+            if (dateStr.length() < 11) {
+                LocalDate date = LocalDate.parse(dateStr, DateUtils.DATE_FORMATTER);
+                LocalDate localDate = date.plusDays(days);
+                return localDate.format(DateUtils.DATE_FORMATTER);
+            }
+            if (dateStr.length() > 19) {
+                dateStr = dateStr.substring(0, 19);
+            }
+            LocalDateTime dateTime = LocalDateTime.parse(dateStr, DateUtils.DATE_TIME_FORMATTER);
+            LocalDateTime localDateTime = dateTime.plusDays(days);
+            return localDateTime.format(DateUtils.DATE_FORMATTER);
+
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -79,9 +85,9 @@ public class DateAdd extends UDF {
     }*/
 
     /**
-     *
      * date_add_str(String, int, Date);
      * select date_add_str('week',-1,cast('2023-10-05 14:30:45' as date));
+     *
      * @param unit
      * @param value
      * @param date
@@ -122,7 +128,7 @@ public class DateAdd extends UDF {
 
         try {
             LocalDateTime localDateTime = dateTime.plusDays(days);
-            return localDateTime.format(DateUtils.DATE_TIME_FORMATTER);
+            return localDateTime.format(DateUtils.DATE_FORMATTER);
         } catch (Exception e) {
             return null;
         }

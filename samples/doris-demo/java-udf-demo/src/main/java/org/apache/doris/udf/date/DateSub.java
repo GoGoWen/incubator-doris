@@ -39,21 +39,24 @@ public class DateSub extends UDF {
      * @return
      */
     public String evaluate(String dateStr, Integer days) {
-        if (StringUtils.isEmpty(dateStr) || days == null) {
-            return null;
-        }
         try {
-            LocalDate date = LocalDate.parse(dateStr, DateUtils.DATE_FORMATTER);
-            LocalDate localDate = date.minusDays(days);
-            return localDate.format(DateUtils.DATE_FORMATTER);
-        } catch (Exception e) {
-            try {
-                LocalDateTime dateTime = LocalDateTime.parse(dateStr, DateUtils.DATE_TIME_FORMATTER);
-                LocalDateTime localDateTime = dateTime.minusDays(days);
-                return localDateTime.format(DateUtils.DATE_TIME_FORMATTER);
-            } catch (Exception e1) {
+            if (StringUtils.isEmpty(dateStr)) {
                 return null;
             }
+            if (dateStr.length() < 11) {
+                LocalDate date = LocalDate.parse(dateStr, DateUtils.DATE_FORMATTER);
+                LocalDate localDate = date.minusDays(days);
+                return localDate.format(DateUtils.DATE_FORMATTER);
+            }
+            if (dateStr.length() > 19) {
+                dateStr = dateStr.substring(0, 19);
+            }
+            LocalDateTime dateTime = LocalDateTime.parse(dateStr, DateUtils.DATE_TIME_FORMATTER);
+            LocalDateTime localDateTime = dateTime.minusDays(days);
+            return localDateTime.format(DateUtils.DATE_FORMATTER);
+
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -125,7 +128,7 @@ public class DateSub extends UDF {
 
         try {
             LocalDateTime localDateTime = dateTime.minusDays(days);
-            return localDateTime.format(DateUtils.DATE_TIME_FORMATTER);
+            return localDateTime.format(DateUtils.DATE_FORMATTER);
         } catch (Exception e) {
             return null;
         }

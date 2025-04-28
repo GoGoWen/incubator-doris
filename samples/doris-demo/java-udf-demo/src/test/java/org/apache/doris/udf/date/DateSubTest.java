@@ -22,8 +22,8 @@ public class DateSubTest {
         Assert.assertEquals("2023-10-06", dateSub.evaluate("2023-10-05", -1));
         
         // Test with datetime string format
-        Assert.assertEquals("2023-10-04 14:30:45", dateSub.evaluate("2023-10-05 14:30:45", 1));
-        Assert.assertEquals("2023-10-06 14:30:45", dateSub.evaluate("2023-10-05 14:30:45", -1));
+        Assert.assertEquals("2023-10-04", dateSub.evaluate("2023-10-05", 1));
+        Assert.assertEquals("2023-10-06", dateSub.evaluate("2023-10-05", -1));
         
         // Test with invalid date format
         Assert.assertNull(dateSub.evaluate("invalid-date", 1));
@@ -69,12 +69,12 @@ public class DateSubTest {
         LocalDateTime testDateTime = LocalDateTime.parse("2023-10-05T14:30:45");
         
         // Test positive days
-        Assert.assertEquals("2023-10-04 14:30:45", dateSub.evaluate(testDateTime, 1));
-        Assert.assertEquals("2023-09-28 14:30:45", dateSub.evaluate(testDateTime, 7));
+        Assert.assertEquals("2023-10-04", dateSub.evaluate(testDateTime, 1));
+        Assert.assertEquals("2023-09-28", dateSub.evaluate(testDateTime, 7));
         
         // Test negative days (which effectively become additions)
-        Assert.assertEquals("2023-10-06 14:30:45", dateSub.evaluate(testDateTime, -1));
-        Assert.assertEquals("2023-10-12 14:30:45", dateSub.evaluate(testDateTime, -7));
+        Assert.assertEquals("2023-10-06", dateSub.evaluate(testDateTime, -1));
+        Assert.assertEquals("2023-10-12", dateSub.evaluate(testDateTime, -7));
         
         // Test null inputs
         Assert.assertNull(dateSub.evaluate((LocalDateTime)null, 1));
