@@ -23,6 +23,7 @@ suite("eager_aggregate_basic_one_side") {
 
     sql "SET ENABLE_NEREIDS_RULES=push_down_agg_through_join_one_side"
     sql "set disable_nereids_rules=PRUNE_EMPTY_PARTITION"
+    sql "set disable_join_reorder=true"
 
     sql """
         DROP TABLE IF EXISTS shunt_log_com_dd_library_one_side;
