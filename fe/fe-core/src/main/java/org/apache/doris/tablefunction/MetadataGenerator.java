@@ -207,7 +207,16 @@ public class MetadataGenerator {
                 result = mtmvMetadataResult(params);
                 break;
             case PARTITIONS:
-                result = partitionMetadataResult(params);
+                boolean isViewBased = false;
+                if (ConnectContext.get() != null) {
+                    String hadoopUserName = ConnectContext.get().getBdpAuthContext().getHadoopUserName();
+                    if (hadoopUserName.endsWith("$")) {
+                        hadoopUserName = hadoopUserName.substring(0, hadoopUserName.length() - 1);
+                        ConnectContext.get().getBdpAuthContext().setHadoopUserName(hadoopUserName);
+                        isViewBased = true;
+                    }
+                }
+                result = partitionMetadataResult(params, isViewBased);
                 break;
             case JOBS:
                 result = jobMetadataResult(params);
@@ -839,7 +848,8 @@ public class MetadataGenerator {
         return result;
     }
 
-    private static TFetchSchemaTableDataResult partitionMetadataResult(TMetadataTableRequestParams params) {
+    private static TFetchSchemaTableDataResult partitionMetadataResult(TMetadataTableRequestParams params,
+            boolean isViewBased) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("partitionMetadataResult() start");
         }
@@ -882,7 +892,7 @@ public class MetadataGenerator {
         } else if (catalog instanceof MaxComputeExternalCatalog) {
             return dealMaxComputeCatalog((MaxComputeExternalCatalog) catalog, dbName, tableName);
         } else if (catalog instanceof HMSExternalCatalog) {
-            return dealHMSCatalog((HMSExternalCatalog) catalog, dbName, tableName);
+            return dealHMSCatalog((HMSExternalCatalog) catalog, dbName, tableName, isViewBased);
         }
 
         if (LOG.isDebugEnabled()) {
@@ -892,18 +902,9 @@ public class MetadataGenerator {
     }
 
     private static TFetchSchemaTableDataResult dealHMSCatalog(HMSExternalCatalog catalog, String dbName,
-            String tableName) {
+            String tableName, boolean isViewBased) {
         List<TRow> dataBatch = Lists.newArrayList();
-        boolean isViewBased = false;
-        DatabaseIf db = catalog.getDbNullable(dbName);
-        if (db != null) {
-            HMSExternalTable table = (HMSExternalTable) db.getTableNullable(tableName);
-            if (table != null) {
-                isViewBased = table.isViewBased();
-            }
-        }
-
-        List<String> partitionNames = Lists.newArrayList();
+        List<String> partitionNames;
         if (isViewBased) {
             partitionNames = catalog.getClient().listPartitionNamesFromView(dbName, tableName);
         } else {

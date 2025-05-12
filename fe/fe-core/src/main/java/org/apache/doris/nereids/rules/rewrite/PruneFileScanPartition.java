@@ -55,6 +55,7 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
 import org.apache.doris.qe.AutoCloseConnectContext;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.StmtExecutor;
 import org.apache.doris.statistics.ResultRow;
@@ -69,7 +70,6 @@ import org.apache.commons.text.StringSubstitutor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -187,21 +187,47 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             isDirectlyByFilter = false;
         }
         if (!isDirectlyByFilter) {
-            HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
-                    > Config.max_partition_num_for_single_hive_table_without_filter
-                    ? cache.getPartitionValuesFromViewWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
-                    hiveTbl.getPartitionColumnTypes()) :
-                    cache.getPartitionValuesFromView(
-                            hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
-            Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
-            List<Long> prunedPartitions = new ArrayList<>(PartitionPruner.prune(
-                    partitionSlots, filter.getPredicate(), idToPartitionItem, ctx));
-            for (Long id : prunedPartitions) {
-                selectedPartitionItems.put(id, idToPartitionItem.get(id));
-            }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("[ViewBased] db:{} table: {} total partition num: {} selected partitions: {}",
-                        hiveTbl.getDbName(), hiveTbl.getName(), partitionNum, selectedPartitionItems.size());
+            BDPAuthContext bdpAuthContext = ConnectContext.get().getBdpAuthContext();
+            try (AutoCloseConnectContext r = StatisticsUtil.buildConnectContext()) {
+                partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
+                        ImmutableSet.copyOf(partitionSlots), ctx);
+                r.connectContext.setBdpAuthContext(new BDPAuthContext(bdpAuthContext.getErp(),
+                        bdpAuthContext.getSource(), bdpAuthContext.getHadoopUserName() + "$",
+                        bdpAuthContext.getUserToken()));
+                Map<String, String> params = new HashMap<>();
+                params.put("catalogName", hiveTbl.getCatalog().getName());
+                params.put("dbName", hiveTbl.getDbName());
+                params.put("tblName", hiveTbl.getName());
+                params.put("filterSql", partitionPredicate.toSql());
+                StringSubstitutor stringSubstitutor = new StringSubstitutor(params);
+                String sql = stringSubstitutor.replace(QUERY_FILTER_PARTITION_SQL);
+                List<ResultRow> partitionRows = new StmtExecutor(r.connectContext, sql).executeInternalQuery();
+                selectedPartitionItems = Maps.newHashMapWithExpectedSize(partitionRows.size());
+                for (ResultRow partition : partitionRows) {
+                    List<PartitionValue> values = Lists.newArrayListWithExpectedSize(partitionSlots.size());
+                    for (String partitionValue : partition.getValues()) {
+                        values.add(new PartitionValue(partitionValue,
+                                HiveMetaStoreCache.HIVE_DEFAULT_PARTITION.equals(partitionValue)));
+                    }
+                    try {
+                        PartitionKey partitionKey = PartitionKey.createListPartitionKeyWithTypes(values,
+                                hiveTbl.getPartitionColumnTypes(), true);
+                        String partitionName = IntStream.range(0, partitionSlots.size())
+                                .mapToObj(i -> partitionSlots.get(i).getName() + "=" + values.get(i).getStringValue())
+                                .collect(Collectors.joining("/"));
+                        long partitionId = Util.genIdByName(hiveTbl.getCatalog().getName(), hiveTbl.getDbName(),
+                                hiveTbl.getName(), partitionName);
+                        selectedPartitionItems.put(partitionId,
+                                new ListPartitionItem(Lists.newArrayList(partitionKey)));
+                    } catch (AnalysisException e) {
+                        throw new CacheException("failed to convert hive partition %s to list partition in catalog %s",
+                                e, partition.getValues(), hiveTbl.getCatalog().getName());
+                    }
+                }
+            } catch (Exception e) {
+                LOG.warn("failed to fetch filter partitions for " + hiveTbl.getDbName() + "." + hiveTbl.getName()
+                        + "[view based]");
+                throw e;
             }
         }
         return new SelectedPartitions(partitionNum, selectedPartitionItems, true);
@@ -301,10 +327,11 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             isDirectlyByFilter = false;
         }
         if (!isDirectlyByFilter) {
+            BDPAuthContext bdpAuthContext = ConnectContext.get().getBdpAuthContext();
             try (AutoCloseConnectContext r = StatisticsUtil.buildConnectContext()) {
                 partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
                         ImmutableSet.copyOf(partitionSlots), ctx);
-                r.connectContext.setBdpAuthContext(ConnectContext.get().getBdpAuthContext());
+                r.connectContext.setBdpAuthContext(bdpAuthContext);
                 Map<String, String> params = new HashMap<>();
                 params.put("catalogName", hiveTbl.getCatalog().getName());
                 params.put("dbName", hiveTbl.getDbName());
