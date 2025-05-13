@@ -44,7 +44,8 @@ Result<FileReaderSPtr> create_cached_file_reader(FileReaderSPtr raw_reader,
     case io::FileCachePolicy::NO_CACHE:
         return raw_reader;
     case FileCachePolicy::FILE_BLOCK_CACHE:
-        return std::make_shared<CachedRemoteFileReader>(std::move(raw_reader), opts);
+        // return std::make_shared<CachedRemoteFileReader>(std::move(raw_reader), opts);
+        return raw_reader;
     default:
         return ResultError(Status::InternalError("Unknown cache type: {}", opts.cache_type));
     }

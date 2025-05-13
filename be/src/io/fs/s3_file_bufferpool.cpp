@@ -152,6 +152,8 @@ void UploadFileBuffer::on_upload() {
         return;
     }
     _upload_to_remote(*this);
+
+    /*
     if (config::enable_flush_file_cache_async) {
         // If we call is_cancelled() after _state.set_status() then there might one situation where
         // s3 file writer is already destructed
@@ -164,6 +166,7 @@ void UploadFileBuffer::on_upload() {
         upload_to_local_file_cache(is_cancelled());
         _state.set_status();
     }
+    */
 }
 
 /**
