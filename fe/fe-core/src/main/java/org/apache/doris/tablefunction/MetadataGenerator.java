@@ -60,6 +60,7 @@ import org.apache.doris.mysql.privilege.PrivPredicate;
 import org.apache.doris.plsql.metastore.PlsqlManager;
 import org.apache.doris.plsql.metastore.PlsqlProcedureKey;
 import org.apache.doris.plsql.metastore.PlsqlStoredProcedure;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.QeProcessorImpl;
 import org.apache.doris.qe.QeProcessorImpl.QueryInfo;
@@ -207,16 +208,7 @@ public class MetadataGenerator {
                 result = mtmvMetadataResult(params);
                 break;
             case PARTITIONS:
-                boolean isViewBased = false;
-                if (ConnectContext.get() != null) {
-                    String hadoopUserName = ConnectContext.get().getBdpAuthContext().getHadoopUserName();
-                    if (hadoopUserName.endsWith("$")) {
-                        hadoopUserName = hadoopUserName.substring(0, hadoopUserName.length() - 1);
-                        ConnectContext.get().getBdpAuthContext().setHadoopUserName(hadoopUserName);
-                        isViewBased = true;
-                    }
-                }
-                result = partitionMetadataResult(params, isViewBased);
+                result = partitionMetadataResult(params);
                 break;
             case JOBS:
                 result = jobMetadataResult(params);
@@ -848,8 +840,7 @@ public class MetadataGenerator {
         return result;
     }
 
-    private static TFetchSchemaTableDataResult partitionMetadataResult(TMetadataTableRequestParams params,
-            boolean isViewBased) {
+    private static TFetchSchemaTableDataResult partitionMetadataResult(TMetadataTableRequestParams params) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("partitionMetadataResult() start");
         }
@@ -892,7 +883,7 @@ public class MetadataGenerator {
         } else if (catalog instanceof MaxComputeExternalCatalog) {
             return dealMaxComputeCatalog((MaxComputeExternalCatalog) catalog, dbName, tableName);
         } else if (catalog instanceof HMSExternalCatalog) {
-            return dealHMSCatalog((HMSExternalCatalog) catalog, dbName, tableName, isViewBased);
+            return dealHMSCatalog((HMSExternalCatalog) catalog, dbName, tableName);
         }
 
         if (LOG.isDebugEnabled()) {
@@ -902,10 +893,10 @@ public class MetadataGenerator {
     }
 
     private static TFetchSchemaTableDataResult dealHMSCatalog(HMSExternalCatalog catalog, String dbName,
-            String tableName, boolean isViewBased) {
+            String tableName) {
         List<TRow> dataBatch = Lists.newArrayList();
         List<String> partitionNames;
-        if (isViewBased) {
+        if (BDPAuthContext.get() != null && BDPAuthContext.get().getHadoopUserName().endsWith("$")) {
             partitionNames = catalog.getClient().listPartitionNamesFromView(dbName, tableName);
         } else {
             partitionNames = catalog.getClient().listPartitionNames(dbName, tableName);
@@ -1263,8 +1254,14 @@ public class MetadataGenerator {
 
         HiveMetaStoreCache cache = Env.getCurrentEnv().getExtMetaCacheMgr()
                 .getMetaStoreCache((HMSExternalCatalog) tbl.getCatalog());
-        HiveMetaStoreCache.HivePartitionValues hivePartitionValues = cache.getPartitionValuesWithoutCache(
-                tbl.getDbName(), tbl.getName(), tbl.getPartitionColumnTypes());
+        HiveMetaStoreCache.HivePartitionValues hivePartitionValues;
+        if (BDPAuthContext.get() != null && BDPAuthContext.get().getHadoopUserName().endsWith("$")) {
+            hivePartitionValues = cache.getPartitionValuesFromViewWithoutCache(tbl.getDbName(), tbl.getName(),
+                    tbl.getPartitionColumnTypes());
+        } else {
+            hivePartitionValues = cache.getPartitionValuesWithoutCache(tbl.getDbName(),
+                    tbl.getName(), tbl.getPartitionColumnTypes());
+        }
         Map<Long, List<String>> valuesMap = hivePartitionValues.getPartitionValuesMap();
         List<TRow> dataBatch = Lists.newArrayList();
         for (Map.Entry<Long, List<String>> entry : valuesMap.entrySet()) {

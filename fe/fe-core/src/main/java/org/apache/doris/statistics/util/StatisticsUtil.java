@@ -60,6 +60,7 @@ import org.apache.doris.nereids.trees.expressions.literal.DateTimeLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.VarcharLiteral;
 import org.apache.doris.qe.AuditLogHelper;
 import org.apache.doris.qe.AutoCloseConnectContext;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.QueryState;
 import org.apache.doris.qe.SessionVariable;
@@ -179,7 +180,11 @@ public class StatisticsUtil {
         return buildConnectContext(false);
     }
 
-    public static AutoCloseConnectContext buildConnectContext(boolean limitScan) {
+    public static AutoCloseConnectContext buildConnectContext(BDPAuthContext authContext) {
+        return buildConnectContext(false, authContext);
+    }
+
+    public static AutoCloseConnectContext buildConnectContext(boolean limitScan, BDPAuthContext authContext) {
         ConnectContext connectContext = new ConnectContext();
         SessionVariable sessionVariable = connectContext.getSessionVariable();
         sessionVariable.internalSession = true;
@@ -206,7 +211,14 @@ public class StatisticsUtil {
         connectContext.setQualifiedUser(UserIdentity.ROOT.getQualifiedUser());
         connectContext.setCurrentUserIdentity(UserIdentity.ROOT);
         connectContext.setStartTime();
+        if (authContext != null) {
+            return new AutoCloseConnectContext(connectContext, authContext);
+        }
         return new AutoCloseConnectContext(connectContext);
+    }
+
+    public static AutoCloseConnectContext buildConnectContext(boolean limitScan) {
+        return buildConnectContext(limitScan, null);
     }
 
     public static void analyze(StatementBase statementBase) throws UserException {

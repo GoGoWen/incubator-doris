@@ -449,8 +449,10 @@ public class HiveMetaStoreCache {
         String dbName = oneKey.getDbName();
         String tblName = oneKey.getTblName();
         boolean fromView = oneKey.fromView;
-        List<Column> partitionColumns = ((HMSExternalTable) (
-                catalog.getDbNullable(dbName).getTableNullable(tblName))).getPartitionColumns();
+        HMSExternalTable hmsTable = ((HMSExternalTable) (
+                catalog.getDbNullable(dbName).getTableNullable(tblName)));
+        hmsTable.setIsViewBased(fromView);
+        List<Column> partitionColumns = hmsTable.getPartitionColumns();
         // A partitionName is like "country=China/city=Beijing" or "date=2023-02-01"
         List<String> partitionNames = Streams.stream(keys)
                 .map(key -> buildPartitionName(key, partitionColumns))

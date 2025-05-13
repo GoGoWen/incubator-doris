@@ -85,6 +85,7 @@ public class PartitionValuesTableValuedFunction extends MetadataTableValuedFunct
         if (StringUtils.isEmpty(catalogName) || StringUtils.isEmpty(dbName) || StringUtils.isEmpty(tableName)) {
             throw new AnalysisException("catalog, database and table are required");
         }
+
         this.table = analyzeAndGetTable(catalogName, dbName, tableName, true);
         this.catalogName = catalogName;
         this.databaseName = dbName;
@@ -135,6 +136,9 @@ public class PartitionValuesTableValuedFunction extends MetadataTableValuedFunct
             throw new AnalysisException("Currently only support hive table's partition values meta table");
         }
         HMSExternalTable hmsTable = (HMSExternalTable) table;
+        if (BDPAuthContext.get() != null && BDPAuthContext.get().getHadoopUserName().endsWith("$")) {
+            hmsTable.setIsViewBased(true);
+        }
         if (!hmsTable.isPartitionedTable()) {
             throw new AnalysisException("Table " + tableName + " is not a partitioned table");
         }

@@ -188,12 +188,12 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
         }
         if (!isDirectlyByFilter) {
             BDPAuthContext bdpAuthContext = ConnectContext.get().getBdpAuthContext();
-            try (AutoCloseConnectContext r = StatisticsUtil.buildConnectContext()) {
+            BDPAuthContext authContextForViewTable = new BDPAuthContext(bdpAuthContext.getErp(),
+                    bdpAuthContext.getSource(), bdpAuthContext.getHadoopUserName() + "$",
+                    bdpAuthContext.getUserToken());
+            try (AutoCloseConnectContext r = StatisticsUtil.buildConnectContext(authContextForViewTable)) {
                 partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
                         ImmutableSet.copyOf(partitionSlots), ctx);
-                r.connectContext.setBdpAuthContext(new BDPAuthContext(bdpAuthContext.getErp(),
-                        bdpAuthContext.getSource(), bdpAuthContext.getHadoopUserName() + "$",
-                        bdpAuthContext.getUserToken()));
                 Map<String, String> params = new HashMap<>();
                 params.put("catalogName", hiveTbl.getCatalog().getName());
                 params.put("dbName", hiveTbl.getDbName());
