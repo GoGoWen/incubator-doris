@@ -22,6 +22,7 @@ import org.apache.doris.common.Config;
 import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.StatementContext;
 import org.apache.doris.nereids.exceptions.AnalysisException;
+import org.apache.doris.nereids.exceptions.NotSupportedException;
 import org.apache.doris.nereids.exceptions.ParseException;
 import org.apache.doris.nereids.glue.LogicalPlanAdapter;
 import org.apache.doris.nereids.trees.expressions.Cast;
@@ -418,5 +419,93 @@ public class NereidsParserTest extends ParserTestBase {
         String sql = "SELECT BINARY 'abc' FROM information_schema.partitions order by AUTO_INCREMENT";
         NereidsParser nereidsParser = new NereidsParser();
         nereidsParser.parseSingle(sql);
+    }
+
+    @Test
+    public void testUnclosedCommentThrowsNotSupportedException() {
+        // Test cases for single statements (implicitly tested via parsePlan which likely uses parseSingle)
+        String sqlSimpleUnclosed = "SELECT * FROM my_table /* this is an unclosed comment";
+        parsePlan(sqlSimpleUnclosed)
+                .assertThrowsExactly(NotSupportedException.class)
+                .assertMessageEquals("Not Supported: Syntax error: unclosed bracketed comment detected.");
+
+        String sqlNestedUnclosed = "SELECT 1 /* outer /* inner */ still_outer_unclosed ";
+        parsePlan(sqlNestedUnclosed)
+                .assertThrowsExactly(NotSupportedException.class)
+                .assertMessageEquals("Not Supported: Syntax error: unclosed bracketed comment detected.");
+
+        String originalProblemSql = "select * from  hive.dev.test_sales  /*this is a /*comment*/  where year = '2025'";
+        parsePlan(originalProblemSql)
+                .assertThrowsExactly(NotSupportedException.class)
+                .assertMessageEquals("Not Supported: Syntax error: unclosed bracketed comment detected.");
+
+        // Test cases for multi-statements (using parseMultiple directly, similar to other tests in this file)
+        NereidsParser parser = new NereidsParser();
+
+        String multiStmtUnclosed1 = "SELECT 1; SELECT 2 /* unclosed";
+        NotSupportedException e1 = Assertions.assertThrows(NotSupportedException.class, () -> {
+            parser.parseMultiple(multiStmtUnclosed1);
+        });
+        Assertions.assertEquals("Not Supported: Syntax error: unclosed bracketed comment detected.", e1.getMessage());
+
+        String multiStmtUnclosed2 = "SELECT 1 /* unclosed ; SELECT 2"; // Comment before semicolon
+        NotSupportedException e2 = Assertions.assertThrows(NotSupportedException.class, () -> {
+            parser.parseMultiple(multiStmtUnclosed2);
+        });
+        Assertions.assertEquals("Not Supported: Syntax error: unclosed "
+                + "bracketed comment detected.", e2.getMessage());
+    }
+
+    @Test
+    public void testProperlyClosedCommentDoesNotCauseUnclosedCommentError() {
+        // Test cases for single statements
+        String sqlWithClosedComment = "SELECT * FROM my_table /* this is a closed comment */ WHERE col = 1";
+        // We expect this to parse without the specific "unclosed bracketed comment" error.
+        // It might still fail for other reasons if the SQL is malformed (e.g., my_table doesn't exist in test context),
+        // but that's not what this test is checking.
+        try {
+            // Attempt to parse. If parsePlan itself throws for other reasons, this try-catch handles it.
+            // The key is that our specific NotSupportedException for unclosed comments is not thrown.
+            parsePlan(sqlWithClosedComment);
+            // If you want to ensure it parses to a specific plan, you can add:
+            // .matches(logicalProject(logicalFilter(logicalOlapScan()))); // Example
+        } catch (NotSupportedException e) {
+            if ("Not Supported: Syntax error: unclosed bracketed comment detected.".equals(e.getMessage())) {
+                Assertions.fail("NotSupportedException for unclosed comment "
+                        + "was thrown for a correctly closed comment: " + sqlWithClosedComment, e);
+            }
+            // Other NotSupportedExceptions are acceptable for this test's scope.
+        } catch (ParseException e) {
+            // Other ParseExceptions (not for unclosed comment) are acceptable.
+        }
+
+        String sqlWithNestedClosedComment = "SELECT * FROM another_table /* outer /* inner */ closed */";
+        try {
+            parsePlan(sqlWithNestedClosedComment);
+            // .matches(logicalProject(logicalOlapScan())); // Example
+        } catch (NotSupportedException e) {
+            if ("Not Supported: Syntax error: unclosed bracketed comment detected.".equals(e.getMessage())) {
+                Assertions.fail("NotSupportedException for unclosed comment "
+                        + "was thrown for a correctly closed nested comment: " + sqlWithNestedClosedComment, e);
+            }
+        } catch (ParseException e) {
+            // Other ParseExceptions are acceptable.
+        }
+
+        // Test cases for multi-statements
+        NereidsParser parser = new NereidsParser();
+        String multiStmtClosed = "SELECT 1 /* comment1 */ ; SELECT 2 /* comment2 */";
+        try {
+            List<Pair<LogicalPlan, StatementContext>> stmts = parser.parseMultiple(multiStmtClosed);
+            Assertions.assertNotNull(stmts,
+                    "Parsing multi-statement with closed comments should not return null.");
+            Assertions.assertEquals(2, stmts.size(),
+                    "Should parse both statements for multi-statement with closed comments.");
+        } catch (NotSupportedException e) {
+            if ("Not Supported: Syntax error: unclosed bracketed comment detected.".equals(e.getMessage())) {
+                Assertions.fail("NotSupportedException for unclosed comment was thrown for "
+                        + "a correctly closed multi-statement: " + multiStmtClosed, e);
+            }
+        }
     }
 }

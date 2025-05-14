@@ -21,16 +21,34 @@ parser grammar DorisParser;
 
 options { tokenVocab = DorisLexer; }
 
+@header {
+    import org.apache.doris.nereids.exceptions.NotSupportedException;
+}
+
 @members {
     public boolean doris_legacy_SQL_syntax = true;
 }
 
 multiStatements
-    : SEMICOLON* statement? (SEMICOLON+ statement)* SEMICOLON* EOF
+    : SEMICOLON* statement? (SEMICOLON+ statement)* SEMICOLON*
+      {
+          DorisLexer lexer = (DorisLexer) getTokenStream().getTokenSource();
+          if (lexer.has_unclosed_bracketed_comment) {
+              throw new NotSupportedException("Syntax error: unclosed bracketed comment detected.");
+          }
+      }
+      EOF
     ;
 
 singleStatement
-    : SEMICOLON* statement? SEMICOLON* EOF
+    : SEMICOLON* statement? SEMICOLON*
+      {
+          DorisLexer lexer = (DorisLexer) getTokenStream().getTokenSource();
+          if (lexer.has_unclosed_bracketed_comment) {
+              throw new NotSupportedException("Syntax error: unclosed bracketed comment detected.");
+          }
+      }
+      EOF
     ;
 
 statement
