@@ -170,7 +170,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                     Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
                     partitionNum = idToPartitionItem.size();
                     List<Long> prunedPartitions = Lists.newArrayList();
-                    if (PartitionPruner.tryPrune(partitionSlots, filter.getPredicate(), idToPartitionItem,
+                    if (PartitionPruner.tryPrune(partitionSlots, partitionPredicate, idToPartitionItem,
                             prunedPartitions, ctx)) {
                         for (Long id : prunedPartitions) {
                             selectedPartitionItems.put(id, idToPartitionItem.get(id));
@@ -310,7 +310,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                     Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
                     partitionNum = idToPartitionItem.size();
                     List<Long> prunedPartitions = Lists.newArrayList();
-                    if (PartitionPruner.tryPrune(partitionSlots, filter.getPredicate(), idToPartitionItem,
+                    if (PartitionPruner.tryPrune(partitionSlots, partitionPredicate, idToPartitionItem,
                             prunedPartitions, ctx)) {
                         for (Long id : prunedPartitions) {
                             selectedPartitionItems.put(id, idToPartitionItem.get(id));
