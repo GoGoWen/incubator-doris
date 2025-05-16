@@ -23,12 +23,12 @@ import org.apache.doris.nereids.trees.expressions.Cast;
 import org.apache.doris.nereids.trees.expressions.EqualTo;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Concat;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Floor;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.If;
 import org.apache.doris.nereids.trees.expressions.literal.VarcharLiteral;
 import org.apache.doris.nereids.types.DataType;
 import org.apache.doris.nereids.types.DoubleType;
 import org.apache.doris.nereids.types.FloatType;
-import org.apache.doris.nereids.types.LargeIntType;
 import org.apache.doris.nereids.types.VarcharType;
 
 import com.google.common.base.Preconditions;
@@ -79,7 +79,7 @@ public class ConvertPrestoDoubleToString implements ExpressionPatternRuleFactory
                             Expression doubleExpr = cast.child();
                             Cast castDoubleAsVarchar = new DoubleToVarcharCast(doubleExpr, cast.getDataType());
                             return new If(
-                                    new EqualTo(doubleExpr, new Cast(doubleExpr, LargeIntType.INSTANCE)),
+                                    new EqualTo(doubleExpr, new Floor(doubleExpr)),
                                     new Concat(castDoubleAsVarchar, new VarcharLiteral(".0")),
                                     castDoubleAsVarchar
                             );
