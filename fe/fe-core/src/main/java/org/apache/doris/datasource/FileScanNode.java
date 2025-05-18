@@ -24,6 +24,7 @@ import org.apache.doris.analysis.StringLiteral;
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.TableIf;
+import org.apache.doris.catalog.Type;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.common.util.Util;
@@ -212,7 +213,6 @@ public abstract class FileScanNode extends ExternalScanNode {
         Preconditions.checkNotNull(tbl);
         TExpr tExpr = new TExpr();
         tExpr.setNodes(Lists.newArrayList());
-
         for (Column column : tbl.getBaseSchema()) {
             Expr expr;
             if (column.getDefaultValue() != null) {
@@ -242,7 +242,12 @@ public abstract class FileScanNode extends ExternalScanNode {
             // and if z is not nullable, the load will fail.
             if (slotDesc != null) {
                 if (expr != null) {
-                    expr = castToSlot(slotDesc, expr);
+                    if (expr.getType().equals(Type.BITMAP) && expr.toSql().equalsIgnoreCase(
+                            "bitmap_empty()") && slotDesc.getType().equals(Type.VARCHAR)) {
+                        expr = new StringLiteral("");
+                    } else {
+                        expr = castToSlot(slotDesc, expr);
+                    }
                     params.putToDefaultValueOfSrcSlot(slotDesc.getId().asInt(), expr.treeToThrift());
                 } else {
                     params.putToDefaultValueOfSrcSlot(slotDesc.getId().asInt(), tExpr);

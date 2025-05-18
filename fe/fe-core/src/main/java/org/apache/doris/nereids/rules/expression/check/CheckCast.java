@@ -23,11 +23,13 @@ import org.apache.doris.nereids.rules.expression.ExpressionPatternRuleFactory;
 import org.apache.doris.nereids.trees.expressions.Cast;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.types.ArrayType;
+import org.apache.doris.nereids.types.BitmapType;
 import org.apache.doris.nereids.types.DataType;
 import org.apache.doris.nereids.types.JsonType;
 import org.apache.doris.nereids.types.MapType;
 import org.apache.doris.nereids.types.StructField;
 import org.apache.doris.nereids.types.StructType;
+import org.apache.doris.nereids.types.VarcharType;
 import org.apache.doris.nereids.types.coercion.CharacterType;
 import org.apache.doris.nereids.types.coercion.PrimitiveType;
 
@@ -69,6 +71,9 @@ public class CheckCast implements ExpressionPatternRuleFactory {
             return true;
         }
         if (originalType instanceof CharacterType && !(targetType instanceof PrimitiveType)) {
+            return true;
+        }
+        if (originalType instanceof BitmapType && (targetType instanceof VarcharType)) {
             return true;
         }
         if (originalType instanceof ArrayType && targetType instanceof ArrayType) {
