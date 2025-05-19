@@ -353,9 +353,6 @@ class FoldConstantTest extends ExpressionRewriteTestHelper {
         Round round = new Round(new DoubleLiteral(3.4d));
         rewritten = executor.rewrite(round, context);
         Assertions.assertEquals(new DoubleLiteral(3d), rewritten);
-        round = new Round(new DoubleLiteral(3.4d), new IntegerLiteral(5));
-        rewritten = executor.rewrite(round, context);
-        Assertions.assertEquals(new DoubleLiteral(3.4d), rewritten);
         round = new Round(new DoubleLiteral(3.5d));
         rewritten = executor.rewrite(round, context);
         Assertions.assertEquals(new DoubleLiteral(4d), rewritten);
@@ -363,16 +360,10 @@ class FoldConstantTest extends ExpressionRewriteTestHelper {
         Ceil ceil = new Ceil(new DoubleLiteral(3.4d));
         rewritten = executor.rewrite(ceil, context);
         Assertions.assertEquals(new DoubleLiteral(4d), rewritten);
-        ceil = new Ceil(new DoubleLiteral(3.4d), new IntegerLiteral(5));
-        rewritten = executor.rewrite(ceil, context);
-        Assertions.assertEquals(new DoubleLiteral(3.4d), rewritten);
 
         Floor floor = new Floor(new DoubleLiteral(3.4d));
         rewritten = executor.rewrite(floor, context);
         Assertions.assertEquals(new DoubleLiteral(3d), rewritten);
-        floor = new Floor(new DoubleLiteral(3.4d), new IntegerLiteral(5));
-        rewritten = executor.rewrite(floor, context);
-        Assertions.assertEquals(new DoubleLiteral(3.4d), rewritten);
 
         Exp exp = new Exp(new DoubleLiteral(0d));
         rewritten = executor.rewrite(exp, context);

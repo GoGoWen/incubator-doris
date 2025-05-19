@@ -91,7 +91,7 @@ public class DecimalV3Literal extends FractionalLiteral {
     public DecimalV3Literal roundFloor(int newScale) {
         return new DecimalV3Literal(DecimalV3Type
                 .createDecimalV3Type(((DecimalV3Type) dataType).getPrecision(), newScale),
-                value.setScale(newScale, RoundingMode.CEILING));
+                value.setScale(newScale, RoundingMode.FLOOR));
     }
 
     /**
@@ -102,7 +102,7 @@ public class DecimalV3Literal extends FractionalLiteral {
     public DecimalV3Literal round(int newScale) {
         return new DecimalV3Literal(DecimalV3Type
                 .createDecimalV3Type(((DecimalV3Type) dataType).getPrecision(), newScale),
-                value.setScale(newScale, RoundingMode.FLOOR));
+                value.setScale(newScale, RoundingMode.HALF_UP));
     }
 
     /**
