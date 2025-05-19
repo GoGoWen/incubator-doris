@@ -40,7 +40,7 @@ public class CastBitmapToVarcharRewriteTest extends ExpressionRewriteTestHelper 
         assertRewriteAfterCastBitmapToVarchar(new Cast(new BitmapEmpty(), VarcharType.MAX_VARCHAR_TYPE),
                 "bitmap_to_string(bitmap_empty())", StringType.INSTANCE);
         assertRewriteAfterCastBitmapToVarchar(new Cast(new BitmapFromString(new VarcharLiteral("1,2,3,4,5")),
-                VarcharType.MAX_VARCHAR_TYPE), "bitmap_to_string(bitmap_from_string('1,2,3,4,5'))",
+                        VarcharType.MAX_VARCHAR_TYPE), "bitmap_to_string(bitmap_from_string('1,2,3,4,5'))",
                 StringType.INSTANCE);
     }
 
