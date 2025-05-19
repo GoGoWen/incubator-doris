@@ -20,6 +20,7 @@ package org.apache.doris.nereids.rules.expression;
 import org.apache.doris.nereids.rules.expression.check.CheckCast;
 import org.apache.doris.nereids.rules.expression.rules.BooleanLiteralRewrite;
 import org.apache.doris.nereids.rules.expression.rules.CastBitmapToVarcharRewrite;
+import org.apache.doris.nereids.rules.expression.rules.CastDoubleToDecimalRewrite;
 import org.apache.doris.nereids.rules.expression.rules.ConvertAggStateCast;
 import org.apache.doris.nereids.rules.expression.rules.ConvertPrestoDoubleToString;
 import org.apache.doris.nereids.rules.expression.rules.DigitalMaskingConvert;
@@ -62,6 +63,7 @@ public class ExpressionNormalization extends ExpressionRewrite {
                 MergeDateTrunc.INSTANCE,
                 CheckCast.INSTANCE,
                 CastBitmapToVarcharRewrite.INSTANCE,
+                CastDoubleToDecimalRewrite.INSTANCE,
                 BooleanLiteralRewrite.INSTANCE,
                 ConvertPrestoDoubleToString.INSTANCE
             )

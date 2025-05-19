@@ -33,7 +33,7 @@ import java.util.List;
  */
 public class BooleanLiteralRewrite implements ExpressionPatternRuleFactory {
 
-    public static BooleanLiteralRewrite INSTANCE = new BooleanLiteralRewrite();
+    public static final BooleanLiteralRewrite INSTANCE = new BooleanLiteralRewrite();
 
     @Override
     public List<ExpressionPatternMatcher<? extends Expression>> buildRules() {

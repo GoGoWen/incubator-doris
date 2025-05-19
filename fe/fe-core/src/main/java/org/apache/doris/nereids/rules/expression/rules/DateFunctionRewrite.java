@@ -45,7 +45,8 @@ import java.util.List;
  *
  */
 public class DateFunctionRewrite implements ExpressionPatternRuleFactory {
-    public static DateFunctionRewrite INSTANCE = new DateFunctionRewrite();
+
+    public static final DateFunctionRewrite INSTANCE = new DateFunctionRewrite();
 
     @Override
     public List<ExpressionPatternMatcher<? extends Expression>> buildRules() {

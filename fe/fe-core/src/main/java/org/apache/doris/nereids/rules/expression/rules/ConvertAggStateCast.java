@@ -38,7 +38,7 @@ import java.util.List;
  */
 public class ConvertAggStateCast implements ExpressionPatternRuleFactory {
 
-    public static ConvertAggStateCast INSTANCE = new ConvertAggStateCast();
+    public static final ConvertAggStateCast INSTANCE = new ConvertAggStateCast();
 
     @Override
     public List<ExpressionPatternMatcher<? extends Expression>> buildRules() {

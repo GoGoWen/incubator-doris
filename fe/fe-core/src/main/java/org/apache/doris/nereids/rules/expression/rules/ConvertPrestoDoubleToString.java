@@ -27,6 +27,8 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.Floor;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.If;
 import org.apache.doris.nereids.trees.expressions.literal.VarcharLiteral;
 import org.apache.doris.nereids.types.DataType;
+import org.apache.doris.nereids.types.DecimalV2Type;
+import org.apache.doris.nereids.types.DecimalV3Type;
 import org.apache.doris.nereids.types.DoubleType;
 import org.apache.doris.nereids.types.FloatType;
 import org.apache.doris.nereids.types.VarcharType;
@@ -42,7 +44,8 @@ import java.util.List;
  * --cast(cast(2493.0 as double) as varchar)
  */
 public class ConvertPrestoDoubleToString implements ExpressionPatternRuleFactory {
-    public static ConvertPrestoDoubleToString INSTANCE = new ConvertPrestoDoubleToString();
+
+    public static final ConvertPrestoDoubleToString INSTANCE = new ConvertPrestoDoubleToString();
 
     /**
      * subclass of Cast
@@ -64,6 +67,14 @@ public class ConvertPrestoDoubleToString implements ExpressionPatternRuleFactory
         }
     }
 
+    private boolean isCastToDecimal(Expression expression) {
+        if (expression instanceof Cast) {
+            Cast cast = (Cast) expression;
+            return cast.getDataType() instanceof DecimalV3Type || cast.getDataType() instanceof DecimalV2Type;
+        }
+        return false;
+    }
+
     @Override
     public List<ExpressionPatternMatcher<? extends Expression>> buildRules() {
         return ImmutableList.of(
@@ -74,12 +85,15 @@ public class ConvertPrestoDoubleToString implements ExpressionPatternRuleFactory
                                     || ctx.expr.child(0).getDataType() instanceof FloatType)
                                 && ctx.expr.getDataType().isStringLikeType()
                                 && !(ctx.expr instanceof DoubleToVarcharCast)
-                        )
+                                && (!ctx.parent.isPresent() || !isCastToDecimal(ctx.parent.get())))
                         .then(cast -> {
                             Expression doubleExpr = cast.child();
                             Cast castDoubleAsVarchar = new DoubleToVarcharCast(doubleExpr, cast.getDataType());
+                            if (doubleExpr.getDataType() instanceof FloatType) {
+                                doubleExpr = new Cast(doubleExpr, DoubleType.INSTANCE);
+                            }
                             return new If(
-                                    new EqualTo(doubleExpr, new Floor(doubleExpr)),
+                                    new EqualTo(cast.child(), new Floor(doubleExpr)),
                                     new Concat(castDoubleAsVarchar, new VarcharLiteral(".0")),
                                     castDoubleAsVarchar
                             );

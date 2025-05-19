@@ -143,23 +143,23 @@ class DecimalV3LiteralTest {
     @Test
     void testRoundFloor() {
         DecimalV3Literal literal = new DecimalV3Literal(new BigDecimal("123.456")); // scale 3
-        Assertions.assertEquals(-1, new BigDecimal("123.45").compareTo(literal.roundFloor(2).getValue()));
-        Assertions.assertEquals(-1, new BigDecimal("123.4").compareTo(literal.roundFloor(1).getValue()));
-        Assertions.assertEquals(-1, new BigDecimal("123").compareTo(literal.roundFloor(0).getValue()));
+        Assertions.assertEquals(0, new BigDecimal("123.45").compareTo(literal.roundFloor(2).getValue()));
+        Assertions.assertEquals(0, new BigDecimal("123.4").compareTo(literal.roundFloor(1).getValue()));
+        Assertions.assertEquals(0, new BigDecimal("123").compareTo(literal.roundFloor(0).getValue()));
 
         DecimalV3Literal negLiteral = new DecimalV3Literal(new BigDecimal("-123.451"));
-        Assertions.assertEquals(-1, new BigDecimal("-123.46").compareTo(negLiteral.roundFloor(2).getValue()));
-        Assertions.assertEquals(-1, new BigDecimal("-123.5").compareTo(negLiteral.roundFloor(1).getValue()));
-        Assertions.assertEquals(-1, new BigDecimal("-124").compareTo(negLiteral.roundFloor(0).getValue()));
+        Assertions.assertEquals(0, new BigDecimal("-123.46").compareTo(negLiteral.roundFloor(2).getValue()));
+        Assertions.assertEquals(0, new BigDecimal("-123.5").compareTo(negLiteral.roundFloor(1).getValue()));
+        Assertions.assertEquals(0, new BigDecimal("-124").compareTo(negLiteral.roundFloor(0).getValue()));
     }
 
     @Test
     void testRoundHalfUp() {
         DecimalV3Literal literal1 = new DecimalV3Literal(new BigDecimal("123.456")); // scale 3
-        Assertions.assertEquals(1, new BigDecimal("123.46").compareTo(literal1.round(2).getValue()));
+        Assertions.assertEquals(0, new BigDecimal("123.46").compareTo(literal1.round(2).getValue()));
 
         DecimalV3Literal literal2 = new DecimalV3Literal(new BigDecimal("123.455"));
-        Assertions.assertEquals(1, new BigDecimal("123.46").compareTo(literal2.round(2).getValue()));
+        Assertions.assertEquals(0, new BigDecimal("123.46").compareTo(literal2.round(2).getValue()));
 
         DecimalV3Literal literal3 = new DecimalV3Literal(new BigDecimal("123.454"));
         Assertions.assertEquals(0, new BigDecimal("123.45").compareTo(literal3.round(2).getValue()));

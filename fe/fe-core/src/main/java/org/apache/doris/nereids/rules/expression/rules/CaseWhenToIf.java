@@ -36,7 +36,7 @@ import java.util.List;
  */
 public class CaseWhenToIf implements ExpressionPatternRuleFactory {
 
-    public static CaseWhenToIf INSTANCE = new CaseWhenToIf();
+    public static final CaseWhenToIf INSTANCE = new CaseWhenToIf();
 
     @Override
     public List<ExpressionPatternMatcher<? extends Expression>> buildRules() {
