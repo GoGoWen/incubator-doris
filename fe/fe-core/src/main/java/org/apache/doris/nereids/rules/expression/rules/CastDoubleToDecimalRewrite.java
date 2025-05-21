@@ -21,6 +21,7 @@ import org.apache.doris.nereids.rules.expression.ExpressionPatternMatcher;
 import org.apache.doris.nereids.rules.expression.ExpressionPatternRuleFactory;
 import org.apache.doris.nereids.trees.expressions.Cast;
 import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Trim;
 import org.apache.doris.nereids.types.DecimalV2Type;
 import org.apache.doris.nereids.types.DecimalV3Type;
 import org.apache.doris.nereids.types.DoubleType;
@@ -42,11 +43,12 @@ public class CastDoubleToDecimalRewrite implements ExpressionPatternRuleFactory 
     @Override
     public List<ExpressionPatternMatcher<? extends Expression>> buildRules() {
         return ImmutableList.of(
-                matchesType(Cast.class).then(CastDoubleToDecimalRewrite::rewrite)
+                matchesType(Cast.class).then(CastDoubleToDecimalRewrite::rewrite),
+                matchesType(Trim.class).then(CastDoubleToDecimalRewrite::rewrite)
         );
     }
 
-    /** rewrite */
+    /** rewrite cast*/
     public static Expression rewrite(Cast cast) {
         if (ConnectContext.get() != null && ConnectContext.get().getSessionVariable().getSqlDialect().equalsIgnoreCase(
                 "presto")) {
@@ -60,5 +62,18 @@ public class CastDoubleToDecimalRewrite implements ExpressionPatternRuleFactory 
             }
         }
         return cast;
+    }
+
+    /** rewrite trim*/
+    public static Expression rewrite(Trim trim) {
+        if (ConnectContext.get() != null && ConnectContext.get().getSessionVariable().getSqlDialect().equalsIgnoreCase(
+                "presto")) {
+            Expression expr = trim.child();
+            if (expr instanceof Cast && (expr.child(0).getDataType() instanceof DoubleType
+                    || expr.child(0).getDataType() instanceof FloatType)) {
+                return expr;
+            }
+        }
+        return trim;
     }
 }

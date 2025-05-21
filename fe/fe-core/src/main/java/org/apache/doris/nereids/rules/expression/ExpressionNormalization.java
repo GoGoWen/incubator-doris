@@ -47,6 +47,7 @@ public class ExpressionNormalization extends ExpressionRewrite {
     // we should run supportJavaDateFormatter before foldConstantRule or be will fold
     // from_unixtime(timestamp, 'yyyyMMdd') to 'yyyyMMdd'
     public static final List<ExpressionRewriteRule> NORMALIZE_REWRITE_RULES = ImmutableList.of(
+            bottomUp(CastDoubleToDecimalRewrite.INSTANCE),
             bottomUp(
                 SupportJavaDateFormatter.INSTANCE,
                 NormalizeBinaryPredicatesRule.INSTANCE,
@@ -63,7 +64,6 @@ public class ExpressionNormalization extends ExpressionRewrite {
                 MergeDateTrunc.INSTANCE,
                 CheckCast.INSTANCE,
                 CastBitmapToVarcharRewrite.INSTANCE,
-                CastDoubleToDecimalRewrite.INSTANCE,
                 BooleanLiteralRewrite.INSTANCE,
                 ConvertPrestoDoubleToString.INSTANCE
             )
