@@ -30,6 +30,7 @@ import org.apache.doris.datasource.TablePartitionValues;
 import org.apache.doris.datasource.maxcompute.MaxComputeExternalTable;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
+import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
 import org.apache.doris.thrift.TFileFormatType;
@@ -54,13 +55,15 @@ public class MaxComputeScanNode extends FileQueryScanNode {
     private static final int MIN_SPLIT_SIZE = 4096;
     private static final LocationPath VIRTUAL_SLICE_PART = new LocationPath("/virtual_slice_part", Maps.newHashMap());
 
-    public MaxComputeScanNode(PlanNodeId id, TupleDescriptor desc, boolean needCheckColumnPriv) {
-        this(id, desc, "MCScanNode", StatisticalType.MAX_COMPUTE_SCAN_NODE, needCheckColumnPriv);
+    // For new planner
+    public MaxComputeScanNode(PlanNodeId id, TupleDescriptor desc, boolean needCheckColumnPriv,
+            SessionVariable sv) {
+        this(id, desc, "MCScanNode", StatisticalType.MAX_COMPUTE_SCAN_NODE, needCheckColumnPriv, sv);
     }
 
-    public MaxComputeScanNode(PlanNodeId id, TupleDescriptor desc, String planNodeName,
-                              StatisticalType statisticalType, boolean needCheckColumnPriv) {
-        super(id, desc, planNodeName, statisticalType, needCheckColumnPriv);
+    private MaxComputeScanNode(PlanNodeId id, TupleDescriptor desc, String planNodeName,
+            StatisticalType statisticalType, boolean needCheckColumnPriv, SessionVariable sv) {
+        super(id, desc, planNodeName, statisticalType, needCheckColumnPriv, sv);
         table = (MaxComputeExternalTable) desc.getTable();
     }
 
@@ -103,7 +106,7 @@ public class MaxComputeScanNode extends FileQueryScanNode {
     }
 
     @Override
-    public List<Split> getSplits() throws UserException {
+    public List<Split> getSplits(int numBackends) throws UserException {
         List<Split> result = new ArrayList<>();
         com.aliyun.odps.Table odpsTable = table.getOdpsTable();
         if (desc.getSlots().isEmpty() || odpsTable.getFileNum() <= 0) {

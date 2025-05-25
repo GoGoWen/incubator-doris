@@ -47,6 +47,8 @@ public class FileSplit implements Split {
     // the location type for BE, eg: HDFS, LOCAL, S3
     protected TFileType locationType;
 
+    public Long targetSplitSize;
+
     public FileSplit(LocationPath path, long start, long length, long fileLength,
             long modificationTime, String[] hosts, List<String> partitionValues) {
         this.path = path;
@@ -78,15 +80,19 @@ public class FileSplit implements Split {
         return path.toString();
     }
 
+
     public static class FileSplitCreator implements SplitCreator {
 
         public static final FileSplitCreator DEFAULT = new FileSplitCreator();
 
         @Override
         public Split create(LocationPath path, long start, long length, long fileLength,
+                long fileSplitSize,
                 long modificationTime, String[] hosts,
                 List<String> partitionValues) {
-            return new FileSplit(path, start, length, fileLength, modificationTime, hosts, partitionValues);
+            FileSplit split = new FileSplit(path, start, length, fileLength, modificationTime, hosts, partitionValues);
+            split.setTargetSplitSize(fileSplitSize);
+            return split;
         }
     }
 }

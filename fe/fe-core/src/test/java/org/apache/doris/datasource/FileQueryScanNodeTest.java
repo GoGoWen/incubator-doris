@@ -37,12 +37,14 @@ public class FileQueryScanNodeTest {
     public void testGetNumInstances() {
         Config.enable_adaptive_generate_num_instances = true;
         Config.selected_split_num_to_decide_num_instances = new long[] {5000, 20000, 40000, 60000};
+        ConnectContext connectContext = new ConnectContext();
+        connectContext.setThreadLocalInfo();
         TupleDescriptor tuple = new TupleDescriptor(new TupleId(2));
         HMSExternalCatalog catalog = new HMSExternalCatalog();
         HMSExternalTable table = new HMSExternalTable(1, "test", "test", catalog);
         tuple.setTable(table);
         FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tuple, "hive-scan-node",
-                StatisticalType.HIVE_SCAN_NODE, true);
+                StatisticalType.HIVE_SCAN_NODE, true, connectContext.getSessionVariable());
         setSelectedSplitNumForFileQueryScanNode(scanNode, 2);
         Assertions.assertEquals(1, scanNode.getNumInstances());
         setSelectedSplitNumForFileQueryScanNode(scanNode, 6000);
@@ -56,8 +58,6 @@ public class FileQueryScanNodeTest {
 
         try {
             Config.enable_adaptive_generate_num_instances = false;
-            ConnectContext connectContext = new ConnectContext();
-            connectContext.setThreadLocalInfo();
             connectContext.getSessionVariable().setPipelineTaskNum("8");
             Assertions.assertEquals(8, scanNode.getNumInstances());
         } catch (Exception e) {

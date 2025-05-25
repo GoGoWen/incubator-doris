@@ -28,6 +28,7 @@ import org.apache.doris.datasource.jdbc.source.JdbcScanNode;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.planner.ScanNode;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.SessionVariable;
 
 import com.google.common.base.Strings;
 import org.apache.logging.log4j.LogManager;
@@ -50,7 +51,7 @@ public class JdbcQueryTableValueFunction extends QueryTableValueFunction {
     }
 
     @Override
-    public ScanNode getScanNode(PlanNodeId id, TupleDescriptor desc) {
+    public ScanNode getScanNode(PlanNodeId id, TupleDescriptor desc, SessionVariable sv) {
         JdbcExternalCatalog catalog = (JdbcExternalCatalog) catalogIf;
 
         ConnectContext ctx = ConnectContext.get();

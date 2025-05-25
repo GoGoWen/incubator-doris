@@ -38,6 +38,7 @@ import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
 import org.apache.doris.thrift.TExplainLevel;
@@ -130,8 +131,9 @@ public class HudiScanNode extends HiveScanNode {
      * These scan nodes do not have corresponding catalog/database/table info, so no need to do priv check
      */
     public HudiScanNode(PlanNodeId id, TupleDescriptor desc, boolean needCheckColumnPriv,
-            Optional<TableScanParams> scanParams, Optional<IncrementalRelation> incrementalRelation) {
-        super(id, desc, "HUDI_SCAN_NODE", StatisticalType.HUDI_SCAN_NODE, needCheckColumnPriv);
+            Optional<TableScanParams> scanParams, Optional<IncrementalRelation> incrementalRelation,
+            SessionVariable sv) {
+        super(id, desc, "HUDI_SCAN_NODE", StatisticalType.HUDI_SCAN_NODE, needCheckColumnPriv, sv);
         isCowOrRoTable = hmsTable.isHoodieCowTable();
         if (LOG.isDebugEnabled()) {
             if (isCowOrRoTable) {
@@ -424,7 +426,7 @@ public class HudiScanNode extends HiveScanNode {
     }
 
     @Override
-    public List<Split> getSplits() throws UserException {
+    public List<Split> getSplits(int numBackends) throws UserException {
         if (incrementalRead && !incrementalRelation.fallbackFullTableScan()) {
             return getIncrementalSplits();
         }
@@ -449,7 +451,7 @@ public class HudiScanNode extends HiveScanNode {
     }
 
     @Override
-    public void startSplit() {
+    public void startSplit(int numBackends) {
         if (prunedPartitions.isEmpty()) {
             splitAssignment.finishSchedule();
             return;

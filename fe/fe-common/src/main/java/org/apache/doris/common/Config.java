@@ -2951,7 +2951,7 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = true, description = {"是否支持自适应生成运行实例并发数",
             "whether to enable generate num of instances adaptively"})
-    public static boolean enable_adaptive_generate_num_instances = true;
+    public static boolean enable_adaptive_generate_num_instances = false;
 
     @ConfField(mutable = true, description = {"根据文件切分数量大小范围来决定实例并发数",
             "selected split num to decide num of instances"})
