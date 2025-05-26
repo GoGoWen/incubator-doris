@@ -22,6 +22,7 @@ import org.apache.doris.catalog.KeysType;
 import org.apache.doris.catalog.OlapTable;
 import org.apache.doris.catalog.PrimitiveType;
 import org.apache.doris.datasource.hive.HMSExternalTable;
+import org.apache.doris.datasource.hive.HMSExternalTable.DLAType;
 import org.apache.doris.nereids.properties.FunctionalDependencies;
 import org.apache.doris.nereids.properties.LogicalProperties;
 import org.apache.doris.nereids.trees.expressions.EqualTo;
@@ -125,6 +126,9 @@ public class PhysicalPlanTranslatorTest {
 
                 fileScan.getConjuncts();
                 result = Sets.newHashSet(expression1, expression2, expression3);
+
+                table.getDlaType();
+                result = DLAType.HIVE;
             }
         };
         PlanTranslatorContext planTranslatorContext = new PlanTranslatorContext();
