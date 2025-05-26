@@ -36,7 +36,7 @@ public class CastDoubleToDecimalRewriteTest extends ExpressionRewriteTestHelper 
         ConnectContext context = new ConnectContext();
         context.getSessionVariable().setSqlDialect("presto");
         context.setThreadLocalInfo();
-        Assertions.assertEquals(1, new CastDoubleToDecimalRewrite().buildRules().size());
+        Assertions.assertEquals(2, new CastDoubleToDecimalRewrite().buildRules().size());
 
         Cast cast1 = new Cast(new DoubleLiteral(1.1d), VarcharType.MAX_VARCHAR_TYPE);
         Cast cast2 = new Cast(cast1, DecimalV2Type.SYSTEM_DEFAULT);

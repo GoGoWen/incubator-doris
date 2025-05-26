@@ -41,6 +41,7 @@ import org.apache.doris.utframe.TestWithFeService;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -296,11 +297,11 @@ public class NormalizeAggregateTest extends TestWithFeService implements MemoPat
     @Test
     void testWithAggFunction() {
         String sql = "select 'abc', 1, COUNT(*) from t1 group by 1, 2";
-        PlanChecker.from(connectContext)
+        PlanChecker checker = PlanChecker.from(connectContext)
                 .analyze(sql)
-                .rewrite()
-                .matches(logicalAggregate().when(agg ->
-                        agg.getGroupByExpressions().size() == 1
-                                && agg.getOutputExpressions().stream().anyMatch(e -> e.toString().contains("COUNT"))));
+                .rewrite();
+        Assertions.assertTrue(checker.getExplainFragments().contains("count"));
+        checker.matches(logicalAggregate().when(agg -> agg.getGroupByExpressions().size() == 1
+                && agg.getOutputExpressions().stream().anyMatch(e -> e.toString().contains("count"))));
     }
 }
