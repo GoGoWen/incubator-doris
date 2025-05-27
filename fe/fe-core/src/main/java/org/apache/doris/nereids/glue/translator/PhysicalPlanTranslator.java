@@ -674,7 +674,8 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
      *
      */
     public Set<Expression> getConjunctsWithoutPartitionPredicate(PhysicalFileScan fileScan) {
-        if (fileScan.getTable() instanceof HMSExternalTable) {
+        ExternalTable tbl = fileScan.getTable();
+        if (tbl instanceof HMSExternalTable && ((HMSExternalTable) tbl).getDlaType() == DLAType.HIVE) {
             Map<String, Slot> scanOutput = fileScan.getOutput()
                     .stream()
                     .collect(Collectors.toMap(slot -> slot.getName().toLowerCase(), Function.identity()));
