@@ -20,7 +20,6 @@
 #include <bthread/mutex.h>
 #include <gen_cpp/internal_service.pb.h>
 
-#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <unordered_map>

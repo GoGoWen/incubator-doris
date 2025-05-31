@@ -129,7 +129,7 @@ Status MemTableWriter::_flush_memtable_async() {
     DCHECK(_flush_token != nullptr);
     std::unique_ptr<MemTable> memtable;
     {
-        std::lock_guard<SpinLock> l(_mem_table_ptr_lock);
+        std::lock_guard<std::mutex> l(_mem_table_ptr_lock);
         memtable = std::move(_mem_table);
     }
     return _flush_token->submit(std::move(memtable));
@@ -201,12 +201,12 @@ void MemTableWriter::_reset_mem_table() {
             _mem_table_num++, UniqueId(_req.load_id).to_string()));
 #endif
     {
-        std::lock_guard<SpinLock> l(_mem_table_tracker_lock);
+        std::lock_guard<std::mutex> l(_mem_table_tracker_lock);
         _mem_table_insert_trackers.push_back(mem_table_insert_tracker);
         _mem_table_flush_trackers.push_back(mem_table_flush_tracker);
     }
     {
-        std::lock_guard<SpinLock> l(_mem_table_ptr_lock);
+        std::lock_guard<std::mutex> l(_mem_table_ptr_lock);
         _mem_table.reset(new MemTable(_req.tablet_id, _tablet_schema, _req.slots, _req.tuple_desc,
                                       _unique_key_mow, _partial_update_info.get(),
                                       mem_table_insert_tracker, mem_table_flush_tracker));
@@ -233,7 +233,7 @@ Status MemTableWriter::close() {
 
     auto s = _flush_memtable_async();
     {
-        std::lock_guard<SpinLock> l(_mem_table_ptr_lock);
+        std::lock_guard<std::mutex> l(_mem_table_ptr_lock);
         _mem_table.reset();
     }
     _is_closed = true;
@@ -332,7 +332,7 @@ Status MemTableWriter::cancel_with_status(const Status& st) {
         return Status::OK();
     }
     {
-        std::lock_guard<SpinLock> l(_mem_table_ptr_lock);
+        std::lock_guard<std::mutex> l(_mem_table_ptr_lock);
         _mem_table.reset();
     }
     if (_flush_token != nullptr) {
@@ -360,7 +360,7 @@ int64_t MemTableWriter::mem_consumption(MemType mem) {
     }
     int64_t mem_usage = 0;
     {
-        std::lock_guard<SpinLock> l(_mem_table_tracker_lock);
+        std::lock_guard<std::mutex> l(_mem_table_tracker_lock);
         if ((mem & MemType::WRITE) == MemType::WRITE) { // 3 & 2 = 2
             for (const auto& mem_table_tracker : _mem_table_insert_trackers) {
                 mem_usage += mem_table_tracker->consumption();
@@ -376,7 +376,7 @@ int64_t MemTableWriter::mem_consumption(MemType mem) {
 }
 
 int64_t MemTableWriter::active_memtable_mem_consumption() {
-    std::lock_guard<SpinLock> l(_mem_table_ptr_lock);
+    std::lock_guard<std::mutex> l(_mem_table_ptr_lock);
     return _mem_table != nullptr ? _mem_table->memory_usage() : 0;
 }
 

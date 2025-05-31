@@ -110,7 +110,7 @@ Status SegmentFlusher::_parse_variant_columns(vectorized::Block& block) {
 }
 
 Status SegmentFlusher::close() {
-    std::lock_guard<SpinLock> l(_lock);
+    std::lock_guard<std::mutex> l(_lock);
     for (auto& [segment_id, file_writer] : _file_writers) {
         Status status = file_writer->close();
         if (!status.ok()) {
@@ -163,7 +163,7 @@ Status SegmentFlusher::_create_segment_writer(std::unique_ptr<segment_v2::Segmen
                                                _context->data_dir, _context->max_rows_per_segment,
                                                writer_options, _context->mow_context));
     {
-        std::lock_guard<SpinLock> l(_lock);
+        std::lock_guard<std::mutex> l(_lock);
         _file_writers.emplace(segment_id, std::move(file_writer));
     }
     auto s = writer->init();
@@ -194,7 +194,7 @@ Status SegmentFlusher::_create_segment_writer(
             _context->data_dir, _context->max_rows_per_segment, writer_options,
             _context->mow_context));
     {
-        std::lock_guard<SpinLock> l(_lock);
+        std::lock_guard<std::mutex> l(_lock);
         _file_writers.emplace(segment_id, std::move(file_writer));
     }
     auto s = writer->init();

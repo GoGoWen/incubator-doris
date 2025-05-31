@@ -23,8 +23,6 @@
 #include "gutil/strings/substitute.h"
 #include "gutil/threading/thread_collision_warner.h"
 #include "util/scoped_cleanup.h"
-#include "util/spinlock.h"
-#include "util/time.h"
 
 // If this scope times out, make a simple trace.
 // It will log the cost time only.

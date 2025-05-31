@@ -24,7 +24,6 @@
 
 #include "common/compiler_util.h" // IWYU pragma: keep
 #include "common/logging.h"
-#include "util/spinlock.h"
 #include "util/sse_util.hpp"
 
 namespace doris {
@@ -52,14 +51,14 @@ public:
     void* get_or_create(size_t id) override {
         size_t block_id = id / ELEMENTS_PER_BLOCK;
         {
-            std::lock_guard<SpinLock> l(_lock);
+            std::lock_guard<std::mutex> l(_lock);
             if (block_id >= _blocks.size()) {
                 _blocks.resize(block_id + 1);
             }
         }
         CoreDataBlock* block = _blocks[block_id];
         if (block == nullptr) {
-            std::lock_guard<SpinLock> l(_lock);
+            std::lock_guard<std::mutex> l(_lock);
             block = _blocks[block_id];
             if (block == nullptr) {
                 block = new CoreDataBlock();
@@ -72,7 +71,7 @@ public:
 
 private:
     static constexpr int ELEMENTS_PER_BLOCK = BLOCK_SIZE / ELEMENT_BYTES;
-    SpinLock _lock; // lock to protect the modification of _blocks
+    std::mutex _lock; // lock to protect the modification of _blocks
     std::vector<CoreDataBlock*> _blocks;
 };
 

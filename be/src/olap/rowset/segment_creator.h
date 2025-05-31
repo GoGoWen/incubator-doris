@@ -25,10 +25,8 @@
 
 #include "common/status.h"
 #include "io/fs/file_reader_writer_fwd.h"
-#include "olap/olap_common.h"
 #include "olap/rowset/rowset_writer_context.h"
 #include "olap/tablet_fwd.h"
-#include "util/spinlock.h"
 #include "vec/core/block.h"
 
 namespace doris {
@@ -157,7 +155,7 @@ private:
 private:
     RowsetWriterContext* _context;
 
-    mutable SpinLock _lock; // protect following vectors.
+    mutable std::mutex _lock; // protect following vectors.
     std::unordered_map<int32_t, io::FileWriterPtr> _file_writers;
 
     // written rows by add_block/add_row

@@ -64,7 +64,6 @@
 #include "runtime/types.h"
 #include "util/countdown_latch.h"
 #include "util/runtime_profile.h"
-#include "util/spinlock.h"
 #include "util/stopwatch.hpp"
 #include "vec/columns/column.h"
 #include "vec/common/allocator.h"

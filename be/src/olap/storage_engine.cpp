@@ -62,7 +62,6 @@
 #include "olap/memtable_flush_executor.h"
 #include "olap/olap_common.h"
 #include "olap/olap_define.h"
-#include "olap/olap_meta.h"
 #include "olap/rowset/rowset_fwd.h"
 #include "olap/rowset/rowset_meta.h"
 #include "olap/rowset/rowset_meta_manager.h"
@@ -78,7 +77,6 @@
 #include "runtime/stream_load/stream_load_recorder.h"
 #include "util/doris_metrics.h"
 #include "util/metrics.h"
-#include "util/spinlock.h"
 #include "util/stopwatch.hpp"
 #include "util/thread.h"
 #include "util/threadpool.h"
@@ -199,7 +197,7 @@ Status StorageEngine::_open() {
 Status StorageEngine::_init_store_map() {
     std::vector<DataDir*> tmp_stores;
     std::vector<std::thread> threads;
-    SpinLock error_msg_lock;
+    std::mutex error_msg_lock;
     std::string error_msg;
     for (auto& path : _options.store_paths) {
         DataDir* store = new DataDir(path.path, path.capacity_bytes, path.storage_medium,
@@ -209,7 +207,7 @@ Status StorageEngine::_init_store_map() {
             auto st = store->init();
             if (!st.ok()) {
                 {
-                    std::lock_guard<SpinLock> l(error_msg_lock);
+                    std::lock_guard<std::mutex> l(error_msg_lock);
                     error_msg.append(st.to_string() + ";");
                 }
                 LOG(WARNING) << "Store load failed, status=" << st.to_string()

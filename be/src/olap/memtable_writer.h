@@ -38,7 +38,6 @@
 #include "olap/tablet.h"
 #include "olap/tablet_meta.h"
 #include "olap/tablet_schema.h"
-#include "util/spinlock.h"
 #include "util/uid_util.h"
 
 namespace doris {
@@ -132,8 +131,8 @@ private:
     std::shared_ptr<FlushToken> _flush_token;
     std::vector<std::shared_ptr<MemTracker>> _mem_table_insert_trackers;
     std::vector<std::shared_ptr<MemTracker>> _mem_table_flush_trackers;
-    SpinLock _mem_table_tracker_lock;
-    SpinLock _mem_table_ptr_lock;
+    std::mutex _mem_table_tracker_lock;
+    std::mutex _mem_table_ptr_lock;
     std::atomic<uint32_t> _mem_table_num = 1;
     QueryThreadContext _query_thread_context;
 

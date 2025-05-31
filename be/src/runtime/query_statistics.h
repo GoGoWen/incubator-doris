@@ -24,10 +24,6 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <unordered_map>
-#include <utility>
-
-#include "util/spinlock.h"
 
 namespace doris {
 

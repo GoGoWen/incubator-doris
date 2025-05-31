@@ -20,16 +20,12 @@
 #include <fmt/format.h>
 #include <gen_cpp/olap_file.pb.h>
 
-#include <algorithm>
 #include <atomic>
-#include <condition_variable>
 #include <map>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <roaring/roaring.hh>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "common/status.h"
@@ -42,7 +38,6 @@
 #include "olap/rowset/rowset_writer_context.h"
 #include "olap/rowset/segment_creator.h"
 #include "segment_v2/segment.h"
-#include "util/spinlock.h"
 
 namespace doris {
 namespace vectorized {
@@ -106,7 +101,7 @@ public:
     RowsetTypePB type() const override { return RowsetTypePB::BETA_ROWSET; }
 
     Status get_segment_num_rows(std::vector<uint32_t>* segment_num_rows) const override {
-        std::lock_guard<SpinLock> l(_lock);
+        std::lock_guard<std::mutex> l(_lock);
         *segment_num_rows = _segment_num_rows;
         return Status::OK();
     }
@@ -159,7 +154,7 @@ protected:
     std::mutex _segment_set_mutex;     // mutex for _segment_set
     int32_t _segment_start_id;         // basic write start from 0, partial update may be different
 
-    mutable SpinLock _lock; // protect following vectors.
+    mutable std::mutex _lock; // protect following vectors.
     // record rows number of every segment already written, using for rowid
     // conversion when compaction in unique key with MoW model
     std::vector<uint32_t> _segment_num_rows;

@@ -35,7 +35,6 @@
 #include "olap/rowset/rowset_meta.h"
 #include "olap/rowset/rowset_writer_context.h"
 #include "util/slice.h"
-#include "util/spinlock.h"
 #include "vec/core/block.h"
 
 namespace doris {
@@ -188,7 +187,7 @@ Status VerticalBetaRowsetWriter::_create_segment_writer(
             file_writer.get(), _num_segment, _context.tablet_schema, _context.tablet,
             _context.data_dir, _context.max_rows_per_segment, writer_options, nullptr));
     {
-        std::lock_guard<SpinLock> l(_lock);
+        std::lock_guard<std::mutex> l(_lock);
         _file_writers.push_back(std::move(file_writer));
     }
 

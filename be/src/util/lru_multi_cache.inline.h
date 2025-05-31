@@ -22,7 +22,6 @@
 #pragma once
 
 #include <glog/logging.h>
-
 #include "util/lru_multi_cache.h"
 #include "util/time.h"
 
@@ -109,25 +108,25 @@ LruMultiCache<KeyType, ValueType>::LruMultiCache(size_t capacity) : _capacity(ca
 
 template <typename KeyType, typename ValueType>
 size_t LruMultiCache<KeyType, ValueType>::size() {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
     return _size;
 }
 
 template <typename KeyType, typename ValueType>
 size_t LruMultiCache<KeyType, ValueType>::number_of_keys() {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
     return _hash_table.size();
 }
 
 template <typename KeyType, typename ValueType>
 void LruMultiCache<KeyType, ValueType>::set_capacity(size_t new_capacity) {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
     _capacity = new_capacity;
 }
 
 template <typename KeyType, typename ValueType>
 auto LruMultiCache<KeyType, ValueType>::get(const KeyType& key) -> Accessor {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
     auto hash_table_it = _hash_table.find(key);
 
     // No owning list found with this key, the caller will have to create a new object
@@ -159,7 +158,7 @@ template <typename KeyType, typename ValueType>
 template <typename... Args>
 auto LruMultiCache<KeyType, ValueType>::emplace_and_get(const KeyType& key, Args&&... args)
         -> Accessor {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
 
     // creates default container if there isn't one
     Container& container = _hash_table[key];
@@ -185,7 +184,7 @@ auto LruMultiCache<KeyType, ValueType>::emplace_and_get(const KeyType& key, Args
 
 template <typename KeyType, typename ValueType>
 void LruMultiCache<KeyType, ValueType>::release(ValueType_internal* p_value_internal) {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
 
     // This only can be used by the accessor, which already checks for nullptr
     DCHECK(p_value_internal);
@@ -210,7 +209,7 @@ void LruMultiCache<KeyType, ValueType>::release(ValueType_internal* p_value_inte
 
 template <typename KeyType, typename ValueType>
 void LruMultiCache<KeyType, ValueType>::destroy(ValueType_internal* p_value_internal) {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
 
     // This only can be used by the accessor, which already checks for nullptr
     DCHECK(p_value_internal);
@@ -233,19 +232,19 @@ void LruMultiCache<KeyType, ValueType>::destroy(ValueType_internal* p_value_inte
 
 template <typename KeyType, typename ValueType>
 size_t LruMultiCache<KeyType, ValueType>::number_of_available_objects() {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
     return _lru_list.size();
 }
 
 template <typename KeyType, typename ValueType>
 void LruMultiCache<KeyType, ValueType>::rehash() {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
     _hash_table.rehash(_hash_table.bucket_count() + 1);
 }
 
 template <typename KeyType, typename ValueType>
 void LruMultiCache<KeyType, ValueType>::_evict_one(ValueType_internal& value_internal) {
-    // SpinLock is locked by the caller evicting function
+    // std::mutex is locked by the caller evicting function
     // _lock.DCheckLocked();
 
     // Has to be available to evict
@@ -269,7 +268,7 @@ void LruMultiCache<KeyType, ValueType>::_evict_one(ValueType_internal& value_int
 
 template <typename KeyType, typename ValueType>
 void LruMultiCache<KeyType, ValueType>::_evict_one_if_needed() {
-    // SpinLock is locked by the caller public function
+    // std::mutex is locked by the caller public function
     // _lock.DCheckLocked();
 
     if (!_lru_list.empty() && _size > _capacity) {
@@ -279,7 +278,7 @@ void LruMultiCache<KeyType, ValueType>::_evict_one_if_needed() {
 
 template <typename KeyType, typename ValueType>
 void LruMultiCache<KeyType, ValueType>::evict_older_than(uint64_t oldest_allowed_timestamp) {
-    std::lock_guard<SpinLock> g(_lock);
+    std::lock_guard<std::mutex> g(_lock);
 
     // Stop eviction if
     //   - there are no more available (i.e. evictable) objects
