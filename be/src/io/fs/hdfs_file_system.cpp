@@ -59,7 +59,6 @@ namespace io {
 // Cache for HdfsFileSystemHandle
 class HdfsFileSystemCache {
 public:
-    static int MAX_CACHE_HANDLE;
 
     static HdfsFileSystemCache* instance() {
         static HdfsFileSystemCache s_instance;
@@ -374,9 +373,6 @@ Status HdfsFileSystem::download_impl(const Path& remote_file, const Path& local_
     return local_writer->close();
 }
 
-// ************* HdfsFileSystemCache ******************
-int HdfsFileSystemCache::MAX_CACHE_HANDLE = 64;
-
 Status HdfsFileSystemCache::_create_fs(const THdfsParams& hdfs_params, const std::string& fs_name,
                                        hdfsFS* fs) {
     HDFSCommonBuilder builder;
@@ -436,11 +432,11 @@ Status HdfsFileSystemCache::get_connection(const THdfsParams& hdfs_params,
         // create a new one and try to put it into cache
         hdfsFS hdfs_fs = nullptr;
         RETURN_IF_ERROR(_create_fs(hdfs_params, fs_name, &hdfs_fs));
-        if (_cache.size() >= MAX_CACHE_HANDLE) {
+        if (_cache.size() >= config::max_hdfs_file_system_cache_num) {
             _clean_invalid();
             _clean_oldest();
         }
-        if (_cache.size() < MAX_CACHE_HANDLE) {
+        if (_cache.size() < config::max_hdfs_file_system_cache_num) {
             auto handle = std::make_shared<HdfsFileSystemHandle>(hdfs_fs, true);
             handle->update_last_access_time();
             *fs_handle = handle;
@@ -475,7 +471,9 @@ uint64 HdfsFileSystemCache::_hdfs_hash_code(const THdfsParams& hdfs_params,
     if (hdfs_params.__isset.hdfs_conf) {
         std::map<std::string, std::string> conf_map;
         for (auto& conf : hdfs_params.hdfs_conf) {
-            conf_map[conf.key] = conf.value;
+            if (conf.key == "BEE_USER" || conf.key == "BEE_SOURCE") {
+                conf_map[conf.key] = conf.value;
+            }
         }
         for (auto& conf : conf_map) {
             hash_code ^= Fingerprint(conf.first);

@@ -139,6 +139,11 @@ THdfsParams parse_properties(const std::map<std::string, std::string>& propertie
         } else if (iter->first.compare(KERBEROS_KEYTAB) == 0) {
             hdfsParams.__set_hdfs_kerberos_keytab(iter->second);
             iter = prop.erase(iter);
+        } else if (iter->first.compare(HIVE_METASTORE_URIS) == 0
+            || iter->first.compare(CREATE_TIME) == 0
+            || iter->first.compare(TYPE) == 0
+            || iter->first.compare(USE_META_CACHE) == 0) {
+            iter = prop.erase(iter);
         } else {
             THdfsConf item;
             item.key = iter->first;
@@ -173,7 +178,7 @@ Status create_hdfs_builder(const THdfsParams& hdfsParams, const std::string& fs_
     // set other conf
     if (hdfsParams.__isset.hdfs_conf) {
         for (const THdfsConf& conf : hdfsParams.hdfs_conf) {
-            LOG(INFO) << "set hdfs config: " << conf.key << ", value: " << conf.value;
+            VLOG_DEBUG << "set hdfs config: " << conf.key << ", value: " << conf.value;
             if (strcmp(conf.key.c_str(), "HADOOP_USER_TOKEN") == 0) {
                 hdfsBuilderSetUserToken(builder->get(), conf.value.c_str());
                 getTokenByConf = true;

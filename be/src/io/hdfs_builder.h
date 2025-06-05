@@ -34,6 +34,10 @@ const std::string USER = "hadoop.username";
 const std::string KERBEROS_PRINCIPAL = "hadoop.kerberos.principal";
 const std::string KERBEROS_KEYTAB = "hadoop.kerberos.keytab";
 const std::string TICKET_CACHE_PATH = "/tmp/krb5cc_doris_";
+const std::string HIVE_METASTORE_URIS = "hive.metastore.uris";
+const std::string CREATE_TIME = "create_time";
+const std::string USE_META_CACHE = "use_meta_cache";
+const std::string TYPE = "type";
 
 class HDFSCommonBuilder {
     friend Status create_hdfs_builder(const THdfsParams& hdfsParams, const std::string& fs_name,

@@ -151,7 +151,6 @@ Status FileHandleCache::get_file_handle(const hdfsFS& fs, const std::string& use
     // find an unused entry with the same mtime
     if (!require_new_handle) {
         auto cache_accessor = p.cache.get(cache_key);
-
         if (cache_accessor.get()) {
             // Found a handler in cache and reserved it
             *cache_hit = true;
