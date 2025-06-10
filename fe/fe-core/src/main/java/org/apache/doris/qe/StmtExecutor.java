@@ -600,8 +600,6 @@ public class StmtExecutor {
                 executeByLegacy(queryId);
             }
         } finally {
-            // Recover the isViewBased value
-            context.setIsViewBased(false);
             // revert Session Value
             try {
                 VariableMgr.revertSessionValue(sessionVariable);

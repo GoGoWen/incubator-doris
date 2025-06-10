@@ -349,14 +349,16 @@ public class BindRelation extends OneAnalysisRuleFactory {
         ConnectContext ctx = cascadesContext.getConnectContext();
         String previousCatalog = ctx.getCurrentCatalog().getName();
         String previousDb = ctx.getDatabase();
-        boolean isViewBased = ctx.isViewBased();
+        boolean previousIsViewBased = ctx.isViewBased();
         ctx.changeDefaultCatalog(hiveCatalog);
         ctx.setIsViewBased(true);
-        Plan hiveViewPlan = parseAndAnalyzeView(table, ddlSql, cascadesContext);
-        ctx.changeDefaultCatalog(previousCatalog);
-        ctx.setDatabase(previousDb);
-        ctx.setIsViewBased(isViewBased);
-        return hiveViewPlan;
+        try {
+            return parseAndAnalyzeView(table, ddlSql, cascadesContext);
+        } finally {
+            ctx.changeDefaultCatalog(previousCatalog);
+            ctx.setDatabase(previousDb);
+            ctx.setIsViewBased(previousIsViewBased);
+        }
     }
 
     private Plan parseAndAnalyzeView(TableIf view, String ddlSql, CascadesContext parentContext) {
