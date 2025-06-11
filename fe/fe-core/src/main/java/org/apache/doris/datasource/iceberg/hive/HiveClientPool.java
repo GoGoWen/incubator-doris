@@ -39,6 +39,10 @@ import java.security.PrivilegedAction;
 
 public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException> {
     private static final HiveMetaHookLoader DUMMY_HOOK_LOADER = t -> null;
+
+    private static final String JD_CONF_KEYS = "BEE_COMPUTE,BEE_BUSINESSID,BEE_SN,BEE_SCRIPT_ID,BEE_SCRIPT_V,"
+            + "BUFFALO_ENV_ACTION_DEF_ID,BUFFALO_ENV_ACTION_INSTANCE_ID,BUFFALO_ENV_TASK_DEF_ID";
+
     private static final DynMethods.StaticMethod GET_CLIENT = DynMethods.builder("getProxy")
             .impl(RetryingMetaStoreClient.class, HiveConf.class, HiveMetaHookLoader.class, String.class) // Hive1 & 2
             .impl(RetryingMetaStoreClient.class, Configuration.class, HiveMetaHookLoader.class, String.class) // Hive3
@@ -60,8 +64,12 @@ public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException>
                     Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
                     BDPAuthContext bdpAuthContext = BDPAuthContext.get();
                     HiveConf conf = new HiveConf(hiveConf);
+                    Preconditions.checkNotNull(bdpAuthContext.getErp(), "erp cannot be null");
+                    Preconditions.checkNotNull(bdpAuthContext.getSource(), "source cannot be null");
                     conf.set("BEE_SOURCE", bdpAuthContext.getSource());
                     conf.set("BEE_USER", bdpAuthContext.getErp());
+                    conf.set("hive.jd.conf.keys", JD_CONF_KEYS);
+                    conf.set("BEE_COMPUTE", "Doris");
                     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
                             null, bdpAuthContext.getUserToken());
                     IMetaStoreClient client = ugi.doAs((PrivilegedAction<IMetaStoreClient>) () -> {

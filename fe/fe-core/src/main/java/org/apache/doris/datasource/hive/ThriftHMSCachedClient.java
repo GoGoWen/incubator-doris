@@ -101,6 +101,9 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
             Comparator.comparingLong(Pair::value)
     );
 
+    private static final String JD_CONF_KEYS = "BEE_COMPUTE,BEE_BUSINESSID,BEE_SN,BEE_SCRIPT_ID,BEE_SCRIPT_V,"
+            + "BUFFALO_ENV_ACTION_DEF_ID,BUFFALO_ENV_ACTION_INSTANCE_ID,BUFFALO_ENV_TASK_DEF_ID";
+
     private boolean isClosed = false;
     private final int poolSize;
     private final HiveConf hiveConf;
@@ -809,10 +812,14 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                         return client;
                     }
                 }
+                Preconditions.checkNotNull(bdpAuthContext.getErp(), "erp cannot be null");
+                Preconditions.checkNotNull(bdpAuthContext.getSource(), "source cannot be null");
                 long start = System.currentTimeMillis();
                 HiveConf conf = new HiveConf(hiveConf);
                 conf.set("BEE_SOURCE", bdpAuthContext.getSource());
                 conf.set("BEE_USER", bdpAuthContext.getErp());
+                conf.set("hive.jd.conf.keys", JD_CONF_KEYS);
+                conf.set("BEE_COMPUTE", "Doris");
                 client = new ThriftHMSClient(bdpAuthContext, conf);
                 if (bdpAuthContext.getUserType() != null && bdpAuthContext.getUserType().equalsIgnoreCase(
                         "dev_personal")) {
