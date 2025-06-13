@@ -258,12 +258,17 @@ public class StringArithmetic {
      */
     @ExecFunction(name = "locate")
     public static Expression locate(StringLikeLiteral first, StringLikeLiteral second, IntegerLiteral third) {
-        int result = second.getValue().indexOf(first.getValue()) + 1;
-        if (third.getValue() <= 0 || !substringImpl(second.getValue(), third.getValue(),
-                second.getValue().length()).contains(first.getValue())) {
-            result = 0;
+        if (third.getValue() <= 0) {
+            return new IntegerLiteral(0);
         }
-        return new IntegerLiteral(result);
+
+        int startIndex = third.getValue() - 1;
+        if (startIndex >= second.getValue().length()) {
+            return new IntegerLiteral(0);
+        }
+        int result = second.getValue().indexOf(first.getValue(), startIndex);
+
+        return new IntegerLiteral(result == -1 ? 0 : result + 1);
     }
 
     /**
