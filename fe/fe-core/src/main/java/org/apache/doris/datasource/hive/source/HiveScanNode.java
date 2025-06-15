@@ -261,6 +261,7 @@ public class HiveScanNode extends FileQueryScanNode {
                     }
                 }
             }
+            withCache = withCache & !isUpdateFileListRecently();
             getFileSplitByPartitions(cache, prunedPartitions, allFiles, bindBrokerName, withCache, numBackends);
             if (ConnectContext.get().getExecutor() != null) {
                 ConnectContext.get().getExecutor().getSummaryProfile().setGetPartitionFilesFinishTime();
