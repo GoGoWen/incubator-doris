@@ -66,6 +66,7 @@ import org.apache.doris.thrift.TTextSerdeType;
 import org.apache.doris.thrift.TTransactionalHiveDeleteDeltaDesc;
 import org.apache.doris.thrift.TTransactionalHiveDesc;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -632,6 +633,7 @@ public abstract class FileQueryScanNode extends FileScanNode {
      * @param blockSize, got from file system, eg, hdfs
      * @return the real file split size
      */
+    @VisibleForTesting
     protected long getRealFileSplitSize(long blockSize) {
         long realSplitSize = sessionVariable.getFileSplitSize();
         if (realSplitSize <= 0) {

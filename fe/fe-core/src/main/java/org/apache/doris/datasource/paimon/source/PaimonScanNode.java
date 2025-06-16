@@ -227,7 +227,7 @@ public class PaimonScanNode extends FileQueryScanNode {
                             try {
                                 List<Split> dorisSplits = FileSplitter.splitFile(
                                         locationPath,
-                                        getRealFileSplitSize(0),
+                                        getRealFileSplitSize(DEFAULT_SPLIT_SIZE),
                                         null,
                                         file.length(),
                                         -1,

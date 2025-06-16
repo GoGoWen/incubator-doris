@@ -216,7 +216,7 @@ public class IcebergScanNode extends FileQueryScanNode {
         HashSet<String> partitionPathSet = new HashSet<>();
         boolean isPartitionedTable = icebergTable.spec().isPartitioned();
 
-        long realFileSplitSize = getRealFileSplitSize(0);
+        long realFileSplitSize = getRealFileSplitSize(DEFAULT_SPLIT_SIZE);
         CloseableIterable<FileScanTask> fileScanTasks = TableScanUtil.splitFiles(scan.planFiles(), realFileSplitSize);
         try (CloseableIterable<CombinedScanTask> combinedScanTasks =
                 TableScanUtil.planTasks(fileScanTasks, realFileSplitSize, 1, 0)) {

@@ -25,8 +25,11 @@ import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.source.HiveScanNode;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.statistics.StatisticalType;
 
+import mockit.Expectations;
+import mockit.Injectable;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
@@ -92,5 +95,41 @@ public class FileQueryScanNodeTest {
         throw new NoSuchFieldException(
                 String.format("filed '%s' not found", fieldName, clazz.getName())
         );
+    }
+
+    @Test
+    public void testGetRealFileSplitSize(@Injectable SessionVariable sessionVariable,
+                                         @Injectable TupleDescriptor tupleDesc,
+                                         @Injectable HMSExternalTable table,
+                                         @Injectable ExternalCatalog catalog) {
+        new Expectations() {
+            {
+                sessionVariable.getFileSplitSize();
+                result = 0;
+
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+            }
+        };
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+        long splitSize1 = scanNode.getRealFileSplitSize(FileQueryScanNode.DEFAULT_SPLIT_SIZE);
+        Assertions.assertEquals(FileQueryScanNode.DEFAULT_SPLIT_SIZE, splitSize1);
+        new Expectations() {
+            {
+                sessionVariable.getFileSplitSize();
+                result = 33554432;
+            }
+        };
+        long splitSize2 = scanNode.getRealFileSplitSize(FileQueryScanNode.DEFAULT_SPLIT_SIZE);
+        Assertions.assertEquals(33554432, splitSize2);
     }
 }
