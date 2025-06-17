@@ -2123,13 +2123,6 @@ public class Config extends ConfigBase {
     public static long external_row_count_cache_refresh_time_minutes_after_write = 60; // 60 mins
 
     /**
-     * The wait time of get a row count result from cache.
-     *
-     */
-    @ConfField(mutable = true, masterOnly = false)
-    public static long wait_to_get_rowcount_time_ms = 100; // 100ms
-
-    /**
      * The expiration time of a file cache after last write of it.
      * For file meta cache.
      */

@@ -312,7 +312,12 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
             return Optional.empty();
         }
         for (CatalogRelation scan : scans) {
-            double rowCount = calculator.getTableRowCount(scan);
+            double rowCount = -1;
+            if (scan instanceof OlapScan) {
+                rowCount = calculator.getOlapTableRowCount((OlapScan) scan);
+            } else {
+                rowCount = scan.getTable().getRowCount();
+            }
             // row count not available
             if (rowCount == -1) {
                 LOG.info("disable join reorder since row count not available: "
