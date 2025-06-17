@@ -1922,6 +1922,11 @@ visible_functions = {
         [['xxhash_64'], 'BIGINT', ['STRING', '...'], '']
     ],
 
+    # typeof function
+    "TypeOf": [
+        [['typeof'], 'VARCHAR', ['T'], 'ALWAYS_NOT_NULLABLE', ['T']],
+    ],
+
     # aes and base64 function
     "aes": [
         [['aes_encrypt'], 'VARCHAR', ['VARCHAR', 'VARCHAR', 'VARCHAR'], 'ALWAYS_NULLABLE'],

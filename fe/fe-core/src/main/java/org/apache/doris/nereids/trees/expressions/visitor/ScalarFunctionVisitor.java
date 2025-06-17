@@ -435,6 +435,7 @@ import org.apache.doris.nereids.trees.expressions.functions.scalar.Translate;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Trim;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.TrimIn;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Truncate;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.TypeOf;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Unhex;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.UnixTimestamp;
 import org.apache.doris.nereids.trees.expressions.functions.scalar.Upper;
@@ -2271,5 +2272,9 @@ public interface ScalarFunctionVisitor<R, C> {
 
     default R visitMultiMatch(MultiMatch multiMatch, C context) {
         return visitScalarFunction(multiMatch, context);
+    }
+
+    default R visitTypeOf(TypeOf typeOf, C context) {
+        return visitScalarFunction(typeOf, context);
     }
 }
