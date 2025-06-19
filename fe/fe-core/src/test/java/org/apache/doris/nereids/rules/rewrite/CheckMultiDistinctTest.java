@@ -17,7 +17,6 @@
 
 package org.apache.doris.nereids.rules.rewrite;
 
-import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.trees.expressions.Alias;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
@@ -66,10 +65,6 @@ public class CheckMultiDistinctTest implements MemoPatternMatchSupported {
 
     @Test
     public void testSupportedFunctionsAllowMultiDistinct() {
-        // Test that supported functions (Count, Sum, GroupConcat, CollectList, ArrayAgg) 
-        // don't throw exception when used with multiple distinct operations
-        
-        // Multiple distinct Count and Sum - should pass
         List<Expression> groupExpressionList = Lists.newArrayList();
         List<NamedExpression> outputExpressionList = Lists.newArrayList(
                 new Alias(new Count(true, id), "count_distinct_id"),
