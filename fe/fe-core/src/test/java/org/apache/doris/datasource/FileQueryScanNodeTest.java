@@ -20,20 +20,29 @@ package org.apache.doris.datasource;
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.analysis.TupleId;
 import org.apache.doris.common.Config;
+import org.apache.doris.common.UserException;
 import org.apache.doris.datasource.hive.HMSExternalCatalog;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.source.HiveScanNode;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
+import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
+import org.apache.doris.system.Backend;
 
+import com.google.common.collect.Multimap;
 import mockit.Expectations;
 import mockit.Injectable;
+import mockit.Mock;
+import mockit.MockUp;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 
 public class FileQueryScanNodeTest {
     @Test
@@ -131,5 +140,60 @@ public class FileQueryScanNodeTest {
         };
         long splitSize2 = scanNode.getRealFileSplitSize(FileQueryScanNode.DEFAULT_SPLIT_SIZE);
         Assertions.assertEquals(33554432, splitSize2);
+    }
+
+    @Test
+    public void testGetScanRangeAssignment(@Injectable Multimap<Backend, Split> roundRobinAssignment,
+            @Injectable Multimap<Backend, Split> defaultAssignment,
+            @Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Injectable Split split) throws UserException {
+        new MockUp<EnhancedRoundRobinBackendPolicy>() {
+            @Mock
+            public void $init() {
+            }
+
+            @Mock
+            Multimap<Backend, Split> computeScanRangeAssignment(List<Split> splits) {
+                return roundRobinAssignment;
+            }
+
+        };
+
+        new MockUp<FederationBackendPolicy>() {
+            @Mock
+            public void $init() {
+            }
+
+            @Mock
+            Multimap<Backend, Split> computeScanRangeAssignment(List<Split> splits) {
+                return defaultAssignment;
+            }
+        };
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+            }
+        };
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+        Config.enable_enhanced_round_robin_backend_policy = false;
+        List<Split> splits = new ArrayList<>();
+        splits.add(split);
+        Assert.assertEquals(defaultAssignment, scanNode.getScanRangeAssignment(splits));
+        Config.enable_enhanced_round_robin_backend_policy = true;
+        Assert.assertEquals(roundRobinAssignment, scanNode.getScanRangeAssignment(splits));
     }
 }

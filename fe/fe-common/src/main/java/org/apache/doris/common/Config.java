@@ -2949,4 +2949,12 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"根据文件切分数量大小范围来决定实例并发数",
             "selected split num to decide num of instances"})
     public static long[] selected_split_num_to_decide_num_instances = { 5000, 20000, 40000, 60000 };
+
+    @ConfField(mutable = true, description = {"是否启用改进后的基于轮转的文件分片分配策略",
+            "whether to enable enhanced round robin backend policy"})
+    public static boolean enable_enhanced_round_robin_backend_policy = false;
+
+    @ConfField(mutable = true, description = {"每一轮需要分配的文件分片数",
+            "the split num for per round to assign"})
+    public static int assign_split_num_per_round = 800;
 }

@@ -359,7 +359,7 @@ public abstract class FileQueryScanNode extends FileScanNode {
             if (inputSplits.isEmpty() && !isFileStreamType()) {
                 return;
             }
-            Multimap<Backend, Split> assignment = backendPolicy.computeScanRangeAssignment(inputSplits);
+            Multimap<Backend, Split> assignment = getScanRangeAssignment(inputSplits);
             for (Backend backend : assignment.keySet()) {
                 Collection<Split> splits = assignment.get(backend);
                 for (Split split : splits) {
@@ -377,6 +377,13 @@ public abstract class FileQueryScanNode extends FileScanNode {
             LOG.debug("create #{} ScanRangeLocations cost: {} ms", scanRangeLocations.size(),
                     (System.currentTimeMillis() - start));
         }
+    }
+
+    @VisibleForTesting
+    protected Multimap<Backend, Split> getScanRangeAssignment(List<Split> inputSplits) throws UserException {
+        return Config.enable_enhanced_round_robin_backend_policy
+                ? new EnhancedRoundRobinBackendPolicy().computeScanRangeAssignment(inputSplits)
+                : backendPolicy.computeScanRangeAssignment(inputSplits);
     }
 
     private TScanRangeLocations splitToScanRange(
