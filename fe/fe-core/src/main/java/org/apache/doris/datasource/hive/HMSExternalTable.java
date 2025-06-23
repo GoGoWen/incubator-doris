@@ -561,6 +561,9 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         List<FieldSchema> schema = remoteTable.getSd().getCols();
         List<Column> columns = Lists.newArrayListWithCapacity(schema.size());
         for (FieldSchema field : schema) {
+            if ("void".equalsIgnoreCase(field.getType())) {
+                continue;
+            }
             String fieldName = field.getName().toLowerCase(Locale.ROOT);
             columns.add(new Column(fieldName,
                     HiveMetaStoreClientHelper.hiveTypeToDorisType(field.getType()), true, null,
