@@ -20,6 +20,7 @@ package org.apache.doris.nereids.rules.expression.rules;
 import org.apache.doris.nereids.rules.expression.ExpressionRewriteTestHelper;
 import org.apache.doris.nereids.trees.expressions.Cast;
 import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Trim;
 import org.apache.doris.nereids.trees.expressions.literal.DoubleLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.FloatLiteral;
 import org.apache.doris.nereids.types.DecimalV2Type;
@@ -47,5 +48,9 @@ public class CastDoubleToDecimalRewriteTest extends ExpressionRewriteTestHelper 
         Cast cast4 = new Cast(cast3, DecimalV3Type.SYSTEM_DEFAULT);
         Expression expr2 = CastDoubleToDecimalRewrite.rewrite(cast4);
         Assertions.assertEquals(new Cast(new FloatLiteral(1.1f), DecimalV3Type.SYSTEM_DEFAULT), expr2);
+
+        Trim trim = new Trim(new Cast(new FloatLiteral(1.1f), VarcharType.MAX_VARCHAR_TYPE));
+        Expression expr3 = CastDoubleToDecimalRewrite.rewrite(trim);
+        Assertions.assertEquals(new Cast(new FloatLiteral(1.1f), VarcharType.MAX_VARCHAR_TYPE), expr3);
     }
 }
