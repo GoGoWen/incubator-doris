@@ -1088,7 +1088,7 @@ DEFINE_Bool(enable_feature_binlog, "false");
 // enable set in BitmapValue
 DEFINE_Bool(enable_set_in_bitmap_value, "false");
 
-DEFINE_Int64(max_hdfs_file_system_cache_num, "1024");
+DEFINE_Int64(max_hdfs_file_system_cache_num, "512");
 DEFINE_Int64(max_hdfs_file_handle_cache_num, "4096");
 DEFINE_Int64(num_partitions_for_hdfs_file_handle_cache, "32");
 DEFINE_Int32(max_hdfs_file_handle_cache_time_sec, "3600");

@@ -120,6 +120,7 @@ import org.apache.doris.thrift.TStatusCode;
 import org.apache.doris.thrift.TTabletCommitInfo;
 import org.apache.doris.thrift.TUniqueId;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultiset;
@@ -396,7 +397,8 @@ public class Coordinator implements CoordInterface {
         this.executionProfile = new ExecutionProfile(queryId, fragments);
     }
 
-    private void setFromUserProperty(ConnectContext connectContext) {
+    @VisibleForTesting
+    protected void setFromUserProperty(ConnectContext connectContext) {
         String qualifiedUser = connectContext.getQualifiedUser();
         // set cpu resource limit
         int cpuLimit = Env.getCurrentEnv().getAuth().getCpuResourceLimit(qualifiedUser);
@@ -407,15 +409,21 @@ public class Coordinator implements CoordInterface {
             this.queryOptions.setResourceLimit(resourceLimit);
         }
         // set exec mem limit
-        long maxExecMemByte = connectContext.getSessionVariable().getMaxExecMemByte();
-        long memLimit = maxExecMemByte > 0 ? maxExecMemByte :
-                Env.getCurrentEnv().getAuth().getExecMemLimit(qualifiedUser);
-        if (memLimit > 0) {
-            // overwrite the exec_mem_limit from session variable;
-            this.queryOptions.setMemLimit(memLimit);
-            this.queryOptions.setMaxReservation(memLimit);
-            this.queryOptions.setInitialReservationTotalClaims(memLimit);
-            this.queryOptions.setBufferPoolLimit(memLimit);
+        long userMemLimit = Env.getCurrentEnv().getAuth().getExecMemLimit(qualifiedUser);
+        if (userMemLimit > 0) {
+            this.queryOptions.setMemLimit(userMemLimit);
+            this.queryOptions.setMaxReservation(userMemLimit);
+            this.queryOptions.setInitialReservationTotalClaims(userMemLimit);
+            this.queryOptions.setBufferPoolLimit(userMemLimit);
+        } else {
+            long memLimit = connectContext.getSessionVariable().getMaxExecMemByte();
+            if (memLimit > 0) {
+                // overwrite the exec_mem_limit from session variable;
+                this.queryOptions.setMemLimit(memLimit);
+                this.queryOptions.setMaxReservation(memLimit);
+                this.queryOptions.setInitialReservationTotalClaims(memLimit);
+                this.queryOptions.setBufferPoolLimit(memLimit);
+            }
         }
     }
 

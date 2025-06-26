@@ -108,6 +108,7 @@ public class UserPropertyTest {
         properties.add(Pair.of("sql_block_rules", "rule1,rule2"));
         properties.add(Pair.of("cpu_resource_limit", "2"));
         properties.add(Pair.of("query_timeout", "500"));
+        properties.add(Pair.of("exec_mem_limit", "2147483648"));
 
         UserProperty userProperty = new UserProperty();
         userProperty.update(properties);
@@ -120,6 +121,7 @@ public class UserPropertyTest {
         Assert.assertEquals(2, userProperty.getCpuResourceLimit());
         Assert.assertEquals(500, userProperty.getQueryTimeout());
         Assert.assertEquals(Sets.newHashSet(), userProperty.getCopiedResourceTags());
+        Assert.assertEquals(2147483648L, userProperty.getExecMemLimit());
 
         // fetch property
         List<List<String>> rows = userProperty.fetchProperty();
@@ -141,6 +143,8 @@ public class UserPropertyTest {
                 Assert.assertEquals("2", value);
             } else if (key.equalsIgnoreCase("query_timeout")) {
                 Assert.assertEquals("500", value);
+            } else if (key.equalsIgnoreCase("exec_mem_limit")) {
+                Assert.assertEquals("2147483648", value);
             }
         }
 

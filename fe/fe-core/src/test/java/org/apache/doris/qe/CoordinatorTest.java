@@ -28,6 +28,7 @@ import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.HashDistributionInfo;
 import org.apache.doris.catalog.OlapTable;
 import org.apache.doris.common.jmockit.Deencapsulation;
+import org.apache.doris.mysql.privilege.Auth;
 import org.apache.doris.persist.EditLog;
 import org.apache.doris.planner.DataPartition;
 import org.apache.doris.planner.EmptySetNode;
@@ -42,6 +43,7 @@ import org.apache.doris.service.FrontendOptions;
 import org.apache.doris.system.Backend;
 import org.apache.doris.thrift.TNetworkAddress;
 import org.apache.doris.thrift.TPartitionType;
+import org.apache.doris.thrift.TQueryOptions;
 import org.apache.doris.thrift.TScanRangeLocation;
 import org.apache.doris.thrift.TScanRangeLocations;
 import org.apache.doris.thrift.TScanRangeParams;
@@ -51,6 +53,10 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import mockit.Expectations;
+import mockit.Injectable;
+import mockit.Mock;
+import mockit.MockUp;
 import mockit.Mocked;
 import org.apache.commons.collections.map.HashedMap;
 import org.junit.Assert;
@@ -166,12 +172,12 @@ public class CoordinatorTest extends Coordinator {
         ArrayList<Expr> testJoinexprs = new ArrayList<>();
 
         BinaryPredicate binaryPredicate = new BinaryPredicate(BinaryPredicate.Operator.EQ, new BoolLiteral(true),
-                        new BoolLiteral(true));
+                new BoolLiteral(true));
         testJoinexprs.add(binaryPredicate);
 
         HashJoinNode hashJoinNode = new HashJoinNode(testPlanNodeId, new EmptySetNode(testPlanNodeId, tupleIdArrayList),
-                        new EmptySetNode(testPlanNodeId, tupleIdArrayList), new TableRef(), testJoinexprs,
-                        new ArrayList<>());
+                new EmptySetNode(testPlanNodeId, tupleIdArrayList), new TableRef(), testJoinexprs,
+                new ArrayList<>());
 
         hashJoinNode.setFragment(new PlanFragment(new PlanFragmentId(-1), hashJoinNode,
                 new DataPartition(TPartitionType.BUCKET_SHFFULE_HASH_PARTITIONED, testJoinexprs)));
@@ -284,6 +290,45 @@ public class CoordinatorTest extends Coordinator {
                 .stream().flatMap(buckend2BucketCountMap -> buckend2BucketCountMap.values().stream())
                 .filter(count -> count == 22).count();
         Assert.assertEquals(targetBeCount, 3);
+    }
+
+    @Test
+    public void testSetFromUserProperty(@Injectable Env env, @Injectable Auth auth) {
+        new MockUp<Env>() {
+            @Mock
+            public Env getCurrentEnv() {
+                return env;
+            }
+        };
+        new Expectations() {
+            {
+                env.getAuth();
+                result = auth;
+                auth.getCpuResourceLimit("root");
+                result = -1;
+                auth.getExecMemLimit("root");
+                result = -1;
+            }
+        };
+        Coordinator coordinator = new Coordinator(context, analyzer, originalPlanner);
+        coordinator.setFromUserProperty(context);
+        TQueryOptions queryOptions = coordinator.getQueryOptions();
+        Assert.assertNull(queryOptions.getResourceLimit());
+        Assert.assertEquals(2147483648L, queryOptions.getMemLimit());
+        new Expectations() {
+            {
+                env.getAuth();
+                result = auth;
+                auth.getCpuResourceLimit("root");
+                result = 3;
+                auth.getExecMemLimit("root");
+                result = 1073741824;
+            }
+        };
+        coordinator.setFromUserProperty(context);
+        Assert.assertNotNull(queryOptions.getResourceLimit());
+        Assert.assertEquals(3, queryOptions.getResourceLimit().getCpuLimit());
+        Assert.assertEquals(1073741824, queryOptions.getMemLimit());
     }
 
     @Test
@@ -575,10 +620,10 @@ public class CoordinatorTest extends Coordinator {
 
         ImmutableMap<Long, Backend> idToBackend =
                 new ImmutableMap.Builder<Long, Backend>()
-                    .put(0L, backend0)
-                    .put(1L, backend1)
-                    .put(2L, backend2)
-                    .build();
+                        .put(0L, backend0)
+                        .put(1L, backend1)
+                        .put(2L, backend2)
+                        .build();
         Deencapsulation.setField(coordinator, "idToBackend", idToBackend);
         FragmentScanRangeAssignment assignment = new FragmentScanRangeAssignment();
         List<TScanRangeLocations> locations = new ArrayList<>();
@@ -635,10 +680,10 @@ public class CoordinatorTest extends Coordinator {
 
         ImmutableMap<Long, Backend> idToBackend =
                 new ImmutableMap.Builder<Long, Backend>()
-                    .put(0L, backend0)
-                    .put(1L, backend1)
-                    .put(2L, backend2)
-                    .build();
+                        .put(0L, backend0)
+                        .put(1L, backend1)
+                        .put(2L, backend2)
+                        .build();
         Deencapsulation.setField(coordinator, "idToBackend", idToBackend);
         Map<PlanFragmentId, Map<Integer, TNetworkAddress>> fragmentIdToSeqToAddressMap = Maps.newHashMap();
         fragmentIdToSeqToAddressMap.put(planFragmentId, new HashedMap());
@@ -703,10 +748,10 @@ public class CoordinatorTest extends Coordinator {
 
         ImmutableMap<Long, Backend> idToBackend =
                 new ImmutableMap.Builder<Long, Backend>()
-                    .put(0L, backend0)
-                    .put(1L, backend1)
-                    .put(2L, backend2)
-                    .build();
+                        .put(0L, backend0)
+                        .put(1L, backend1)
+                        .put(2L, backend2)
+                        .build();
         Map<PlanFragmentId, Map<Long, Integer>> fragmentIdToBuckendIdBucketCountMap = Maps.newHashMap();
         Map<Long, Integer> backendIdBucketCountMap = new HashMap<Long, Integer>();
         fragmentIdToBuckendIdBucketCountMap.put(planFragmentId, backendIdBucketCountMap);
@@ -838,10 +883,10 @@ public class CoordinatorTest extends Coordinator {
 
         ImmutableMap<Long, Backend> idToBackend =
                 new ImmutableMap.Builder<Long, Backend>()
-                    .put(0L, backend0)
-                    .put(1L, backend1)
-                    .put(2L, backend2)
-                    .build();
+                        .put(0L, backend0)
+                        .put(1L, backend1)
+                        .put(2L, backend2)
+                        .build();
         Deencapsulation.setField(coordinator, "idToBackend", idToBackend);
 
         Deencapsulation.invoke(coordinator, "computeScanRangeAssignment");
