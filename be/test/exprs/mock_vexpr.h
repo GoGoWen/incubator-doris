@@ -31,6 +31,8 @@ public:
     MOCK_CONST_METHOD0(expr_name, const std::string&());
     MOCK_METHOD3(execute,
                  Status(VExprContext* context, vectorized::Block* block, int* result_column_id));
+    MOCK_CONST_METHOD0(is_compound_predicate, bool());
+    MOCK_CONST_METHOD0(is_constant, bool());
 }; // class MockVExpr
 
 } // namespace vectorized

@@ -105,6 +105,26 @@ module.exports = {
                 ]
 
             },
+            // Handle modern JS syntax in specific node_modules packages
+            {
+                test: /\.js$/,
+                include: /node_modules\/(react-draggable|react-resizable)/,
+                use: [
+                    'cache-loader',
+                    {
+                        loader: 'ts-loader',
+                        options: {
+                            transpileOnly: true,
+                            allowTsInNodeModules: true,
+                            compilerOptions: {
+                                target: 'es5',
+                                module: 'commonjs',
+                                allowJs: true
+                            }
+                        }
+                    }
+                ]
+            },
             {
                 test: /\.(png|jpg|gif|ttf|eot|svg|woff|woff2)$/,
                 loader: 'url-loader',

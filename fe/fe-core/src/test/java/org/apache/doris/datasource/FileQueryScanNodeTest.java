@@ -151,9 +151,6 @@ public class FileQueryScanNodeTest {
             @Injectable ExternalCatalog catalog,
             @Injectable Split split) throws UserException {
         new MockUp<EnhancedRoundRobinBackendPolicy>() {
-            @Mock
-            public void $init() {
-            }
 
             @Mock
             Multimap<Backend, Split> computeScanRangeAssignment(List<Split> splits) {
@@ -163,10 +160,6 @@ public class FileQueryScanNodeTest {
         };
 
         new MockUp<FederationBackendPolicy>() {
-            @Mock
-            public void $init() {
-            }
-
             @Mock
             Multimap<Backend, Split> computeScanRangeAssignment(List<Split> splits) {
                 return defaultAssignment;
