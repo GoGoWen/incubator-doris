@@ -38,15 +38,12 @@ import org.apache.doris.catalog.ScalarType;
 import org.apache.doris.catalog.StructField;
 import org.apache.doris.catalog.StructType;
 import org.apache.doris.catalog.Type;
-import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.security.authentication.AuthenticationConfig;
 import org.apache.doris.common.security.authentication.HadoopUGI;
 import org.apache.doris.datasource.ExternalCatalog;
 import org.apache.doris.fs.remote.dfs.DFSFileSystem;
-import org.apache.doris.nereids.parser.Dialect;
 import org.apache.doris.qe.BDPAuthContext;
-import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.thrift.TExprOpcode;
 
 import com.google.common.base.Preconditions;
@@ -642,17 +639,7 @@ public class HiveMetaStoreClientHelper {
             case "timestamp":
                 return ScalarType.createDatetimeV2Type(timeScale);
             case "float":
-            case "real":
-                // Enhanced precision compatibility logic:
-                // 1. Check if Presto dialect is enabled
-                // 2. Check if hive_float_precision_compatible is enabled
-                // Only map to DOUBLE when both conditions are met
-                if (isPrestoDialectEnabled() && Config.hive_float_precision_compatible) {
-                    return Type.DOUBLE;
-                } else {
-                    // Keep original FLOAT mapping for non-Presto dialects or when compatibility is disabled
-                    return Type.FLOAT;
-                }
+                return Type.FLOAT;
             case "double":
                 return Type.DOUBLE;
             case "string":
@@ -916,27 +903,5 @@ public class HiveMetaStoreClientHelper {
             }
         }
         return null;
-    }
-
-    /**
-     * Check if Presto dialect is currently enabled in the session.
-     * This method checks both "presto" and "trino" dialects since they have similar precision requirements.
-     *
-     * @return true if Presto or Trino dialect is enabled, false otherwise
-     */
-    private static boolean isPrestoDialectEnabled() {
-        ConnectContext context = ConnectContext.get();
-        if (context == null) {
-            return false;
-        }
-
-        String sqlDialect = context.getSessionVariable().getSqlDialect();
-        if (sqlDialect == null) {
-            return false;
-        }
-
-        // Check for both Presto and Trino dialects as they have similar precision requirements
-        return Dialect.PRESTO.getDialectName().equalsIgnoreCase(sqlDialect)
-            || Dialect.TRINO.getDialectName().equalsIgnoreCase(sqlDialect);
     }
 }

@@ -46,11 +46,7 @@ public class HiveTypeToDorisTypeTest {
         Assert.assertEquals(ScalarType.createDateV2Type(), hiveTypeToDorisType("date", 0));
         Assert.assertEquals(ScalarType.createDatetimeV2Type(3), hiveTypeToDorisType("timestamp", 3));
         Assert.assertEquals(ScalarType.createDatetimeV2Type(3), hiveTypeToDorisType("timestamp(19)", 3));
-        // Note: The actual result depends on Config.hive_float_precision_compatible and SQL dialect
-        // This test may need to be updated based on the configuration
-        Type floatResult = hiveTypeToDorisType("float", 0);
-        Assert.assertTrue("Float type should map to either FLOAT or DOUBLE based on configuration",
-                         floatResult.equals(Type.FLOAT) || floatResult.equals(Type.DOUBLE));
+        Assert.assertEquals(Type.FLOAT, hiveTypeToDorisType("float", 0));
         Assert.assertEquals(Type.DOUBLE, hiveTypeToDorisType("double", 0));
         Assert.assertEquals(ScalarType.createStringType(), hiveTypeToDorisType("string", 0));
         Assert.assertEquals(ScalarType.createStringType(), hiveTypeToDorisType("binary", 0));

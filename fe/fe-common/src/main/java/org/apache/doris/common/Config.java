@@ -2430,12 +2430,6 @@ public class Config extends ConfigBase {
             "Default hive file format for creating table."})
     public static String hive_default_file_format = "orc";
 
-    @ConfField(mutable = true, description = {
-            "启用Hive FLOAT/REAL类型映射为DOUBLE以提高精度兼容性",
-            "Enable mapping Hive FLOAT/REAL types to Doris DOUBLE "
-                + "for better precision compatibility with Presto/Trino"})
-    public static boolean hive_float_precision_compatible = true;
-
     @ConfField
     public static int statistics_sql_parallel_exec_instance_num = 1;
 
