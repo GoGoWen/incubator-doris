@@ -2432,7 +2432,8 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = true, description = {
             "启用Hive FLOAT/REAL类型映射为DOUBLE以提高精度兼容性",
-            "Enable mapping Hive FLOAT/REAL types to Doris DOUBLE for better precision compatibility with Presto/Trino"})
+            "Enable mapping Hive FLOAT/REAL types to Doris DOUBLE "
+                + "for better precision compatibility with Presto/Trino"})
     public static boolean hive_float_precision_compatible = true;
 
     @ConfField
