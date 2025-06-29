@@ -73,9 +73,23 @@ std::string DataTypeNumberBase<T>::to_string(const T& value) const {
     } else if constexpr (std::is_integral<T>::value) {
         return std::to_string(value);
     } else if constexpr (std::numeric_limits<T>::is_iec559) {
+        if (std::isnan(value)) {
+            return "NaN";
+        }
+        if (std::isinf(value)) {
+            return value < 0 ? "-Infinity" : "Infinity";
+        }
+
         fmt::memory_buffer buffer; // only use in size-predictable type.
         fmt::format_to(buffer, "{}", value);
-        return std::string(buffer.data(), buffer.size());
+        std::string result(buffer.data(), buffer.size());
+
+        if (result.find('.') == std::string::npos &&
+            result.find('e') == std::string::npos) {
+            result += ".0";
+        }
+
+        return result;
     }
 }
 template <typename T>
@@ -166,10 +180,25 @@ std::string DataTypeNumberBase<T>::to_string(const IColumn& column, size_t row_n
     } else if constexpr (std::is_integral<T>::value) {
         return std::to_string(assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num));
     } else if constexpr (std::numeric_limits<T>::is_iec559) {
+        T value = assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num);
+
+        if (std::isnan(value)) {
+            return "NaN";
+        }
+        if (std::isinf(value)) {
+            return value < 0 ? "-Infinity" : "Infinity";
+        }
+
         fmt::memory_buffer buffer; // only use in size-predictable type.
-        fmt::format_to(buffer, "{}",
-                       assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num));
-        return std::string(buffer.data(), buffer.size());
+        fmt::format_to(buffer, "{}", value);
+        std::string result(buffer.data(), buffer.size());
+
+        if (result.find('.') == std::string::npos &&
+            result.find('e') == std::string::npos) {
+            result += ".0";
+        }
+
+        return result;
     }
 }
 

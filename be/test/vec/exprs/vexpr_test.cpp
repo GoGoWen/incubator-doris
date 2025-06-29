@@ -438,7 +438,7 @@ TEST(TEST_VEXPR, LITERALTEST) {
         auto ctn = block.safe_get_by_position(ret);
         auto v = (*ctn.column)[0].get<double>();
         EXPECT_FLOAT_EQ(v, 1024.0f);
-        EXPECT_EQ("1024", literal.value());
+        EXPECT_EQ("1024.0", literal.value());
     }
     // double
     {
@@ -449,7 +449,7 @@ TEST(TEST_VEXPR, LITERALTEST) {
         auto ctn = block.safe_get_by_position(ret);
         auto v = (*ctn.column)[0].get<double>();
         EXPECT_FLOAT_EQ(v, 1024.0);
-        EXPECT_EQ("1024", literal.value());
+        EXPECT_EQ("1024.0", literal.value());
     }
     // datetime
     {

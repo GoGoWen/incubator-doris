@@ -131,9 +131,7 @@ public:
         auto create_null_map_column = [&](ColumnPtr& null_map_column,
                                           uint8* __restrict null_map_data) {
             if (null_map_data == nullptr) {
-                if (null_map_column == nullptr) {
-                    null_map_column = ColumnUInt8::create(size, 0);
-                }
+                null_map_column = ColumnUInt8::create(size, 0);
                 null_map_data = assert_cast<ColumnUInt8*>(null_map_column->assume_mutable().get())
                                         ->get_data()
                                         .data();
@@ -173,10 +171,12 @@ public:
             auto col_nulls = ColumnUInt8::create(size);
             auto* __restrict res_datas = assert_cast<ColumnUInt8*>(col_res)->get_data().data();
             auto* __restrict res_nulls = assert_cast<ColumnUInt8*>(col_nulls)->get_data().data();
-            ColumnPtr temp_null_map = nullptr;
+            ColumnPtr lhs_temp_null_map = nullptr;
+            ColumnPtr rhs_temp_null_map = nullptr;
+
             // maybe both children are nullable / or one of children is nullable
-            lhs_null_map = create_null_map_column(temp_null_map, lhs_null_map);
-            rhs_null_map = create_null_map_column(temp_null_map, rhs_null_map);
+            lhs_null_map = create_null_map_column(lhs_temp_null_map, lhs_null_map);
+            rhs_null_map = create_null_map_column(rhs_temp_null_map, rhs_null_map);
 
             if constexpr (is_and_op) {
                 for (size_t i = 0; i < size; ++i) {
