@@ -56,12 +56,74 @@ void DataTypeNumberBase<T>::to_string(const IColumn& column, size_t row_num,
         ostr.write(hex.data(), hex.size());
     } else if constexpr (std::is_same_v<T, float>) {
         // fmt::format_to maybe get inaccurate results at float type, so we use gutil implement.
-        char buf[MAX_FLOAT_STR_LENGTH + 2];
-        int len = FloatToBuffer(assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num),
-                                MAX_FLOAT_STR_LENGTH + 2, buf);
+        T value = assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num);
+
+        if (std::isnan(value)) {
+            ostr.write("NaN", 3);
+            return;
+        }
+        if (std::isinf(value)) {
+            if (value < 0) {
+                ostr.write("-Infinity", 9);
+            } else {
+                ostr.write("Infinity", 8);
+            }
+            return;
+        }
+
+        char buf[MAX_FLOAT_STR_LENGTH + 4]; // Extra space for potential ".0"
+        int len = FloatToBuffer(value, MAX_FLOAT_STR_LENGTH + 2, buf);
+
+        // Check if we need to append ".0" by scanning the buffer directly
+        bool has_decimal = false;
+        bool has_exponent = false;
+        for (int i = 0; i < len; ++i) {
+            if (buf[i] == '.') {
+                has_decimal = true;
+                break;
+            }
+            if (buf[i] == 'e' || buf[i] == 'E') {
+                has_exponent = true;
+                break;
+            }
+        }
+
+        if (!has_decimal && !has_exponent) {
+            buf[len] = '.';
+            buf[len + 1] = '0';
+            len += 2;
+        }
+
         ostr.write(buf, len);
-    } else if constexpr (std::is_integral<T>::value || std::numeric_limits<T>::is_iec559) {
+    } else if constexpr (std::is_integral<T>::value) {
         ostr.write_number(assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num));
+    } else if constexpr (std::numeric_limits<T>::is_iec559) {
+        // Handle floating-point types other than float (e.g., double)
+        T value = assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num);
+
+        if (std::isnan(value)) {
+            ostr.write("NaN", 3);
+            return;
+        }
+        if (std::isinf(value)) {
+            if (value < 0) {
+                ostr.write("-Infinity", 9);
+            } else {
+                ostr.write("Infinity", 8);
+            }
+            return;
+        }
+
+        fmt::memory_buffer buffer;
+        fmt::format_to(buffer, "{}", value);
+        std::string result(buffer.data(), buffer.size());
+
+        if (result.find('.') == std::string::npos &&
+            result.find('e') == std::string::npos) {
+            result += ".0";
+        }
+
+        ostr.write(result.data(), result.size());
     }
 }
 
