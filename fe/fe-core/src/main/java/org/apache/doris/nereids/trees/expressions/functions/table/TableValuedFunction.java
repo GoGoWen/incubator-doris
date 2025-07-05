@@ -55,9 +55,10 @@ public abstract class TableValuedFunction extends BoundFunction
         } catch (AnalysisException e) {
             throw e;
         } catch (Throwable t) {
+            Throwable e = t.getCause() == null ? t : t.getCause();
             // Do not print the whole stmt, it is too long and may contain sensitive information
             throw new AnalysisException(
-                    "Can not build FunctionGenTable '" + this.getName() + "'. error: " + t.getMessage(), t);
+                    "Can not build FunctionGenTable '" + this.getName() + "'. error: " + e.getMessage(), e.getCause());
         }
     });
 
