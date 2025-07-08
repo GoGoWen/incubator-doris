@@ -36,17 +36,27 @@ import org.apache.doris.nereids.trees.expressions.StatementScopeIdGenerator;
 import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
+import org.apache.doris.nereids.trees.plans.LimitPhase;
+import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.PreAggStatus;
+import org.apache.doris.nereids.trees.plans.RelationId;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalEmptyRelation;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalFileScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalFilter;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalLimit;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalProject;
 import org.apache.doris.nereids.types.IntegerType;
 import org.apache.doris.nereids.types.StringType;
 import org.apache.doris.nereids.util.PlanConstructor;
+import org.apache.doris.planner.DataPartition;
+import org.apache.doris.planner.ExchangeNode;
 import org.apache.doris.planner.OlapScanNode;
 import org.apache.doris.planner.PlanFragment;
+import org.apache.doris.planner.PlanFragmentId;
 import org.apache.doris.planner.PlanNode;
+import org.apache.doris.planner.PlanNodeId;
+import org.apache.doris.statistics.StatisticalType;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -136,5 +146,225 @@ public class PhysicalPlanTranslatorTest {
         Set<Expression> conjuncts = translator.getConjunctsWithoutPartitionPredicate(fileScan);
         Assertions.assertEquals(1, conjuncts.size());
         Assertions.assertEquals(expression3, conjuncts.toArray()[0]);
+    }
+
+    /**
+     * Test visitPhysicalLimit with LOCAL phase - validates the LOCAL phase branch
+     * This test covers the first major branch of the commit changes
+     */
+    @Test
+    void testVisitPhysicalLimitLocalPhase() {
+        // Given: Mock plan tree with LOCAL phase PhysicalLimit
+        PlanTranslatorContext context = new PlanTranslatorContext();
+        PhysicalPlanTranslator translator = new PhysicalPlanTranslator(context);
+
+        // Create mock child plan and fragment
+        Plan mockChildPlan = createMockChildPlan();
+        PlanNode mockPlanNode = createMockPlanNode();
+        mockPlanNode.setLimit(20L); // Child has existing limit
+
+        PlanFragment inputFragment = new PlanFragment(
+                new PlanFragmentId(1), mockPlanNode, DataPartition.UNPARTITIONED);
+
+        // Create PhysicalLimit with LOCAL phase
+        PhysicalLimit<Plan> physicalLimit = createPhysicalLimit(10L, 5L, LimitPhase.LOCAL, mockChildPlan);
+
+        // Mock the child plan to return the input fragment
+        new Expectations() {
+            {
+                mockChildPlan.accept(translator, context);
+                result = inputFragment;
+            }
+        };
+
+        // When: Visit PhysicalLimit with local phase
+        PlanFragment result = translator.visitPhysicalLimit(physicalLimit, context);
+
+        // Then: Should return a fragment and merge limits on child
+        Assertions.assertNotNull(result);
+        // Verify merged limit: min(10, max(20-5, 0)) = min(10, 15) = 10
+        Assertions.assertEquals(10L, result.getPlanRoot().getLimit());
+    }
+
+    /**
+     * Test visitPhysicalLimit with GLOBAL phase and non-ExchangeNode child
+     * This validates the new ExchangeNode creation logic from the commit
+     */
+    @Test
+    void testVisitPhysicalLimitGlobalPhaseNonExchangeChild() {
+        // Given: Mock plan tree with GLOBAL phase PhysicalLimit and non-ExchangeNode child
+        PlanTranslatorContext context = new PlanTranslatorContext();
+        PhysicalPlanTranslator translator = new PhysicalPlanTranslator(context);
+
+        // Create mock child plan and fragment with non-ExchangeNode
+        Plan mockChildPlan = createMockChildPlan();
+        PlanNode mockPlanNode = createMockPlanNode(); // Not an ExchangeNode
+
+        PlanFragment inputFragment = new PlanFragment(
+                new PlanFragmentId(1), mockPlanNode, DataPartition.UNPARTITIONED);
+
+        // Create PhysicalLimit with GLOBAL phase
+        PhysicalLimit<Plan> physicalLimit = createPhysicalLimit(15L, 3L, LimitPhase.GLOBAL, mockChildPlan);
+
+        // Mock the child plan to return the input fragment
+        new Expectations() {
+            {
+                mockChildPlan.accept(translator, context);
+                result = inputFragment;
+            }
+        };
+
+        // When: Visit PhysicalLimit with global phase
+        PlanFragment result = translator.visitPhysicalLimit(physicalLimit, context);
+
+        // Then: Should create new fragment with ExchangeNode
+        Assertions.assertNotNull(result);
+        Assertions.assertTrue(result.getPlanRoot() instanceof ExchangeNode);
+
+        ExchangeNode exchangeNode = (ExchangeNode) result.getPlanRoot();
+        Assertions.assertEquals(15L, exchangeNode.getLimit());
+        Assertions.assertEquals(3L, exchangeNode.getOffset());
+        Assertions.assertEquals(1, exchangeNode.getNumInstances());
+    }
+
+    /**
+     * Test visitPhysicalLimit with GLOBAL phase and ExchangeNode child
+     * This validates the existing ExchangeNode limit merging logic
+     */
+    @Test
+    void testVisitPhysicalLimitGlobalPhaseExchangeChild() {
+        // Given: Mock plan tree with GLOBAL phase PhysicalLimit and ExchangeNode child
+        PlanTranslatorContext context = new PlanTranslatorContext();
+        PhysicalPlanTranslator translator = new PhysicalPlanTranslator(context);
+
+        // Create mock child plan and fragment with ExchangeNode
+        Plan mockChildPlan = createMockChildPlan();
+        ExchangeNode exchangeNode = new ExchangeNode(new PlanNodeId(1), createMockPlanNode());
+        exchangeNode.setLimit(12L);
+        exchangeNode.setOffset(1L);
+
+        PlanFragment inputFragment = new PlanFragment(
+                new PlanFragmentId(1), exchangeNode, DataPartition.UNPARTITIONED);
+
+        // Create PhysicalLimit with GLOBAL phase
+        PhysicalLimit<Plan> physicalLimit = createPhysicalLimit(8L, 2L, LimitPhase.GLOBAL, mockChildPlan);
+
+        // Mock the child plan to return the input fragment
+        new Expectations() {
+            {
+                mockChildPlan.accept(translator, context);
+                result = inputFragment;
+            }
+        };
+
+        // When: Visit PhysicalLimit with global phase
+        PlanFragment result = translator.visitPhysicalLimit(physicalLimit, context);
+
+        // Then: Should return a fragment and merge limits on ExchangeNode
+        Assertions.assertNotNull(result);
+        ExchangeNode resultExchangeNode = (ExchangeNode) result.getPlanRoot();
+        // Verify merged limit: min(8, max(12-2, 0)) = min(8, 10) = 8
+        Assertions.assertEquals(8L, resultExchangeNode.getLimit());
+        Assertions.assertEquals(2L, resultExchangeNode.getOffset());
+    }
+
+    /**
+     * Test edge case: visitPhysicalLimit with zero limit
+     */
+    @Test
+    void testVisitPhysicalLimitZeroLimit() {
+        // Given: Mock plan tree with zero limit
+        PlanTranslatorContext context = new PlanTranslatorContext();
+        PhysicalPlanTranslator translator = new PhysicalPlanTranslator(context);
+
+        Plan mockChildPlan = createMockChildPlan();
+        PlanNode mockPlanNode = createMockPlanNode();
+        mockPlanNode.setLimit(10L);
+
+        PlanFragment inputFragment = new PlanFragment(
+                new PlanFragmentId(1), mockPlanNode, DataPartition.UNPARTITIONED);
+
+        // Create PhysicalLimit with zero limit
+        PhysicalLimit<Plan> physicalLimit = createPhysicalLimit(0L, 0L, LimitPhase.LOCAL, mockChildPlan);
+
+        new Expectations() {
+            {
+                mockChildPlan.accept(translator, context);
+                result = inputFragment;
+            }
+        };
+
+        // When: Visit PhysicalLimit with zero limit
+        PlanFragment result = translator.visitPhysicalLimit(physicalLimit, context);
+
+        // Then: Should set limit to 0
+        Assertions.assertNotNull(result);
+        Assertions.assertEquals(0L, result.getPlanRoot().getLimit());
+    }
+
+    /**
+     * Test edge case: visitPhysicalLimit with large offset
+     */
+    @Test
+    void testVisitPhysicalLimitLargeOffset() {
+        // Given: Mock plan tree with large offset
+        PlanTranslatorContext context = new PlanTranslatorContext();
+        PhysicalPlanTranslator translator = new PhysicalPlanTranslator(context);
+
+        Plan mockChildPlan = createMockChildPlan();
+        PlanNode mockPlanNode = createMockPlanNode();
+        mockPlanNode.setLimit(10L);
+
+        PlanFragment inputFragment = new PlanFragment(
+                new PlanFragmentId(1), mockPlanNode, DataPartition.UNPARTITIONED);
+
+        // Create PhysicalLimit with large offset
+        PhysicalLimit<Plan> physicalLimit = createPhysicalLimit(5L, 15L, LimitPhase.LOCAL, mockChildPlan);
+
+        new Expectations() {
+            {
+                mockChildPlan.accept(translator, context);
+                result = inputFragment;
+            }
+        };
+
+        // When: Visit PhysicalLimit with large offset
+        PlanFragment result = translator.visitPhysicalLimit(physicalLimit, context);
+
+        // Then: Should set limit to 0 (max(10-15, 0) = 0, then min(5, 0) = 0)
+        Assertions.assertNotNull(result);
+        Assertions.assertEquals(5L, result.getPlanRoot().getLimit());
+    }
+
+    // Helper methods to create mock objects
+    private PhysicalLimit<Plan> createPhysicalLimit(long limit, long offset, LimitPhase phase, Plan child) {
+        return new PhysicalLimit<>(limit, offset, phase,
+                    new LogicalProperties(() -> Lists.newArrayList(), () -> FunctionalDependencies.EMPTY_FUNC_DEPS),
+                    child);
+    }
+
+    private Plan createMockChildPlan() {
+        return new PhysicalEmptyRelation(
+                    new RelationId(1),
+                    Lists.newArrayList(),
+                    new LogicalProperties(() -> Lists.newArrayList(), () -> FunctionalDependencies.EMPTY_FUNC_DEPS)
+        );
+    }
+
+    private PlanNode createMockPlanNode() {
+        return new PlanNode(new PlanNodeId(1), "MockNode", StatisticalType.DEFAULT) {
+            @Override
+            protected void toThrift(org.apache.doris.thrift.TPlanNode msg) {}
+
+            @Override
+            public String getNodeExplainString(String prefix, org.apache.doris.thrift.TExplainLevel detailLevel) {
+                return "MockNode";
+            }
+
+            @Override
+            public int getNumInstances() {
+                return 1;
+            }
+        };
     }
 }
