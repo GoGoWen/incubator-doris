@@ -26,6 +26,7 @@
 #include <sstream>
 
 #include "common/status.h"
+#include "common/logging.h"
 #include "io/fs/hdfs.h"
 
 namespace doris {
@@ -44,8 +45,15 @@ std::string errcode_to_str(const std::error_code& ec) {
 
 std::string hdfs_error() {
     std::stringstream ss;
-    char buf[1024];
-    ss << "(" << errno << "), " << strerror_r(errno, buf, 1024) << ")";
+    char* root_cause = hdfsGetLastExceptionRootCause();
+    if (root_cause != nullptr) {
+        ss << "reason: " << root_cause;
+    }
+
+    char* stack_trace = hdfsGetLastExceptionStackTrace();
+    if (stack_trace != nullptr) {
+        LOG(WARNING) << "Reason: " << ss.str() << ", HDFS stack trace: " << stack_trace;
+    }
     return ss.str();
 }
 
