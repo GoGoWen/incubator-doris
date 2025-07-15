@@ -19,6 +19,7 @@ package org.apache.doris.fs.remote.dfs;
 
 import org.apache.doris.analysis.StorageBackend;
 import org.apache.doris.backup.Status;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.URI;
 import org.apache.doris.fs.operations.HDFSFileOperations;
@@ -54,6 +55,7 @@ import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.PrivilegedAction;
+import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -107,6 +109,41 @@ public class DFSFileSystem extends RemoteFileSystem {
             }
         }
         return dfsFileSystem;
+    }
+
+    @Override
+    public Status listFiles(String remotePath, boolean recursive, List<RemoteFile> result) {
+        if (Config.enable_list_hdfs_files_without_block_locations) {
+            try {
+                org.apache.hadoop.fs.FileSystem fileSystem = nativeFileSystem(remotePath);
+                Path locatedPath = new Path(remotePath);
+                ArrayDeque<Path> pathQueue = new ArrayDeque<>();
+                pathQueue.add(locatedPath);
+                while (!pathQueue.isEmpty()) {
+                    Path currentPath = pathQueue.poll();
+                    FileStatus[] fileStatusList = fileSystem.listStatus(currentPath);
+                    for (FileStatus fileStatus : fileStatusList) {
+                        if (fileStatus.isDirectory()) {
+                            if (recursive) {
+                                pathQueue.add(fileStatus.getPath());
+                            }
+                        } else {
+                            RemoteFile location = new RemoteFile(
+                                    fileStatus.getPath(), fileStatus.isDirectory(), fileStatus.getLen(),
+                                    fileStatus.getBlockSize(), fileStatus.getModificationTime(), null);
+                            result.add(location);
+                        }
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                return new Status(Status.ErrCode.NOT_FOUND, e.getMessage());
+            } catch (Exception e) {
+                return new Status(Status.ErrCode.COMMON_ERROR, e.getMessage());
+            }
+        } else {
+            return super.listFiles(remotePath, recursive, result);
+        }
+        return Status.OK;
     }
 
     protected RemoteIterator<LocatedFileStatus> getLocatedFiles(boolean recursive,

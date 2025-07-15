@@ -2957,4 +2957,8 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"每一轮需要分配的文件分片数",
             "the split num for per round to assign"})
     public static int assign_split_num_per_round = 800;
+
+    @ConfField(mutable = true, description = {"是否允许获取hdfs的文件元数据信息时不携带block的位置信息",
+        "whether to enable list hdfs files without block locations"})
+    public static boolean enable_list_hdfs_files_without_block_locations = true;
 }
