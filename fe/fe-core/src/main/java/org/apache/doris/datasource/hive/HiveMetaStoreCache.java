@@ -1086,6 +1086,7 @@ public class HiveMetaStoreCache {
                 JobConf authConf = new JobConf(jobConf);
                 authConf.set("BEE_USER", BDPAuthContext.get().getErp());
                 authConf.set("BEE_SOURCE", BDPAuthContext.get().getSource());
+                authConf.set("BEE_SN", BDPAuthContext.get().getQueryIdStr());
                 UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
                         null, bdpAuthContext.getUserToken());
                 directory = ugi.doAs((PrivilegedExceptionAction<AcidUtils.Directory>) () -> AcidUtils.getAcidState(

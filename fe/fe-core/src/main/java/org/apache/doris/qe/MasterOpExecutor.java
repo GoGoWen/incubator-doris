@@ -131,7 +131,8 @@ public class MasterOpExecutor {
             if (BDPAuthContext.get() != null) {
                 BDPAuthContext bdpAuthContext = BDPAuthContext.get();
                 params.setBdpAuthContext(new TBDPAuthContext(bdpAuthContext.getSource(),
-                        bdpAuthContext.getErp(), bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken()));
+                        bdpAuthContext.getErp(), bdpAuthContext.getHadoopUserName(),
+                        bdpAuthContext.getUserToken(), bdpAuthContext.getQueryId()));
             }
             final TMasterOpResult result = client.forward(params);
             isReturnToPool = true;

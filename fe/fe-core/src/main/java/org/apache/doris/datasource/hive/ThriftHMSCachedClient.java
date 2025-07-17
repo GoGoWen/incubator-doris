@@ -808,6 +808,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                         }
                         client.client.setMetaConf("BEE_SOURCE", bdpAuthContext.getSource());
                         client.client.setMetaConf("BEE_USER", bdpAuthContext.getErp());
+                        client.client.setMetaConf("BEE_SN", bdpAuthContext.getQueryIdStr());
                         MetricRepo.GAUGE_HMS_CONNECTIONS.setValue(getPoolSize());
                         return client;
                     }
@@ -820,6 +821,7 @@ public class ThriftHMSCachedClient implements HMSCachedClient {
                 conf.set("BEE_USER", bdpAuthContext.getErp());
                 conf.set("hive.jd.conf.keys", JD_CONF_KEYS);
                 conf.set("BEE_COMPUTE", "Doris");
+                conf.set("BEE_SN", bdpAuthContext.getQueryIdStr());
                 client = new ThriftHMSClient(bdpAuthContext, conf);
                 if (bdpAuthContext.getUserType() != null && bdpAuthContext.getUserType().equalsIgnoreCase(
                         "dev_personal")) {

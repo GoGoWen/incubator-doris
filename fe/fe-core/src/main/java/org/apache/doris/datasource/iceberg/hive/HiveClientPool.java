@@ -70,6 +70,7 @@ public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException>
                     conf.set("BEE_USER", bdpAuthContext.getErp());
                     conf.set("hive.jd.conf.keys", JD_CONF_KEYS);
                     conf.set("BEE_COMPUTE", "Doris");
+                    conf.set("BEE_SN", bdpAuthContext.getQueryIdStr());
                     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
                             null, bdpAuthContext.getUserToken());
                     IMetaStoreClient client = ugi.doAs((PrivilegedAction<IMetaStoreClient>) () -> {

@@ -17,7 +17,9 @@
 
 package org.apache.doris.qe;
 
+import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.thrift.TBDPAuthContext;
+import org.apache.doris.thrift.TUniqueId;
 
 import com.alibaba.ttl.TransmittableThreadLocal;
 
@@ -38,6 +40,8 @@ public class BDPAuthContext {
 
     private String businessLine = null;
 
+    private TUniqueId queryId = null;
+
     private volatile boolean erpChanged = false;
 
     public void setErpChanged(boolean erpChanged) {
@@ -52,7 +56,8 @@ public class BDPAuthContext {
     }
 
     public BDPAuthContext(TBDPAuthContext bdpAuthContext) {
-        this(bdpAuthContext.erp, bdpAuthContext.source, bdpAuthContext.hadoopUserName, bdpAuthContext.userToken);
+        this(bdpAuthContext.erp, bdpAuthContext.source, bdpAuthContext.hadoopUserName,
+                bdpAuthContext.userToken, bdpAuthContext.queryId);
     }
 
     public BDPAuthContext(String erp, String source, String hadoopUserName, String userToken) {
@@ -60,6 +65,14 @@ public class BDPAuthContext {
         this.source = source;
         this.hadoopUserName = hadoopUserName;
         this.userToken = userToken;
+    }
+
+    public BDPAuthContext(String erp, String source, String hadoopUserName, String userToken, TUniqueId queryId) {
+        this.erp = erp;
+        this.source = source;
+        this.hadoopUserName = hadoopUserName;
+        this.userToken = userToken;
+        this.queryId = queryId;
     }
 
     public void setErp(String erp) {
@@ -84,6 +97,10 @@ public class BDPAuthContext {
 
     public void setBusinessLine(String businessLine) {
         this.businessLine = businessLine;
+    }
+
+    public void setQueryId(TUniqueId queryId) {
+        this.queryId = queryId;
     }
 
     public void setThreadLocalInfo() {
@@ -122,6 +139,14 @@ public class BDPAuthContext {
         return businessLine;
     }
 
+    public TUniqueId getQueryId() {
+        return queryId;
+    }
+
+    public String getQueryIdStr() {
+        return queryId != null ? DebugUtil.printId(queryId) : null;
+    }
+
     public String getHmsClientCacheKey() {
         StringBuilder sd = new StringBuilder(hadoopUserName);
         Optional.ofNullable(userType).ifPresent(sd::append);
@@ -130,7 +155,7 @@ public class BDPAuthContext {
     }
 
     public String toString() {
-        return String.format("bdp_auth_context[erp: %s, source: %s, hadoop_user_name: %s]",
-                erp, source, hadoopUserName);
+        return String.format("bdp_auth_context[erp: %s, source: %s, hadoop_user_name: %s, query_id: %s]",
+                erp, source, hadoopUserName, getQueryIdStr());
     }
 }

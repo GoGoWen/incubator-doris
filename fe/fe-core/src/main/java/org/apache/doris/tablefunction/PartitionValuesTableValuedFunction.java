@@ -159,7 +159,7 @@ public class PartitionValuesTableValuedFunction extends MetadataTableValuedFunct
         if (BDPAuthContext.get() != null) {
             BDPAuthContext bdpAuthContext = BDPAuthContext.get();
             metaScanRange.setBdpAuthContext(new TBDPAuthContext(bdpAuthContext.getSource(), bdpAuthContext.getErp(),
-                    bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken()));
+                    bdpAuthContext.getHadoopUserName(), bdpAuthContext.getUserToken(), bdpAuthContext.getQueryId()));
         }
         metaScanRange.setMetadataType(TMetadataType.PARTITION_VALUES);
         TPartitionValuesMetadataParams partitionParam = new TPartitionValuesMetadataParams();
