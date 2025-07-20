@@ -57,6 +57,7 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
 import org.apache.doris.qe.AutoCloseConnectContext;
 import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.InternalQueryExecutionException;
 import org.apache.doris.qe.StmtExecutor;
 import org.apache.doris.statistics.ResultRow;
 import org.apache.doris.statistics.util.StatisticsUtil;
@@ -201,7 +202,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                 params.put("filterSql", partitionPredicate.toSql());
                 StringSubstitutor stringSubstitutor = new StringSubstitutor(params);
                 String sql = stringSubstitutor.replace(QUERY_FILTER_PARTITION_SQL);
-                List<ResultRow> partitionRows = new StmtExecutor(r.connectContext, sql).executeInternalQuery();
+                List<ResultRow> partitionRows = executePartitionFilterQuery(hiveTbl, r, sql);
                 selectedPartitionItems = Maps.newHashMapWithExpectedSize(partitionRows.size());
                 for (ResultRow partition : partitionRows) {
                     List<PartitionValue> values = Lists.newArrayListWithExpectedSize(partitionSlots.size());
@@ -231,6 +232,20 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             }
         }
         return new SelectedPartitions(partitionNum, selectedPartitionItems, true);
+    }
+
+    protected static List<ResultRow> executePartitionFilterQuery(HMSExternalTable hiveTbl,
+            AutoCloseConnectContext r, String sql) {
+        List<ResultRow> partitionRows;
+        try {
+            partitionRows = new StmtExecutor(r.connectContext, sql).executeInternalQuery();
+        } catch (Exception e) {
+            String errorMessage = "prune hive partitions failed for "
+                    + hiveTbl.getDbName() + "." + hiveTbl.getName();
+            LOG.warn(errorMessage, e);
+            throw new InternalQueryExecutionException(errorMessage);
+        }
+        return partitionRows;
     }
 
     private boolean isFilterSupportedByListPartitions(Expression expression) {
@@ -339,7 +354,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                 params.put("filterSql", partitionPredicate.toSql());
                 StringSubstitutor stringSubstitutor = new StringSubstitutor(params);
                 String sql = stringSubstitutor.replace(QUERY_FILTER_PARTITION_SQL);
-                List<ResultRow> partitionRows = new StmtExecutor(r.connectContext, sql).executeInternalQuery();
+                List<ResultRow> partitionRows = executePartitionFilterQuery(hiveTbl, r, sql);
                 selectedPartitionItems = Maps.newHashMapWithExpectedSize(partitionRows.size());
                 for (ResultRow partition : partitionRows) {
                     List<PartitionValue> values = Lists.newArrayListWithExpectedSize(partitionSlots.size());

@@ -18,6 +18,11 @@
 package org.apache.doris.qe;
 
 public class InternalQueryExecutionException extends RuntimeException {
+
+    public InternalQueryExecutionException(String message) {
+        super(message);
+    }
+
     public InternalQueryExecutionException(String message, Throwable cause) {
         super(message, cause);
     }
