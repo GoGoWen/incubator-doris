@@ -51,9 +51,7 @@ public:
 
     ~HdfsFileSystemHandle() {
         if (hdfs_fs != nullptr) {
-            // DO NOT call hdfsDisconnect(), or we will meet "Filesystem closed"
-            // even if we create a new one
-            // hdfsDisconnect(hdfs_fs);
+            hdfsDisconnect(hdfs_fs);
         }
         hdfs_fs = nullptr;
     }

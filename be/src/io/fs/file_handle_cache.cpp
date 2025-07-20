@@ -25,22 +25,33 @@
 #include <tuple>
 
 #include "io/fs/err_utils.h"
+#include "io/fs/hdfs_file_system.h"
 #include "util/hash_util.hpp"
 #include "util/time.h"
 
 namespace doris::io {
 
+hdfsFS HdfsFileHandle::fs() const {
+    return _fs_handle ? _fs_handle->hdfs_fs : nullptr;
+}
+
 HdfsFileHandle::~HdfsFileHandle() {
-    if (_hdfs_file != nullptr && _fs != nullptr) {
+    hdfsFS fs = _fs_handle ? _fs_handle->hdfs_fs : nullptr;
+    if (_hdfs_file != nullptr && fs != nullptr) {
         VLOG_FILE << "hdfsCloseFile() fid=" << _hdfs_file;
-        hdfsCloseFile(_fs, _hdfs_file); // TODO: check return code
+        hdfsCloseFile(fs, _hdfs_file); // TODO: check return code
     }
-    _fs = nullptr;
+    _fs_handle = nullptr;
     _hdfs_file = nullptr;
 }
 
 Status HdfsFileHandle::init(int64_t file_size) {
-    _hdfs_file = hdfsOpenFile(_fs, _fname.c_str(), O_RDONLY, 0, 0, 0);
+    hdfsFS fs = _fs_handle ? _fs_handle->hdfs_fs : nullptr;
+    if (!fs) {
+        return Status::IOError("HdfsFileHandle: hdfsFS is null");
+    }
+
+    _hdfs_file = hdfsOpenFile(fs, _fname.c_str(), O_RDONLY, 0, 0, 0);
     if (_hdfs_file == nullptr) {
         std::string _err_msg = hdfs_error();
         // invoker maybe just skip Status.NotFound and continue
@@ -53,7 +64,7 @@ Status HdfsFileHandle::init(int64_t file_size) {
 
     _file_size = file_size;
     if (_file_size <= 0) {
-        hdfsFileInfo* file_info = hdfsGetPathInfo(_fs, _fname.c_str());
+        hdfsFileInfo* file_info = hdfsGetPathInfo(fs, _fname.c_str());
         if (file_info == nullptr) {
             return Status::IOError("failed to get file size of {}: {}", _fname, hdfs_error());
         }
@@ -63,9 +74,9 @@ Status HdfsFileHandle::init(int64_t file_size) {
     return Status::OK();
 }
 
-CachedHdfsFileHandle::CachedHdfsFileHandle(const hdfsFS& fs, const std::string& fname,
+CachedHdfsFileHandle::CachedHdfsFileHandle(std::shared_ptr<HdfsFileSystemHandle> fs_handle, const std::string& fname,
                                            int64_t mtime)
-        : HdfsFileHandle(fs, fname, mtime) {}
+        : HdfsFileHandle(fs_handle, fname, mtime) {}
 
 CachedHdfsFileHandle::~CachedHdfsFileHandle() {}
 
@@ -80,7 +91,8 @@ void FileHandleCache::Accessor::set(
 }
 
 CachedHdfsFileHandle* FileHandleCache::Accessor::get() {
-    return _cache_accessor.get();
+    auto* handle = _cache_accessor.get();
+    return handle;
 }
 
 void FileHandleCache::Accessor::release() {
@@ -139,7 +151,7 @@ Status FileHandleCache::init() {
                           &FileHandleCache::_evict_handles_loop, this, &_eviction_thread);
 }
 
-Status FileHandleCache::get_file_handle(const hdfsFS& fs, const std::string& user, const std::string& fname,
+Status FileHandleCache::get_file_handle(std::shared_ptr<HdfsFileSystemHandle> fs_handle, const std::string& user, const std::string& fname,
                                         int64_t mtime, int64_t file_size, bool require_new_handle,
                                         FileHandleCache::Accessor* accessor, bool* cache_hit) {
     DCHECK_GE(mtime, 0);
@@ -162,7 +174,7 @@ Status FileHandleCache::get_file_handle(const hdfsFS& fs, const std::string& use
     *cache_hit = false;
 
     // Emplace a new file handle and get access
-    auto accessor_tmp = p.cache.emplace_and_get(cache_key, fs, fname, mtime);
+    auto accessor_tmp = p.cache.emplace_and_get(cache_key, fs_handle, fname, mtime);
 
     // Opening a file handle requires talking to the NameNode so it can take some time.
     Status status = accessor_tmp.get()->init(file_size);

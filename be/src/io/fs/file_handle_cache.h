@@ -35,6 +35,9 @@
 #include "util/thread.h"
 
 namespace doris::io {
+
+class HdfsFileSystemHandle;
+
 class FileHandleCacheKey {
 public:
     FileHandleCacheKey(const std::string& user, const std::string& fname, int64_t mtime)
@@ -78,17 +81,19 @@ public:
     /// Init opens the file handle
     Status init(int64_t file_size);
 
-    hdfsFS fs() const { return _fs; }
+    hdfsFS fs() const;
     hdfsFile file() const { return _hdfs_file; }
     int64_t mtime() const { return _mtime; }
     int64_t file_size() const { return _file_size; }
 
+    std::shared_ptr<HdfsFileSystemHandle> get_fs_handle() const { return _fs_handle; }
+
 protected:
-    HdfsFileHandle(const hdfsFS& fs, const std::string& fname, int64_t mtime)
-            : _fs(fs), _fname(fname), _mtime(mtime) {}
+    HdfsFileHandle(std::shared_ptr<HdfsFileSystemHandle> fs_handle, const std::string& fname, int64_t mtime)
+            : _fs_handle(fs_handle), _fname(fname), _mtime(mtime) {}
 
 private:
-    hdfsFS _fs;
+    std::shared_ptr<HdfsFileSystemHandle> _fs_handle;
     const std::string _fname;
     hdfsFile _hdfs_file = nullptr;
     int64_t _mtime;
@@ -99,7 +104,7 @@ private:
 /// other purpose.
 class CachedHdfsFileHandle : public HdfsFileHandle {
 public:
-    CachedHdfsFileHandle(const hdfsFS& fs, const std::string& fname, int64_t mtime);
+    CachedHdfsFileHandle(std::shared_ptr<HdfsFileSystemHandle> fs_handle, const std::string& fname, int64_t mtime);
     ~CachedHdfsFileHandle();
 };
 
@@ -107,8 +112,8 @@ public:
 /// is not appropriate.
 class ExclusiveHdfsFileHandle : public HdfsFileHandle {
 public:
-    ExclusiveHdfsFileHandle(const hdfsFS& fs, const std::string& fname, int64_t mtime)
-            : HdfsFileHandle(fs, fname, mtime) {}
+    ExclusiveHdfsFileHandle(std::shared_ptr<HdfsFileSystemHandle> fs_handle, const std::string& fname, int64_t mtime)
+            : HdfsFileHandle(fs_handle, fname, mtime) {}
 };
 
 /// The FileHandleCache is a data structure that owns HdfsFileHandles to share between
@@ -205,7 +210,7 @@ public:
     /// a file handle to make room for the new file handle.
     ///
     /// This obtains exclusive control over the returned file handle.
-    Status get_file_handle(const hdfsFS& fs, const std::string& user, const std::string& fname, int64_t mtime,
+    Status get_file_handle(std::shared_ptr<HdfsFileSystemHandle> fs_handle, const std::string& user, const std::string& fname, int64_t mtime,
                            int64_t file_size, bool require_new_handle, Accessor* accessor,
                            bool* cache_hit) WARN_UNUSED_RESULT;
 

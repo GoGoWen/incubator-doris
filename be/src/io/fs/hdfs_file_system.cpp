@@ -56,10 +56,22 @@ namespace io {
     }
 #endif
 
+class RandomGenerator {
+private:
+    std::random_device _rd;
+    std::mt19937 _gen;
+
+public:
+    RandomGenerator() : _gen(_rd()) {}
+    uint32_t uniform(uint32_t max_value) {
+        std::uniform_int_distribution<uint32_t> dis(0, max_value - 1);
+        return dis(_gen);
+    }
+};
+
 // Cache for HdfsFileSystemHandle
 class HdfsFileSystemCache {
 public:
-
     static HdfsFileSystemCache* instance() {
         static HdfsFileSystemCache s_instance;
         return &s_instance;
@@ -74,14 +86,15 @@ public:
 
 private:
     std::mutex _lock;
-    std::unordered_map<uint64, std::shared_ptr<HdfsFileSystemHandle>> _cache;
+
+    std::unordered_map<std::string, std::shared_ptr<HdfsFileSystemHandle>> _cache;
+    std::vector<std::string> _cache_keys;
+    RandomGenerator _rand;
 
     HdfsFileSystemCache() = default;
 
-    uint64 _hdfs_hash_code(const THdfsParams& hdfs_params, const std::string& fs_name);
+    std::string _hdfs_cache_key(const THdfsParams& hdfs_params, const std::string& fs_name);
     Status _create_fs(const THdfsParams& hdfs_params, const std::string& fs_name, hdfsFS* fs);
-    void _clean_invalid();
-    void _clean_oldest();
 };
 
 class HdfsFileHandleCache {
@@ -104,7 +117,8 @@ public:
 private:
     FileHandleCache _cache;
     HdfsFileHandleCache()
-            : _cache(config::max_hdfs_file_handle_cache_num, config::num_partitions_for_hdfs_file_handle_cache,
+            : _cache(config::max_hdfs_file_handle_cache_num,
+                     config::num_partitions_for_hdfs_file_handle_cache,
                      config::max_hdfs_file_handle_cache_time_sec * 1000L) {};
 };
 
@@ -114,7 +128,8 @@ Status HdfsFileHandleCache::get_file(const std::shared_ptr<HdfsFileSystem>& fs, 
     bool cache_hit;
     std::string fname = file.string();
     RETURN_IF_ERROR(HdfsFileHandleCache::instance()->cache().get_file_handle(
-            fs->_fs_handle->hdfs_fs, fs->_hdfs_params.user, fname, mtime, file_size, false, accessor, &cache_hit));
+            fs->_fs_handle, fs->_hdfs_params.user, fname, mtime, file_size, false, accessor,
+            &cache_hit));
     accessor->set_fs(fs);
 
     return Status::OK();
@@ -232,7 +247,8 @@ Status HdfsFileSystem::exists_impl(const Path& path, bool* res) const {
     //  https://github.com/apache/hadoop/blob/5cda162a804fb0cfc2a5ac0058ab407662c5fb00/
     //  hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/hdfs.c#L1923-L1924
     if (is_exists != 0 && errno != ENOENT) {
-        return Status::IOError("failed to check path existence {}: {}", path.native(), hdfs_error());
+        return Status::IOError("failed to check path existence {}: {}", path.native(),
+                               hdfs_error());
     }
 #endif
     *res = (is_exists == 0);
@@ -385,102 +401,74 @@ Status HdfsFileSystemCache::_create_fs(const THdfsParams& hdfs_params, const std
     return Status::OK();
 }
 
-void HdfsFileSystemCache::_clean_invalid() {
-    std::vector<uint64> removed_handle;
-    for (auto& item : _cache) {
-        if (item.second.use_count() == 1 && item.second->invalid()) {
-            removed_handle.emplace_back(item.first);
-        }
-    }
-    for (auto& handle : removed_handle) {
-        _cache.erase(handle);
-    }
-}
-
-void HdfsFileSystemCache::_clean_oldest() {
-    uint64_t oldest_time = ULONG_MAX;
-    uint64 oldest = 0;
-    for (auto& item : _cache) {
-        if (item.second.use_count() == 1 && item.second->last_access_time() < oldest_time) {
-            oldest_time = item.second->last_access_time();
-            oldest = item.first;
-        }
-    }
-    _cache.erase(oldest);
-}
-
 Status HdfsFileSystemCache::get_connection(const THdfsParams& hdfs_params,
                                            const std::string& fs_name,
                                            std::shared_ptr<HdfsFileSystemHandle>* fs_handle) {
-    uint64 hash_code = _hdfs_hash_code(hdfs_params, fs_name);
+    std::string cache_key = _hdfs_cache_key(hdfs_params, fs_name);
     {
         std::lock_guard<std::mutex> l(_lock);
-        auto it = _cache.find(hash_code);
+
+        auto it = _cache.find(cache_key);
         if (it != _cache.end()) {
             std::shared_ptr<HdfsFileSystemHandle> handle = it->second;
             if (!handle->invalid()) {
-                handle->update_last_access_time();
-                *fs_handle = std::move(handle);
+                *fs_handle = handle;
                 return Status::OK();
             }
             // fs handle is invalid, erase it.
             _cache.erase(it);
-            LOG(INFO) << "erase the hdfs handle, fs name: " << hdfs_params.fs_name;
+            auto key_it = std::find(_cache_keys.begin(), _cache_keys.end(), cache_key);
+            if (key_it != _cache_keys.end()) {
+                _cache_keys.erase(key_it);
+            }
         }
+    }
 
-        // not find in cache, or fs handle is invalid
-        // create a new one and try to put it into cache
-        hdfsFS hdfs_fs = nullptr;
-        RETURN_IF_ERROR(_create_fs(hdfs_params, fs_name, &hdfs_fs));
-        if (_cache.size() >= config::max_hdfs_file_system_cache_num) {
-            _clean_invalid();
-            _clean_oldest();
-        }
-        if (_cache.size() < config::max_hdfs_file_system_cache_num) {
-            auto handle = std::make_shared<HdfsFileSystemHandle>(hdfs_fs, true);
-            handle->update_last_access_time();
-            *fs_handle = handle;
-            _cache[hash_code] = std::move(handle);
+    hdfsFS hdfs_fs = nullptr;
+    RETURN_IF_ERROR(_create_fs(hdfs_params, fs_name, &hdfs_fs));
+
+    {
+        std::lock_guard<std::mutex> l(_lock);
+        const uint32_t max_cache_size = config::max_hdfs_file_system_cache_num;
+        auto handle = std::make_shared<HdfsFileSystemHandle>(hdfs_fs, true);
+        *fs_handle = handle;
+        if (_cache_keys.size() >= max_cache_size) {
+            uint32_t idx = _rand.uniform(max_cache_size);
+            _cache.erase(_cache_keys[idx]);
+            _cache[cache_key] = handle;
+            _cache_keys[idx] = cache_key;
+            _cache_keys[idx].swap(cache_key);
         } else {
-            *fs_handle = std::make_shared<HdfsFileSystemHandle>(hdfs_fs, false);
+            _cache[cache_key] = handle;
+            _cache_keys.push_back(std::move(cache_key));
         }
     }
     return Status::OK();
 }
 
-uint64 HdfsFileSystemCache::_hdfs_hash_code(const THdfsParams& hdfs_params,
-                                            const std::string& fs_name) {
-    uint64 hash_code = 0;
-    // The specified fsname is used first.
-    // If there is no specified fsname, the default fsname is used
+std::string HdfsFileSystemCache::_hdfs_cache_key(const THdfsParams& hdfs_params,
+                                                 const std::string& fs_name) {
+    fmt::memory_buffer buffer;
+
     if (!fs_name.empty()) {
-        hash_code ^= Fingerprint(fs_name);
+        fmt::format_to(std::back_inserter(buffer), "{}", fs_name);
     } else if (hdfs_params.__isset.fs_name) {
-        hash_code ^= Fingerprint(hdfs_params.fs_name);
+        fmt::format_to(std::back_inserter(buffer), "{}", hdfs_params.fs_name);
     }
 
     if (hdfs_params.__isset.user) {
-        hash_code ^= Fingerprint(hdfs_params.user);
+        fmt::format_to(std::back_inserter(buffer), "{}", hdfs_params.user);
     }
-    if (hdfs_params.__isset.hdfs_kerberos_principal) {
-        hash_code ^= Fingerprint(hdfs_params.hdfs_kerberos_principal);
-    }
-    if (hdfs_params.__isset.hdfs_kerberos_keytab) {
-        hash_code ^= Fingerprint(hdfs_params.hdfs_kerberos_keytab);
-    }
+
     if (hdfs_params.__isset.hdfs_conf) {
-        std::map<std::string, std::string> conf_map;
-        for (auto& conf : hdfs_params.hdfs_conf) {
+        for (const auto& conf : hdfs_params.hdfs_conf) {
             if (conf.key == "BEE_USER" || conf.key == "BEE_SOURCE") {
-                conf_map[conf.key] = conf.value;
+                fmt::format_to(std::back_inserter(buffer), "{}", conf.value);
             }
         }
-        for (auto& conf : conf_map) {
-            hash_code ^= Fingerprint(conf.first);
-            hash_code ^= Fingerprint(conf.second);
-        }
     }
-    return hash_code;
+
+    return fmt::to_string(buffer);
 }
 } // namespace io
 } // namespace doris
