@@ -4,7 +4,7 @@ import com.google.common.collect.Maps;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.ql.exec.UDF;
 
-import java.util.Map;
+import java.util.HashMap;
 
 /**
  * str_to_map
@@ -19,14 +19,15 @@ public class StrToMap extends UDF {
      * @param keyValueDelimiter
      * @return
      */
-    public String evaluate(String input, String entryDelimiter, String keyValueDelimiter) {
+    public HashMap<String, String> evaluate(String input, String entryDelimiter, String keyValueDelimiter) {
         if (StringUtils.isEmpty(input) || StringUtils.isEmpty(entryDelimiter)
             || StringUtils.isEmpty(keyValueDelimiter)) {
             return null;
         }
 
+        HashMap<String, String> resultMap = Maps.newHashMap();
         if (input.isEmpty()) {
-            return "{}";
+            return resultMap;
         }
 
         isEmpty(entryDelimiter, "entryDelimiter");
@@ -35,7 +36,6 @@ public class StrToMap extends UDF {
             throw new RuntimeException("entryDelimiter and keyValueDelimiter must not be the same");
         }
 
-        Map<String, String> resultMap = Maps.newHashMap();
         String[] entries = input.split(entryDelimiter);
         for (String entry : entries) {
             String[] keyValue = entry.split(keyValueDelimiter, 2);
@@ -45,7 +45,7 @@ public class StrToMap extends UDF {
                 resultMap.put(keyValue[0].trim(), "");
             }
         }
-        return resultMap.toString();
+        return resultMap;
     }
 
     private static void isEmpty(String param, String errMsg) {
