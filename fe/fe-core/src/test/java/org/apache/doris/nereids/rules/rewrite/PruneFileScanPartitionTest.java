@@ -17,26 +17,49 @@
 
 package org.apache.doris.nereids.rules.rewrite;
 
+import org.apache.doris.catalog.Column;
+import org.apache.doris.catalog.PrimitiveType;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.datasource.hive.HMSExternalTable;
+import org.apache.doris.datasource.hive.HMSExternalTable.DLAType;
+import org.apache.doris.nereids.trees.expressions.EqualTo;
+import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.expressions.LessThan;
+import org.apache.doris.nereids.trees.expressions.Slot;
+import org.apache.doris.nereids.trees.expressions.SlotReference;
+import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
+import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
+import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan;
+import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
+import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
+import org.apache.doris.nereids.types.IntegerType;
+import org.apache.doris.nereids.types.StringType;
+import org.apache.doris.nereids.util.MemoPatternMatchSupported;
+import org.apache.doris.nereids.util.MemoTestUtils;
 import org.apache.doris.qe.AutoCloseConnectContext;
 import org.apache.doris.qe.InternalQueryExecutionException;
 import org.apache.doris.qe.StmtExecutor;
 import org.apache.doris.statistics.ResultRow;
 import org.apache.doris.utframe.TestWithFeService;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import mockit.Expectations;
+import mockit.Injectable;
 import mockit.Mock;
 import mockit.MockUp;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Test for PruneFileScanPartition rule, focusing on executePartitionFilterQuery method coverage.
  */
-class PruneFileScanPartitionTest extends TestWithFeService {
+class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatternMatchSupported {
 
     @Override
     protected void runBeforeAll() throws Exception {
@@ -167,5 +190,90 @@ class PruneFileScanPartitionTest extends TestWithFeService {
 
         Assertions.assertNotNull(result, "Result should not be null even when empty");
         Assertions.assertEquals(0, result.size(), "Should return empty list when no partitions match");
+    }
+
+    @Test
+    void testGetConjunctsWithoutPartitionPredicate(@Injectable LogicalFileScan logicalFileScan,
+            @Injectable HMSExternalTable table) {
+        Slot slot1 = new SlotReference("col1", IntegerType.INSTANCE);
+        Slot slot2 = new SlotReference("col2", IntegerType.INSTANCE);
+        Slot slot3 = new SlotReference("col3", StringType.INSTANCE);
+        Slot slot4 = new SlotReference("col4", StringType.INSTANCE);
+
+        Column col1 = new Column("col1", PrimitiveType.INT);
+        Column col2 = new Column("col2", PrimitiveType.INT);
+
+        Expression expression1 = new EqualTo(slot1, new IntegerLiteral(1));
+        Expression expression2 = new LessThan(slot2, new IntegerLiteral(3));
+        Expression expression3 = new EqualTo(slot3, new StringLiteral("abc"));
+
+        new Expectations() {
+            {
+                logicalFileScan.getTable();
+                result = table;
+                minTimes = 1;
+
+                logicalFileScan.getOutput();
+                result = Lists.newArrayList(slot1, slot2, slot3, slot4);
+                minTimes = 1;
+
+                table.getPartitionColumns();
+                result = Lists.newArrayList(col1, col2);
+                minTimes = 1;
+
+                logicalFileScan.getConjuncts();
+                result = Sets.newHashSet(expression1, expression2, expression3);
+                minTimes = 1;
+            }
+        };
+        PruneFileScanPartition pruneFileScanPartition = new PruneFileScanPartition();
+        Set<Expression> conjuncts = pruneFileScanPartition.getConjunctsWithoutPartitionPredicate(logicalFileScan);
+        Assertions.assertEquals(1, conjuncts.size());
+        Assertions.assertEquals(expression3, conjuncts.toArray()[0]);
+    }
+
+    @Test
+    void testPruneFilePartition(@Injectable LogicalFileScan fileScan,
+            @Injectable HMSExternalTable table) {
+        Slot slot1 = new SlotReference("col1", IntegerType.INSTANCE);
+        Slot slot2 = new SlotReference("col2", IntegerType.INSTANCE);
+        Slot slot3 = new SlotReference("col3", StringType.INSTANCE);
+
+        Expression expression1 = new EqualTo(slot1, new IntegerLiteral(1));
+        Expression expression2 = new LessThan(slot2, new IntegerLiteral(3));
+        Expression expression3 = new EqualTo(slot3, new StringLiteral("abc"));
+
+        SelectedPartitions selectedPartitions =
+                new SelectedPartitions(0, ImmutableMap.of(), true);
+        Set<Expression> conjuncts = Sets.newHashSet(expression1, expression2, expression3);
+        new Expectations() {
+            {
+                fileScan.getTable();
+                result = table;
+                minTimes = 1;
+
+                table.getDlaType();
+                result = DLAType.HUDI;
+                minTimes = 1;
+
+                fileScan.getConjuncts();
+                result = conjuncts;
+                minTimes = 1;
+
+                fileScan.withConjuncts(conjuncts).withSelectedPartitions(selectedPartitions);
+                result = fileScan;
+                minTimes = 1;
+            }
+        };
+        LogicalFilter<LogicalFileScan> filter = new LogicalFilter<>(fileScan.getConjuncts(), fileScan);
+        Assertions.assertEquals(filter.getConjuncts(), fileScan.getConjuncts());
+
+        List<Plan> planList = new PruneFileScanPartition().build().transform(filter,
+                MemoTestUtils.createCascadesContext(filter));
+        Assertions.assertEquals(1, planList.size());
+        Assertions.assertTrue(planList.get(0) instanceof LogicalFilter);
+        Assertions.assertTrue(planList.get(0).toString().contains("(col1#4 = 1)")
+                && planList.get(0).toString().contains("(col2#5 < 3)")
+                && planList.get(0).toString().contains("(col3#6 = 'abc')"));
     }
 }

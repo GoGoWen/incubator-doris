@@ -436,7 +436,6 @@ Status HdfsFileSystemCache::get_connection(const THdfsParams& hdfs_params,
             uint32_t idx = _rand.uniform(max_cache_size);
             _cache.erase(_cache_keys[idx]);
             _cache[cache_key] = handle;
-            _cache_keys[idx] = cache_key;
             _cache_keys[idx].swap(cache_key);
         } else {
             _cache[cache_key] = handle;

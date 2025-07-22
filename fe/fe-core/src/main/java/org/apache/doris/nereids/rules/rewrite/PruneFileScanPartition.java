@@ -66,6 +66,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.logging.log4j.LogManager;
@@ -74,6 +75,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -102,25 +104,53 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                     ExternalTable tbl = scan.getTable();
 
                     SelectedPartitions selectedPartitions;
+                    Set<Expression> conjuncts;
                     // TODO(cmy): support other external table
                     if (tbl instanceof HMSExternalTable && ((HMSExternalTable) tbl).getDlaType() == DLAType.HIVE) {
                         HMSExternalTable hiveTbl = (HMSExternalTable) tbl;
                         selectedPartitions = pruneHivePartitions(hiveTbl, filter, scan,
-                            ctx.cascadesContext, hiveTbl.isViewBased());
+                                ctx.cascadesContext, hiveTbl.isViewBased());
+                        conjuncts = getConjunctsWithoutPartitionPredicate(scan);
                     } else {
                         // set isPruned so that it won't go pass the partition prune again
+                        conjuncts = filter.getConjuncts();
                         selectedPartitions = new SelectedPartitions(0, ImmutableMap.of(), true);
                     }
-
-                    LogicalFileScan rewrittenScan = scan.withConjuncts(filter.getConjuncts())
+                    LogicalFileScan rewrittenScan = scan.withConjuncts(conjuncts)
                             .withSelectedPartitions(selectedPartitions);
-                    return new LogicalFilter<>(filter.getConjuncts(), rewrittenScan);
+                    if (conjuncts.isEmpty()) {
+                        return rewrittenScan;
+                    }
+                    return new LogicalFilter<>(conjuncts, rewrittenScan);
                 }).toRule(RuleType.FILE_SCAN_PARTITION_PRUNE);
     }
 
+    /**
+     *  get conjuncts without partition predicate
+     *
+     */
+    public Set<Expression> getConjunctsWithoutPartitionPredicate(LogicalFileScan fileScan) {
+        Map<String, Slot> scanOutput = fileScan.getOutput()
+                .stream()
+                .collect(Collectors.toMap(slot -> slot.getName().toLowerCase(), Function.identity()));
+        Set<Slot> partitionSlots = ((HMSExternalTable) fileScan.getTable()).getPartitionColumns()
+                .stream()
+                .map(column -> scanOutput.get(column.getName().toLowerCase()))
+                .collect(Collectors.toSet());
+        PartitionPruneExpressionExtractor.ExpressionEvaluableDetector detector =
+                new PartitionPruneExpressionExtractor.ExpressionEvaluableDetector(partitionSlots);
+        Set<Expression> result = Sets.newHashSet();
+        for (Expression expression : fileScan.getConjuncts()) {
+            if (!detector.detect(expression)) {
+                result.add(expression);
+            }
+        }
+        return result;
+    }
+
     private SelectedPartitions pruneHivePartitionsFromView(HMSExternalTable hiveTbl,
-                                                   LogicalFilter<LogicalFileScan> filter, LogicalFileScan scan,
-                                                   CascadesContext ctx) {
+            LogicalFilter<LogicalFileScan> filter, LogicalFileScan scan,
+            CascadesContext ctx) {
         Map<Long, PartitionItem> selectedPartitionItems = Maps.newHashMap();
         Map<String, Slot> scanOutput = scan.getOutput()
                 .stream()
@@ -303,7 +333,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                 HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
                         > Config.max_partition_num_for_single_hive_table_without_filter
                         ? cache.getPartitionValuesWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
-                                hiveTbl.getPartitionColumnTypes()) :
+                        hiveTbl.getPartitionColumnTypes()) :
                         cache.getPartitionValues(
                                 hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
                 selectedPartitionItems = hivePartitionValues.getIdToPartitionItem();
@@ -314,12 +344,12 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                         && isFilterSupportedByListPartitions(partitionPredicate)) {
                     selectedPartitionItems = cache.getPartitionValuesByFilter(hiveTbl.getDbName(),
                             hiveTbl.getName(), partitionPredicate.toSql(), partitionColumnNames,
-                                hiveTbl.getPartitionColumnTypes());
+                            hiveTbl.getPartitionColumnTypes());
                 } else {
                     HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
                             > Config.max_partition_num_for_single_hive_table_without_filter
                             ? cache.getPartitionValuesWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
-                                    hiveTbl.getPartitionColumnTypes()) :
+                            hiveTbl.getPartitionColumnTypes()) :
                             cache.getPartitionValues(
                                     hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
                     Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
