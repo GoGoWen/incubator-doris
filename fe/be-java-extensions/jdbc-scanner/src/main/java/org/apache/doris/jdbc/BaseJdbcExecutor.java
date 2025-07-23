@@ -26,6 +26,7 @@ import org.apache.doris.common.jni.vec.VectorTable;
 import org.apache.doris.thrift.TJdbcExecutorCtorParams;
 import org.apache.doris.thrift.TJdbcOperation;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.zaxxer.hikari.HikariDataSource;
 import org.apache.log4j.Logger;
@@ -48,6 +49,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -96,6 +98,10 @@ public abstract class BaseJdbcExecutor implements JdbcExecutor {
         System.setProperty("com.zaxxer.hikari.useWeakReferences", "true");
         init(config, request.statement);
         this.jdbcDriverVersion = getJdbcDriverVersion();
+    }
+
+    @VisibleForTesting
+    protected BaseJdbcExecutor() {
     }
 
     public void close() throws Exception {
@@ -182,32 +188,68 @@ public abstract class BaseJdbcExecutor implements JdbcExecutor {
 
             if (isNullableString == null || replaceString == null) {
                 throw new IllegalArgumentException(
-                        "Output parameters 'is_nullable' and 'replace_string' are required.");
+                    "Output parameters 'is_nullable' and 'replace_string' are required.");
             }
 
             String[] nullableList = isNullableString.split(",");
             String[] replaceStringList = replaceString.split(",");
             curBlockRows = 0;
-            int columnCount = resultSetMetaData.getColumnCount();
 
-            initializeBlock(columnCount, replaceStringList, batchSize, outputTable);
+            int outputColumnCount = outputTable.getColumns().length;
+            initializeBlock(outputColumnCount, replaceStringList, batchSize, outputTable);
+
+            Map<String, Integer> resultSetColumnMap = new HashMap<>();
+            int resultSetColumnCount = resultSetMetaData.getColumnCount();
+            for (int i = 1; i <= resultSetColumnCount; i++) {
+                String columnName = resultSetMetaData.getColumnName(i).trim().toLowerCase();
+                resultSetColumnMap.put(columnName, i);
+            }
+
+            Map<String, Integer> columnIndexMap = new HashMap<>();
+            for (int j = 0; j < outputColumnCount; j++) {
+                String outputColumnName = outputTable.getFields()[j].trim().toLowerCase();
+                Integer resultSetIndex = resultSetColumnMap.get(outputColumnName);
+                if (resultSetIndex == null) {
+                    throw new RuntimeException("Column not found: " + outputColumnName);
+                }
+                columnIndexMap.put(outputColumnName, resultSetIndex - 1);
+            }
 
             do {
-                for (int i = 0; i < columnCount; ++i) {
-                    ColumnType type = outputTable.getColumnType(i);
-                    block.get(i)[curBlockRows] = getColumnValue(i, type, replaceStringList);
+                for (int j = 0; j < outputColumnCount; ++j) {
+                    String outputColumnName = outputTable.getFields()[j];
+                    Integer columnIndex = columnIndexMap.get(outputColumnName);
+
+                    if (columnIndex != null) {
+                        ColumnType type = convertTypeIfNecessary(j, outputTable.getColumnType(j), replaceStringList);
+                        block.get(j)[curBlockRows] = getColumnValue(columnIndex, type, replaceStringList);
+                    } else {
+                        throw new RuntimeException("Column not found in result set: " + outputColumnName);
+                    }
                 }
                 curBlockRows++;
             } while (curBlockRows < batchSize && resultSet.next());
 
-            for (int i = 0; i < columnCount; ++i) {
-                ColumnType type = outputTable.getColumnType(i);
-                Object[] columnData = block.get(i);
-                Class<?> componentType = columnData.getClass().getComponentType();
-                Object[] newColumn = (Object[]) Array.newInstance(componentType, curBlockRows);
-                System.arraycopy(columnData, 0, newColumn, 0, curBlockRows);
-                boolean isNullable = Boolean.parseBoolean(nullableList[i]);
-                outputTable.appendData(i, newColumn, getOutputConverter(type, replaceStringList[i]), isNullable);
+            for (int j = 0; j < outputColumnCount; ++j) {
+                String outputColumnName = outputTable.getFields()[j];
+                Integer columnIndex = columnIndexMap.get(outputColumnName);
+
+                if (columnIndex != null) {
+                    ColumnType type = outputTable.getColumnType(j);
+                    Object[] columnData = block.get(j);
+                    Class<?> componentType = columnData.getClass().getComponentType();
+                    Object[] newColumn = (Object[]) Array.newInstance(componentType, curBlockRows);
+                    System.arraycopy(columnData, 0, newColumn, 0, curBlockRows);
+                    boolean isNullable = Boolean.parseBoolean(nullableList[j]);
+                    outputTable.appendData(
+                            j,
+                            newColumn,
+                            getOutputConverter(type, replaceStringList[j]),
+                            isNullable
+                    );
+                } else {
+                    throw new RuntimeException("Column not found in result set: " + outputColumnName);
+                }
             }
         } catch (Exception e) {
             LOG.warn("jdbc get block address exception: ", e);
@@ -217,6 +259,7 @@ public abstract class BaseJdbcExecutor implements JdbcExecutor {
         }
         return outputTable.getMetaAddress();
     }
+
 
     protected void initializeBlock(int columnCount, String[] replaceStringList, int batchSizeNum,
             VectorTable outputTable) {
@@ -364,6 +407,10 @@ public abstract class BaseJdbcExecutor implements JdbcExecutor {
 
     protected abstract Object getColumnValue(int columnIndex, ColumnType type, String[] replaceStringList)
             throws SQLException;
+
+    protected ColumnType convertTypeIfNecessary(int outputIdx, ColumnType origType, String[] replaceStringList) {
+        return origType;
+    }
 
     /*
     | Type                                        | Java Array Type            |

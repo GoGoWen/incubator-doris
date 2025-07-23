@@ -21,10 +21,10 @@ under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <modules>
-        <module>new-hudi-scanner</module>
         <module>java-common</module>
         <module>java-udf</module>
         <module>jdbc-scanner</module>
+        <module>new-hudi-scanner</module>
         <module>paimon-scanner</module>
         <module>max-compute-scanner</module>
         <module>avro-scanner</module>

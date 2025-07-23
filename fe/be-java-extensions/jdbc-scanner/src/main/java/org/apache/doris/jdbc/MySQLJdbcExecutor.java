@@ -23,6 +23,7 @@ import org.apache.doris.common.jni.vec.ColumnValueConverter;
 import org.apache.doris.common.jni.vec.VectorTable;
 import org.apache.doris.thrift.TJdbcOperation;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.gson.Gson;
@@ -49,6 +50,10 @@ public class MySQLJdbcExecutor extends BaseJdbcExecutor {
     public MySQLJdbcExecutor(byte[] thriftParams) throws Exception {
         super(thriftParams);
         System.setProperty("com.mysql.cj.disableAbandonedConnectionCleanup", "true");
+    }
+
+    @VisibleForTesting
+    protected MySQLJdbcExecutor() {
     }
 
     @Override
@@ -95,49 +100,56 @@ public class MySQLJdbcExecutor extends BaseJdbcExecutor {
     }
 
     @Override
+    protected ColumnType convertTypeIfNecessary(int outputIdx, ColumnType origType, String[] replaceStringList) {
+        if (replaceStringList[outputIdx].equals("bitmap") || replaceStringList[outputIdx].equals("hll")) {
+            return new ColumnType(origType.getName(), Type.BYTE);
+        }
+        return origType;
+    }
+
+    @Override
     protected Object getColumnValue(int columnIndex, ColumnType type, String[] replaceStringList) throws SQLException {
-        if (replaceStringList[columnIndex].equals("bitmap") || replaceStringList[columnIndex].equals("hll")) {
-            byte[] data = resultSet.getBytes(columnIndex + 1);
-            if (resultSet.wasNull()) {
-                return null;
+        switch (type.getType()) {
+            case BOOLEAN:
+                return resultSet.getObject(columnIndex + 1, Boolean.class);
+            case TINYINT:
+            case SMALLINT:
+            case LARGEINT:
+                return resultSet.getObject(columnIndex + 1);
+            case INT:
+                return resultSet.getObject(columnIndex + 1, Integer.class);
+            case BIGINT:
+                return resultSet.getObject(columnIndex + 1, Long.class);
+            case FLOAT:
+                return resultSet.getObject(columnIndex + 1, Float.class);
+            case DOUBLE:
+                return resultSet.getObject(columnIndex + 1, Double.class);
+            case DECIMALV2:
+            case DECIMAL32:
+            case DECIMAL64:
+            case DECIMAL128:
+                return resultSet.getObject(columnIndex + 1, BigDecimal.class);
+            case DATE:
+            case DATEV2:
+                return resultSet.getObject(columnIndex + 1, LocalDate.class);
+            case DATETIME:
+            case DATETIMEV2:
+                return resultSet.getObject(columnIndex + 1, LocalDateTime.class);
+            case CHAR:
+            case VARCHAR:
+            case ARRAY:
+                return resultSet.getObject(columnIndex + 1, String.class);
+            case STRING:
+                return resultSet.getObject(columnIndex + 1);
+            case BYTE: {
+                byte[] data = resultSet.getBytes(columnIndex + 1);
+                if (resultSet.wasNull()) {
+                    return null;
+                }
+                return data;
             }
-            return data;
-        } else {
-            switch (type.getType()) {
-                case BOOLEAN:
-                    return resultSet.getObject(columnIndex + 1, Boolean.class);
-                case TINYINT:
-                case SMALLINT:
-                case LARGEINT:
-                    return resultSet.getObject(columnIndex + 1);
-                case INT:
-                    return resultSet.getObject(columnIndex + 1, Integer.class);
-                case BIGINT:
-                    return resultSet.getObject(columnIndex + 1, Long.class);
-                case FLOAT:
-                    return resultSet.getObject(columnIndex + 1, Float.class);
-                case DOUBLE:
-                    return resultSet.getObject(columnIndex + 1, Double.class);
-                case DECIMALV2:
-                case DECIMAL32:
-                case DECIMAL64:
-                case DECIMAL128:
-                    return resultSet.getObject(columnIndex + 1, BigDecimal.class);
-                case DATE:
-                case DATEV2:
-                    return resultSet.getObject(columnIndex + 1, LocalDate.class);
-                case DATETIME:
-                case DATETIMEV2:
-                    return resultSet.getObject(columnIndex + 1, LocalDateTime.class);
-                case CHAR:
-                case VARCHAR:
-                case ARRAY:
-                    return resultSet.getObject(columnIndex + 1, String.class);
-                case STRING:
-                    return resultSet.getObject(columnIndex + 1);
-                default:
-                    throw new IllegalArgumentException("Unsupported column type: " + type.getType());
-            }
+            default:
+                throw new IllegalArgumentException("Unsupported column type: " + type.getType());
         }
     }
 
