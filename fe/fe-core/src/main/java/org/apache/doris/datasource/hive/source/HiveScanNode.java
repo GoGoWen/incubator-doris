@@ -415,46 +415,58 @@ public class HiveScanNode extends FileQueryScanNode {
         boolean needSplit = true;
         if (getPushDownAggNoGroupingOp() == TPushAggOp.COUNT
                 && !(hmsTable.isHiveTransactionalTable() && hmsTable.isFullAcidTable())) {
-            int totalFileNum = 0;
-            for (FileCacheValue fileCacheValue : fileCaches) {
-                if (fileCacheValue.getFiles() != null) {
-                    totalFileNum += fileCacheValue.getFiles().size();
-                }
-            }
-            int parallelNum = sessionVariable.getParallelExecInstanceNum();
-            needSplit = FileSplitter.needSplitForCountPushdown(parallelNum, numBackends, totalFileNum);
+            needSplit = !hmsTable.isOrcOrParquetFileFormat();
         }
+        generateFileSplits(allFiles, fileCaches, needSplit, getFileSplitSize(fileCaches, needSplit));
+    }
+
+    @VisibleForTesting
+    protected long getFileSplitSize(List<FileCacheValue> fileCaches, boolean needSplit)
+            throws AnalysisException {
         long fileSplitSize = DEFAULT_SPLIT_SIZE;
+        long selectFileSize = getSelectedFileSize(fileCaches);
         if (needSplit && sessionVariable.getFileSplitSize() <= 0) {
-            long totalFileSize = 0;
-            for (HiveMetaStoreCache.FileCacheValue fileCacheValue : fileCaches) {
-                if (fileCacheValue.getFiles() != null) {
-                    for (HiveMetaStoreCache.HiveFileStatus status : fileCacheValue.getFiles()) {
-                        totalFileSize += status.getLength();
-                    }
-                }
-            }
-            if (totalFileSize > Config.max_selected_total_file_size_for_hive_table) {
-                throw new AnalysisException("the total scan bytes: " + totalFileSize
-                        + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
-                        + "exceed max bytes for single hive table: "
-                        + Config.max_selected_total_file_size_for_hive_table);
-            }
-            if (totalFileSize <= Config.file_size_range_to_decide_split_size[0]) {
+            if (selectFileSize <= Config.file_size_range_to_decide_split_size[0]) {
                 fileSplitSize = TINY_SPLIT_FILE_SIZE;
-            } else if (totalFileSize <= Config.file_size_range_to_decide_split_size[1]) {
+            } else if (selectFileSize <= Config.file_size_range_to_decide_split_size[1]) {
                 fileSplitSize = SMALL_SPLIT_FILE_SIZE;
-            } else if (totalFileSize <= Config.file_size_range_to_decide_split_size[2]) {
+            } else if (selectFileSize <= Config.file_size_range_to_decide_split_size[2]) {
                 fileSplitSize = MEDIUM_SPLIT_FILE_SIZE;
-            } else if (totalFileSize <= Config.file_size_range_to_decide_split_size[3]) {
+            } else if (selectFileSize <= Config.file_size_range_to_decide_split_size[3]) {
                 fileSplitSize = LARGE_SPLIT_FILE_SIZE;
-            } else if (totalFileSize <= Config.file_size_range_to_decide_split_size[4]) {
+            } else if (selectFileSize <= Config.file_size_range_to_decide_split_size[4]) {
                 fileSplitSize = HUGE_SPLIT_FILE_SIZE;
             } else {
                 fileSplitSize = DEFAULT_SPLIT_SIZE;
             }
         }
-        generateFileSplits(allFiles, fileCaches, needSplit, fileSplitSize);
+        return fileSplitSize;
+    }
+
+    @VisibleForTesting
+    protected long getSelectedFileSize(List<FileCacheValue> fileCaches) throws AnalysisException {
+        long selectedFileSize = 0;
+        for (HiveMetaStoreCache.FileCacheValue fileCacheValue : fileCaches) {
+            if (fileCacheValue.getFiles() != null) {
+                for (HiveMetaStoreCache.HiveFileStatus status : fileCacheValue.getFiles()) {
+                    selectedFileSize += status.getLength();
+                }
+            }
+        }
+        if (!hmsTable.isOrcOrParquetFileFormat() && selectedFileSize
+                > Config.max_selected_file_size_for_unrecommended_hive_table) {
+            throw new AnalysisException(
+                    "the total scan bytes: " + selectedFileSize + " for " + hmsTable.getDbName() + "."
+                            + hmsTable.getName() + " has " + "exceed max bytes for single hive table with unrecommended"
+                            + " file format: " + Config.max_selected_file_size_for_unrecommended_hive_table);
+        }
+        if (selectedFileSize > Config.max_selected_total_file_size_for_hive_table) {
+            throw new AnalysisException("the total scan bytes: " + selectedFileSize
+                    + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
+                    + "exceed max bytes for single hive table: "
+                    + Config.max_selected_total_file_size_for_hive_table);
+        }
+        return selectedFileSize;
     }
 
     @VisibleForTesting

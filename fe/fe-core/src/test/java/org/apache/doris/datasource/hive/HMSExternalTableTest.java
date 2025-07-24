@@ -267,4 +267,40 @@ public class HMSExternalTableTest {
         // Should have 0 columns (all void columns should be filtered out)
         Assertions.assertEquals(0, baseSchema.size());
     }
+
+    @Test
+    public void testIsOrcOrParquetFileFormat(@Injectable Table remoteTable) {
+        new Expectations() {
+            {
+                remoteTable.getSd().getInputFormat();
+                result = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
+            }
+        };
+
+        new MockUp<HMSExternalTable>() {
+            @Mock
+            public final synchronized void makeSureInitialized() {
+            }
+        };
+        HMSExternalTable hmsExternalTable = new HMSExternalTable(1, "test", "test",
+                new HMSExternalCatalog());
+        hmsExternalTable.setRemoteTable(remoteTable);
+        Assertions.assertTrue(hmsExternalTable.isOrcOrParquetFileFormat());
+
+        new Expectations() {
+            {
+                remoteTable.getSd().getInputFormat();
+                result = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
+            }
+        };
+        Assertions.assertTrue(hmsExternalTable.isOrcOrParquetFileFormat());
+
+        new Expectations() {
+            {
+                remoteTable.getSd().getInputFormat();
+                result = "com.hadoop.mapred.DeprecatedLzoTextInputFormat";
+            }
+        };
+        Assertions.assertFalse(hmsExternalTable.isOrcOrParquetFileFormat());
+    }
 }

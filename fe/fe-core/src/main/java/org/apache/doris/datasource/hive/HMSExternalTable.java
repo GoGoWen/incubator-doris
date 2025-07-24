@@ -331,6 +331,14 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
                 && isSupportedTransactionalFileFormat();
     }
 
+    public boolean isOrcOrParquetFileFormat() {
+        String inputFormatName = remoteTable.getSd().getInputFormat();
+        return inputFormatName != null
+                && (inputFormatName.equalsIgnoreCase("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat")
+                || inputFormatName.equalsIgnoreCase(
+                        "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"));
+    }
+
     private boolean isSupportedTransactionalFileFormat() {
         // Sometimes we meet "transactional" = "true" but format is parquet, which is not supported.
         // So we need to check the input format for transactional table.
