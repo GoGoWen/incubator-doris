@@ -144,7 +144,7 @@ public class BDPAuthContext {
     }
 
     public String getQueryIdStr() {
-        return queryId != null ? DebugUtil.printId(queryId) : null;
+        return queryId != null ? DebugUtil.printId(queryId) : "none";
     }
 
     public String getHmsClientCacheKey() {

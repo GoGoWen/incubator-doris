@@ -60,7 +60,7 @@ public class BDPAuthContextTest {
         Assert.assertEquals("test_token", bdpAuthContext.getUserToken());
         Assert.assertEquals("dev_personal", bdpAuthContext.getUserType());
         Assert.assertEquals("test_business", bdpAuthContext.getBusinessLine());
-        Assert.assertNull(bdpAuthContext.getQueryIdStr());
+        Assert.assertEquals("none", bdpAuthContext.getQueryIdStr());
     }
 
     @Test
@@ -94,11 +94,13 @@ public class BDPAuthContextTest {
 
         // Test null queryId
         bdpAuthContext.setQueryId(null);
-        Assert.assertNull(bdpAuthContext.getQueryIdStr());
+        Assert.assertEquals("none", bdpAuthContext.getQueryIdStr());
     }
 
     @Test
     public void testToStringWithQueryId() {
+        bdpAuthContext.setQueryId(null);
+        Assert.assertEquals("none", bdpAuthContext.getQueryIdStr());
         TUniqueId testQueryId = new TUniqueId(456L, 789L);
         bdpAuthContext.setQueryId(testQueryId);
         String result = bdpAuthContext.toString();
@@ -130,7 +132,7 @@ public class BDPAuthContextTest {
     @Test
     public void testToString() {
         String result = bdpAuthContext.toString();
-        String expected = "bdp_auth_context[erp: test_erp, source: test_source, hadoop_user_name: test_hadoop_user, query_id: null]";
+        String expected = "bdp_auth_context[erp: test_erp, source: test_source, hadoop_user_name: test_hadoop_user, query_id: none]";
         Assert.assertEquals(expected, result);
     }
 
@@ -195,7 +197,8 @@ public class BDPAuthContextTest {
         Assert.assertEquals("source", newContext.getSource());
         Assert.assertEquals("hadoop_user", newContext.getHadoopUserName());
         Assert.assertEquals("token", newContext.getUserToken());
-        Assert.assertNull(newContext.getQueryIdStr());
+        Assert.assertNull(newContext.getQueryId());
+        Assert.assertEquals("none", bdpAuthContext.getQueryIdStr());
     }
 
     @Test
@@ -215,11 +218,11 @@ public class BDPAuthContextTest {
     public void testQueryIdNullHandling() {
         // Test that null queryId is handled properly
         bdpAuthContext.setQueryId(null);
-        Assert.assertNull(bdpAuthContext.getQueryIdStr());
+        Assert.assertNull(bdpAuthContext.getQueryId());
 
         // Test toString with null queryId
         String result = bdpAuthContext.toString();
-        Assert.assertTrue(result.contains("query_id: null"));
+        Assert.assertTrue(result.contains("query_id: none"));
     }
 
     @Test
@@ -231,7 +234,7 @@ public class BDPAuthContextTest {
         ctx.setBdpAuthContext(bdpAuthContext);
 
         // QueryId should remain null
-        Assert.assertNull(bdpAuthContext.getQueryIdStr());
+        Assert.assertNull(bdpAuthContext.getQueryId());
 
         // Test that setBdpAuthContext works without throwing exceptions
         Assert.assertEquals(bdpAuthContext, ctx.getBdpAuthContext());
@@ -332,7 +335,7 @@ public class BDPAuthContextTest {
 
         // Set to null
         bdpAuthContext.setQueryId(null);
-        Assert.assertNull(bdpAuthContext.getQueryIdStr());
+        Assert.assertEquals("none", bdpAuthContext.getQueryIdStr());
 
         // Set back to a value
         TUniqueId finalQueryId = new TUniqueId(808L, 909L);
@@ -351,7 +354,7 @@ public class BDPAuthContextTest {
         Assert.assertNull(defaultContext.getUserType());
         Assert.assertNull(defaultContext.getBusinessLine());
         Assert.assertNull(defaultContext.getQueryId());
-        Assert.assertNull(defaultContext.getQueryIdStr());
+        Assert.assertEquals("none", bdpAuthContext.getQueryIdStr());
         Assert.assertFalse(defaultContext.isErpChanged());
     }
 
@@ -373,7 +376,7 @@ public class BDPAuthContextTest {
         Assert.assertNull(bdpAuthContext.getUserType());
         Assert.assertNull(bdpAuthContext.getBusinessLine());
         Assert.assertNull(bdpAuthContext.getQueryId());
-        Assert.assertNull(bdpAuthContext.getQueryIdStr());
+        Assert.assertEquals("none", bdpAuthContext.getQueryIdStr());
     }
 
     @Test
@@ -420,13 +423,13 @@ public class BDPAuthContextTest {
         // Test toString with different field combinations
         BDPAuthContext context = new BDPAuthContext();
         String result = context.toString();
-        Assert.assertEquals("bdp_auth_context[erp: null, source: null, hadoop_user_name: null, query_id: null]", result);
+        Assert.assertEquals("bdp_auth_context[erp: null, source: null, hadoop_user_name: null, query_id: none]", result);
 
         // With some fields set
         context.setErp("test_erp");
         context.setSource("test_source");
         result = context.toString();
-        Assert.assertEquals("bdp_auth_context[erp: test_erp, source: test_source, hadoop_user_name: null, query_id: null]", result);
+        Assert.assertEquals("bdp_auth_context[erp: test_erp, source: test_source, hadoop_user_name: null, query_id: none]", result);
 
         // With queryId
         TUniqueId queryId = new TUniqueId(123L, 456L);
@@ -829,7 +832,7 @@ public class BDPAuthContextTest {
         Assert.assertTrue(result.contains("erp: null"));
         Assert.assertTrue(result.contains("source: null"));
         Assert.assertTrue(result.contains("hadoop_user_name: null"));
-        Assert.assertTrue(result.contains("query_id: null"));
+        Assert.assertTrue(result.contains("query_id: none"));
 
         // Partial null values
         context.setErp("test_erp");

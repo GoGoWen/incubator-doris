@@ -152,7 +152,7 @@ public class HiveMetaStoreCache {
      * we need to be very careful and try to avoid the circular dependency of these tasks
      * which will bring out thread deadlock.
      **/
-    private void init() {
+    protected void init() {
         CacheFactory partitionNumCacheFactory = new CacheFactory(
                 OptionalLong.of(Config.external_partition_num_cache_expire_time_minutes_after_write * 60L),
                 OptionalLong.empty(),
@@ -260,7 +260,7 @@ public class HiveMetaStoreCache {
         }
     }
 
-    private void initMetrics() {
+    protected void initMetrics() {
         // partition value
         GaugeMetric<Long> valueCacheGauge = new GaugeMetric<Long>("hive_meta_cache",
                 Metric.MetricUnit.NOUNIT, "hive partition value cache number") {
@@ -492,7 +492,8 @@ public class HiveMetaStoreCache {
     }
 
     // Get File Status by using FileSystem API.
-    private FileCacheValue getFileCache(String location, String inputFormat,
+    @VisibleForTesting
+    protected FileCacheValue getFileCache(String location, String inputFormat,
             JobConf jobConf,
             List<String> partitionValues,
             String bindBrokerName) throws UserException {
@@ -514,7 +515,7 @@ public class HiveMetaStoreCache {
         // So we need to recursively list data location.
         // https://blog.actorsfit.com/a?ID=00550-ce56ec63-1bff-4b0c-a6f7-447b93efaa31
         List<RemoteFile> remoteFiles = new ArrayList<>();
-        Status status = fs.listFiles(location, true, remoteFiles);
+        Status status = fs.listFiles(location, !Config.enable_list_hdfs_files_ignore_subdirectory, remoteFiles);
         if (status.ok()) {
             for (RemoteFile remoteFile : remoteFiles) {
                 String srcPath = remoteFile.getPath().toString();

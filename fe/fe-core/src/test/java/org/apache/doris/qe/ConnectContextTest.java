@@ -155,7 +155,7 @@ public class ConnectContextTest {
         ctx.setQueryId(null);
         Assert.assertNull(ctx.queryId());
         Assert.assertNull(bdpAuthContext.getQueryId());
-        Assert.assertNull(bdpAuthContext.getQueryIdStr());
+        Assert.assertEquals("none", bdpAuthContext.getQueryIdStr());
 
         // Test setting another queryId
         TUniqueId anotherQueryId = new TUniqueId(789L, 101112L);
