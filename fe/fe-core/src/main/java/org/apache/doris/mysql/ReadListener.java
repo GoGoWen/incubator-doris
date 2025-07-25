@@ -54,6 +54,7 @@ public class ReadListener implements ChannelListener<ConduitStreamSourceChannel>
             } else {
                 BDPAuthContext.clear();
             }
+            ctx.setQueryId(null);
             try {
                 connectProcessor.processOnce();
                 if (!ctx.isKilled()) {
