@@ -22,6 +22,7 @@ import org.apache.doris.catalog.PrimitiveType;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.HMSExternalTable.DLAType;
+import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.trees.expressions.EqualTo;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.LessThan;
@@ -30,6 +31,7 @@ import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
 import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
@@ -54,10 +56,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * Test for PruneFileScanPartition rule, focusing on executePartitionFilterQuery method coverage.
+ * Test for PruneFileScanPartition rule, focusing on executePartitionFilterQuery
+ * method coverage.
  */
 class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatternMatchSupported {
 
@@ -115,8 +119,7 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
                     try (AutoCloseConnectContext context = new AutoCloseConnectContext(connectContext)) {
                         PruneFileScanPartition.executePartitionFilterQuery(mockTable, context, "SELECT * FROM test");
                     }
-                }
-        );
+                });
 
         String expectedMessage = "prune hive partitions failed for test_db.test_table";
         Assertions.assertEquals(expectedMessage, exception.getMessage(),
@@ -143,8 +146,7 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
                     try (AutoCloseConnectContext context = new AutoCloseConnectContext(connectContext)) {
                         PruneFileScanPartition.executePartitionFilterQuery(mockTable, context, "SELECT * FROM test");
                     }
-                }
-        );
+                });
 
         Assertions.assertTrue(sqlException.getMessage().contains("prune hive partitions failed for"),
                 "SQLException should be wrapped with standard error message");
@@ -163,8 +165,7 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
                     try (AutoCloseConnectContext context = new AutoCloseConnectContext(connectContext)) {
                         PruneFileScanPartition.executePartitionFilterQuery(mockTable, context, "SELECT * FROM test");
                     }
-                }
-        );
+                });
 
         Assertions.assertTrue(timeoutException.getMessage().contains("prune hive partitions failed for"),
                 "TimeoutException should be wrapped with standard error message");
@@ -220,21 +221,19 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
                 table.getPartitionColumns();
                 result = Lists.newArrayList(col1, col2);
                 minTimes = 1;
-
-                logicalFileScan.getConjuncts();
-                result = Sets.newHashSet(expression1, expression2, expression3);
-                minTimes = 1;
             }
         };
+        LogicalFilter<LogicalFileScan> logicalFilter = new LogicalFilter<>(
+                Sets.newHashSet(expression1, expression2, expression3), logicalFileScan);
         PruneFileScanPartition pruneFileScanPartition = new PruneFileScanPartition();
-        Set<Expression> conjuncts = pruneFileScanPartition.getConjunctsWithoutPartitionPredicate(logicalFileScan);
+        Set<Expression> conjuncts = pruneFileScanPartition.getConjunctsWithoutPartitionPredicate(logicalFileScan,
+                logicalFilter);
         Assertions.assertEquals(1, conjuncts.size());
         Assertions.assertEquals(expression3, conjuncts.toArray()[0]);
     }
 
     @Test
-    void testPruneFilePartition(@Injectable LogicalFileScan fileScan,
-            @Injectable HMSExternalTable table) {
+    void testPruneFilePartitionWithHudi(@Injectable LogicalFileScan fileScan, @Injectable HMSExternalTable table) {
         Slot slot1 = new SlotReference("col1", IntegerType.INSTANCE);
         Slot slot2 = new SlotReference("col2", IntegerType.INSTANCE);
         Slot slot3 = new SlotReference("col3", StringType.INSTANCE);
@@ -243,8 +242,7 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
         Expression expression2 = new LessThan(slot2, new IntegerLiteral(3));
         Expression expression3 = new EqualTo(slot3, new StringLiteral("abc"));
 
-        SelectedPartitions selectedPartitions =
-                new SelectedPartitions(0, ImmutableMap.of(), true);
+        final SelectedPartitions selectedPartitions = new SelectedPartitions(0, ImmutableMap.of(), true);
         Set<Expression> conjuncts = Sets.newHashSet(expression1, expression2, expression3);
         new Expectations() {
             {
@@ -256,24 +254,65 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
                 result = DLAType.HUDI;
                 minTimes = 1;
 
-                fileScan.getConjuncts();
-                result = conjuncts;
-                minTimes = 1;
-
                 fileScan.withConjuncts(conjuncts).withSelectedPartitions(selectedPartitions);
                 result = fileScan;
                 minTimes = 1;
             }
         };
-        LogicalFilter<LogicalFileScan> filter = new LogicalFilter<>(fileScan.getConjuncts(), fileScan);
-        Assertions.assertEquals(filter.getConjuncts(), fileScan.getConjuncts());
-
+        LogicalFilter<LogicalFileScan> filter = new LogicalFilter<>(conjuncts, fileScan);
         List<Plan> planList = new PruneFileScanPartition().build().transform(filter,
                 MemoTestUtils.createCascadesContext(filter));
         Assertions.assertEquals(1, planList.size());
         Assertions.assertTrue(planList.get(0) instanceof LogicalFilter);
-        Assertions.assertTrue(planList.get(0).toString().contains("(col1#4 = 1)")
-                && planList.get(0).toString().contains("(col2#5 < 3)")
-                && planList.get(0).toString().contains("(col3#6 = 'abc')"));
+        Assertions.assertTrue(planList.get(0).toString().contains("(col1#0 = 1)")
+                && planList.get(0).toString().contains("(col2#1 < 3)")
+                && planList.get(0).toString().contains("(col3#2 = 'abc')"));
+    }
+
+    @Test
+    void testPruneFilePartitionWithHive(@Injectable HMSExternalTable table) {
+        Slot slot1 = new SlotReference("col1", IntegerType.INSTANCE);
+        Slot slot2 = new SlotReference("col2", IntegerType.INSTANCE);
+        Slot slot3 = new SlotReference("col3", StringType.INSTANCE);
+
+        Expression expression1 = new EqualTo(slot1, new IntegerLiteral(1));
+        Expression expression2 = new LessThan(slot2, new IntegerLiteral(3));
+        Expression expression3 = new EqualTo(slot3, new StringLiteral("abc"));
+
+        final SelectedPartitions selectedPartitions = new SelectedPartitions(0, ImmutableMap.of(), true);
+        Set<Expression> conjuncts = Sets.newHashSet(expression1, expression2, expression3);
+        LogicalFileScan logicalFileScan = new LogicalFileScan(new RelationId(1), table,
+                Lists.newArrayList("test", "test"), Optional.empty(), Optional.empty());
+        new Expectations() {
+            {
+                table.getName();
+                result = "test";
+                minTimes = 1;
+
+                table.getDlaType();
+                result = DLAType.HIVE;
+                minTimes = 1;
+            }
+        };
+        new MockUp<PruneFileScanPartition>() {
+            @Mock
+            private SelectedPartitions pruneHivePartitions(HMSExternalTable hiveTbl,
+                    LogicalFilter<LogicalFileScan> filter, LogicalFileScan scan, CascadesContext ctx,
+                    boolean isViewBased) {
+                return selectedPartitions;
+            }
+
+            @Mock
+            Set<Expression> getConjunctsWithoutPartitionPredicate(LogicalFileScan fileScan,
+                    LogicalFilter<LogicalFileScan> filter) {
+                return Sets.newHashSet();
+            }
+        };
+        LogicalFilter<LogicalFileScan> filter = new LogicalFilter<>(conjuncts, logicalFileScan);
+        List<Plan> planList = new PruneFileScanPartition().build().transform(filter,
+                MemoTestUtils.createCascadesContext(filter));
+        Assertions.assertEquals(1, planList.size());
+        Assertions.assertTrue(planList.get(0) instanceof LogicalFileScan);
+        Assertions.assertTrue(((LogicalFileScan) planList.get(0)).getConjuncts().isEmpty());
     }
 }

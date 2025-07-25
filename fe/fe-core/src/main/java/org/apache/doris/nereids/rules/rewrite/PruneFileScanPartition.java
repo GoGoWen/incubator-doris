@@ -62,6 +62,7 @@ import org.apache.doris.qe.StmtExecutor;
 import org.apache.doris.statistics.ResultRow;
 import org.apache.doris.statistics.util.StatisticsUtil;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -110,7 +111,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                         HMSExternalTable hiveTbl = (HMSExternalTable) tbl;
                         selectedPartitions = pruneHivePartitions(hiveTbl, filter, scan,
                                 ctx.cascadesContext, hiveTbl.isViewBased());
-                        conjuncts = getConjunctsWithoutPartitionPredicate(scan);
+                        conjuncts = getConjunctsWithoutPartitionPredicate(scan, filter);
                     } else {
                         // set isPruned so that it won't go pass the partition prune again
                         conjuncts = filter.getConjuncts();
@@ -129,7 +130,8 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
      *  get conjuncts without partition predicate
      *
      */
-    public Set<Expression> getConjunctsWithoutPartitionPredicate(LogicalFileScan fileScan) {
+    public Set<Expression> getConjunctsWithoutPartitionPredicate(LogicalFileScan fileScan,
+            LogicalFilter<LogicalFileScan> filter) {
         Map<String, Slot> scanOutput = fileScan.getOutput()
                 .stream()
                 .collect(Collectors.toMap(slot -> slot.getName().toLowerCase(), Function.identity()));
@@ -140,7 +142,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
         PartitionPruneExpressionExtractor.ExpressionEvaluableDetector detector =
                 new PartitionPruneExpressionExtractor.ExpressionEvaluableDetector(partitionSlots);
         Set<Expression> result = Sets.newHashSet();
-        for (Expression expression : fileScan.getConjuncts()) {
+        for (Expression expression : filter.getConjuncts()) {
             if (!detector.detect(expression)) {
                 result.add(expression);
             }
@@ -295,7 +297,8 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
         return false;
     }
 
-    private SelectedPartitions pruneHivePartitions(HMSExternalTable hiveTbl,
+    @VisibleForTesting
+    protected SelectedPartitions pruneHivePartitions(HMSExternalTable hiveTbl,
             LogicalFilter<LogicalFileScan> filter, LogicalFileScan scan, CascadesContext ctx, boolean isViewBased) {
         Map<Long, PartitionItem> selectedPartitionItems = Maps.newHashMap();
         if (CollectionUtils.isEmpty(hiveTbl.getPartitionColumns())) {
