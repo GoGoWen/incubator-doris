@@ -57,7 +57,8 @@ public class HiveMetaStoreCacheTest {
             }
         };
         HiveMetaStoreCache cache = new HiveMetaStoreCache(catalog, executor, executor, executor);
-        Config.enable_list_hdfs_files_ignore_subdirectory = true;
+        Config.enable_list_hdfs_files_recursively = true;
+        Config.enable_list_hdfs_files_ignore_hidden_directory = true;
         String location = "hdfs://ns6666/user/hive/warehouse/test.db/test_table/a=dd/c=xx";
         String inputFormat = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
         List<String> partitionValues = Lists.newArrayList("dd", "xx");
@@ -85,7 +86,7 @@ public class HiveMetaStoreCacheTest {
                     fileSystemCache.getRemoteFileSystem(key);
                     result = remoteFileSystem;
 
-                    remoteFileSystem.listFiles(location, false, remoteFiles);
+                    remoteFileSystem.listFiles(location, true, remoteFiles);
                     result = new Delegate() {
                         public Status listFiles(String location, boolean recursive, List<RemoteFile> resultFiles) {
                             resultFiles.add(new RemoteFile(

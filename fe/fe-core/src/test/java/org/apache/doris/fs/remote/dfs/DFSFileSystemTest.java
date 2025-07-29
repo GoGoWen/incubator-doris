@@ -417,7 +417,67 @@ public class DFSFileSystemTest {
         Assertions.assertNotNull(status2);
     }
 
+    @Test
+    public void testListFilesWithIgnoreHiddenDirectory() throws Exception {
+        // Test that the configuration flag properly controls behavior
 
+        Path rootPath = new Path("/test");
+        Path directoryPath = new Path("/test/.test");
+        Path directoryPath2 = new Path("/test/_test");
+        Path filePath = new Path("/test/.test/file.txt");
+        Path filePath2 = new Path("/test/_test/file2.txt");
+        FileStatus fileStatus1 = createMockFileStatus(directoryPath, true, 4, 1000);
+        FileStatus fileStatus2 = createMockFileStatus(filePath, false, 1024, 1000);
+        FileStatus fileStatus3 = createMockFileStatus(directoryPath2, true, 4, 1000);
+        FileStatus fileStatus4 = createMockFileStatus(filePath2, false, 1024, 1000);
+
+        Config.enable_list_hdfs_files_without_block_locations = true;
+        Config.enable_list_hdfs_files_ignore_hidden_directory = true;
+
+        // Use MockUp to partially mock DFSFileSystem - only override nativeFileSystem method
+        new MockUp<DFSFileSystem>() {
+            @Mock
+            public FileSystem nativeFileSystem(String remotePath) {
+                return mockFileSystem;
+            }
+        };
+
+        new Expectations() {
+            {
+                mockFileSystem.listStatus(rootPath);
+                result = new FileStatus[]{fileStatus1, fileStatus3};
+                minTimes = 1;
+            }
+        };
+
+        List<RemoteFile> result1 = new ArrayList<>();
+        Status status1 = dfsFileSystem.listFiles("/test", true, result1);
+
+        Assertions.assertEquals(Status.OK, status1);
+        Assertions.assertEquals(0, result1.size());
+
+
+        Config.enable_list_hdfs_files_ignore_hidden_directory = false;
+
+        new Expectations() {
+            {
+                mockFileSystem.listStatus(directoryPath);
+                result = new FileStatus[]{fileStatus2};
+                minTimes = 1;
+
+                mockFileSystem.listStatus(directoryPath2);
+                result = new FileStatus[]{fileStatus4};
+                minTimes = 1;
+            }
+        };
+
+        List<RemoteFile> result2 = new ArrayList<>();
+        Status status2 = dfsFileSystem.listFiles("/test", true, result2);
+        Assertions.assertEquals(Status.OK, status2);
+        Assertions.assertEquals(2, result2.size());
+        Assertions.assertEquals("file.txt", result2.get(0).getName());
+        Assertions.assertEquals("file2.txt", result2.get(1).getName());
+    }
 
     /**
      * Helper method to create mock FileStatus objects

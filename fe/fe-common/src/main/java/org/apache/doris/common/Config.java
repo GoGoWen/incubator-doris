@@ -2970,7 +2970,11 @@ public class Config extends ConfigBase {
         "whether to enable list hdfs files without block locations"})
     public static boolean enable_list_hdfs_files_without_block_locations = true;
 
-    @ConfField(mutable = true, description = {"是否允许获取hdfs的文件元数据信息时忽略子目录",
-            "whether to enable list hdfs files ignore subdirectory"})
-    public static boolean enable_list_hdfs_files_ignore_subdirectory = true;
+    @ConfField(mutable = true, description = {"是否允许获取hdfs的文件元数据信息时递归遍历子目录",
+            "whether to enable list hdfs files recursively"})
+    public static boolean enable_list_hdfs_files_recursively = true;
+
+    @ConfField(mutable = true, description = {"是否允许获取hdfs的文件元数据信息时忽略隐藏目录",
+            "whether to enable list hdfs files ignore hidden directory"})
+    public static boolean enable_list_hdfs_files_ignore_hidden_directory = true;
 }

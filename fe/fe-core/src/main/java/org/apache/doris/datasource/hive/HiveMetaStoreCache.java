@@ -515,7 +515,7 @@ public class HiveMetaStoreCache {
         // So we need to recursively list data location.
         // https://blog.actorsfit.com/a?ID=00550-ce56ec63-1bff-4b0c-a6f7-447b93efaa31
         List<RemoteFile> remoteFiles = new ArrayList<>();
-        Status status = fs.listFiles(location, !Config.enable_list_hdfs_files_ignore_subdirectory, remoteFiles);
+        Status status = fs.listFiles(location, Config.enable_list_hdfs_files_recursively, remoteFiles);
         if (status.ok()) {
             for (RemoteFile remoteFile : remoteFiles) {
                 String srcPath = remoteFile.getPath().toString();
