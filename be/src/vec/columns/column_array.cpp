@@ -29,6 +29,10 @@
 #include <memory>
 #include <vector>
 
+#include "common/status.h"
+#include "runtime/primitive_type.h"
+#include "util/simd/bits.h"
+#include "util/simd/vstring_function.h"
 #include "vec/columns/column_const.h"
 #include "vec/columns/column_nullable.h"
 #include "vec/columns/column_string.h"
@@ -39,6 +43,7 @@
 #include "vec/common/memcpy_small.h"
 #include "vec/common/typeid_cast.h"
 #include "vec/common/unaligned.h"
+#include "vec/core/sort_block.h"
 #include "vec/data_types/data_type.h"
 
 class SipHash;
@@ -277,6 +282,62 @@ StringRef ColumnArray::serialize_value_into_arena(size_t n, Arena& arena,
     return res;
 }
 
+template <bool positive>
+struct less {
+    const ColumnArray& parent;
+    const int nan_direction_hint;
+    explicit less(const ColumnArray& parent_, int nan_direction_hint_)
+            : parent(parent_), nan_direction_hint(nan_direction_hint_) {}
+    bool operator()(size_t lhs, size_t rhs) const {
+        size_t lhs_size = parent.size_at(lhs);
+        size_t rhs_size = parent.size_at(rhs);
+        size_t min_size = std::min(lhs_size, rhs_size);
+        int res = 0;
+        for (size_t i = 0; i < min_size; ++i) {
+            if (res = parent.get_data().compare_at(
+                        parent.offset_at(lhs) + i, parent.offset_at(rhs) + i,
+                        *parent.get_data_ptr().get(), nan_direction_hint);
+                res) {
+                // if res != 0 , here is something different ,just return
+                break;
+            }
+        }
+        if (res == 0) {
+            // then we check size of array
+            res = lhs_size < rhs_size ? -1 : (lhs_size == rhs_size ? 0 : 1);
+        }
+
+        return positive ? (res < 0) : (res > 0);
+    }
+};
+
+void ColumnArray::insert_many_from(const IColumn& src, size_t position, size_t length) {
+    for (auto x = 0; x != length; ++x) {
+        ColumnArray::insert_from(src, position);
+    }
+}
+
+void ColumnArray::get_permutation(bool reverse, size_t limit, int nan_direction_hint,
+                                  IColumn::Permutation& res) const {
+    size_t s = size();
+    res.resize(s);
+    for (size_t i = 0; i < s; ++i) {
+        res[i] = i;
+    }
+
+    if (reverse) {
+        pdqsort(res.begin(), res.end(), less<false>(*this, nan_direction_hint));
+    } else {
+        pdqsort(res.begin(), res.end(), less<true>(*this, nan_direction_hint));
+    }
+}
+
+void ColumnArray::sort_column(const ColumnSorter* sorter, EqualFlags& flags,
+                              IColumn::Permutation& perms, EqualRange& range,
+                              bool last_column) const {
+    sorter->sort_column(static_cast<const ColumnArray&>(*this), flags, perms, range, last_column);
+}
+
 int ColumnArray::compare_at(size_t n, size_t m, const IColumn& rhs_, int nan_direction_hint) const {
     // since column type is complex, we can't use this function
     const auto& rhs = assert_cast<const ColumnArray&>(rhs_);
@@ -297,6 +358,197 @@ int ColumnArray::compare_at(size_t n, size_t m, const IColumn& rhs_, int nan_dir
     return lhs_size < rhs_size ? -1 : (lhs_size == rhs_size ? 0 : 1);
 }
 
+size_t ColumnArray::get_max_row_byte_size() const {
+    DCHECK(!data->is_variable_length() || data->is_column_string() || data->is_column_string64());
+    size_t max_size = 0;
+    size_t num_rows = size();
+    for (size_t i = 0; i < num_rows; ++i) {
+        max_size = std::max(max_size,
+                            size_at(i) * data->get_max_row_byte_size() +
+                                    (data->is_variable_length() ? sizeof(size_t) * size_at(i) : 0));
+    }
+
+    return sizeof(size_t) + max_size;
+}
+
+void ColumnArray::serialize_vec(std::vector<StringRef>& keys, size_t num_rows,
+                                size_t max_row_byte_size) const {
+    DCHECK(!data->is_variable_length() || data->is_column_string() || data->is_column_string64());
+
+    const auto* nested_col = data->get_ptr().get();
+    if (data->is_nullable()) {
+        nested_col = assert_cast<const ColumnNullable*>(data->get_ptr().get())
+                             ->get_nested_column_ptr()
+                             .get();
+    }
+
+    for (size_t i = 0; i < num_rows; ++i) {
+        char* __restrict dest = const_cast<char*>(keys[i].data + keys[i].size);
+        
+        size_t array_size = size_at(i);
+        size_t offset = offset_at(i);
+
+        // Serialize array size
+        memcpy(dest, &array_size, sizeof(array_size));
+        dest += sizeof(array_size);
+        keys[i].size += sizeof(array_size);
+        
+        // Serialize array elements
+        for (size_t j = 0; j < array_size; ++j) {
+            if (data->is_nullable()) {
+                auto flag = assert_cast<const ColumnNullable*>(data->get_ptr().get())
+                                    ->get_null_map_data()[offset + j];
+                memcpy(dest, &flag, sizeof(flag));
+                dest += sizeof(flag);
+                keys[i].size += sizeof(flag);
+                if (flag) {
+                    continue;
+                }
+            }
+            
+            const auto& it = nested_col->get_data_at(offset + j);
+            if (nested_col->is_variable_length()) {
+                memcpy(dest, &it.size, sizeof(it.size));
+                dest += sizeof(it.size);
+                keys[i].size += sizeof(it.size);
+            }
+            memcpy(dest, it.data, it.size);
+            dest += it.size;
+            keys[i].size += it.size;
+        }
+    }
+}
+
+void ColumnArray::serialize_vec_with_null_map(std::vector<StringRef>& keys, size_t num_rows,
+                                              const UInt8* null_map) const {
+    DCHECK(null_map != nullptr);
+    DCHECK(!data->is_variable_length() || data->is_column_string() || data->is_column_string64());
+
+    const bool has_null = simd::contain_byte(null_map, num_rows, 1);
+
+    const auto* nested_col = data->get_ptr().get();
+    if (data->is_nullable()) {
+        nested_col = assert_cast<const ColumnNullable*>(data->get_ptr().get())
+                             ->get_nested_column_ptr()
+                             .get();
+    }
+    auto serialize_impl = [&](size_t i, char* __restrict dest) {
+        size_t array_size = size_at(i);
+        size_t offset = offset_at(i);
+
+        memcpy(dest, &array_size, sizeof(array_size));
+        dest += sizeof(array_size);
+        keys[i].size += sizeof(array_size);
+        for (size_t j = 0; j < array_size; ++j) {
+            if (data->is_nullable()) {
+                auto flag = assert_cast<const ColumnNullable*>(data->get_ptr().get())
+                                    ->get_null_map_data()[offset + j];
+                memcpy(dest, &flag, sizeof(flag));
+                dest += sizeof(flag);
+                keys[i].size += sizeof(flag);
+                if (flag) {
+                    continue;
+                }
+            }
+            const auto& it = nested_col->get_data_at(offset + j);
+            if (nested_col->is_variable_length()) {
+                memcpy(dest, &it.size, sizeof(it.size));
+                dest += sizeof(it.size);
+                keys[i].size += sizeof(it.size);
+            }
+            memcpy(dest, it.data, it.size);
+            dest += it.size;
+            keys[i].size += it.size;
+        }
+    };
+    if (has_null) {
+        for (size_t i = 0; i < num_rows; ++i) {
+            char* __restrict dest = const_cast<char*>(keys[i].data + keys[i].size);
+            // serialize null first
+            memcpy(dest, null_map + i, sizeof(uint8_t));
+            dest += sizeof(uint8_t);
+            keys[i].size += sizeof(uint8_t);
+            if (null_map[i] == 0) {
+                serialize_impl(i, dest);
+            }
+        }
+    } else {
+        // All rows are not null, serialize null & value
+        for (size_t i = 0; i < num_rows; ++i) {
+            char* __restrict dest = const_cast<char*>(keys[i].data + keys[i].size);
+            // serialize null first
+            memcpy(dest, null_map + i, sizeof(uint8_t));
+            dest += sizeof(uint8_t);
+            keys[i].size += sizeof(uint8_t);
+            serialize_impl(i, dest);
+        }
+    }
+}
+
+void ColumnArray::deserialize_vec_with_null_map(std::vector<StringRef>& keys, const size_t num_rows,
+                                                const uint8_t* null_map) {
+    DCHECK(!data->is_variable_length() || data->is_column_string() || data->is_column_string64());
+    auto item_sz = remove_nullable(get_data().get_ptr())->get_max_row_byte_size();
+    for (size_t i = 0; i != num_rows; ++i) {
+        const auto* original_ptr = keys[i].data;
+        const auto* pos = keys[i].data;
+        if (null_map[i] == 0) {
+            size_t array_size = unaligned_load<size_t>(pos);
+            pos += sizeof(size_t);
+            for (size_t j = 0; j < array_size; j++) {
+                auto null_flag = unaligned_load<uint8_t>(pos);
+                pos += sizeof(uint8_t);
+                if (null_flag) {
+                    DCHECK(data->is_nullable()) << data->get_name();
+                    get_data().insert_default();
+                } else {
+                    size_t it_sz = item_sz;
+                    if (data->is_variable_length()) {
+                        it_sz = unaligned_load<size_t>(pos);
+                        pos += sizeof(it_sz);
+                    }
+                    get_data().insert_data(pos, it_sz);
+                    pos += it_sz;
+                }
+            }
+            get_offsets().push_back(get_offsets().back() + array_size);
+            keys[i].data = pos;
+        } else {
+            insert_default();
+        }
+        keys[i].size -= (keys[i].data - original_ptr);
+    }
+}
+
+void ColumnArray::deserialize_vec(std::vector<StringRef>& keys, const size_t num_rows) {
+    auto item_sz = remove_nullable(get_data().get_ptr())->get_max_row_byte_size();
+    for (size_t i = 0; i != num_rows; ++i) {
+        const auto* original_ptr = keys[i].data;
+        const auto* pos = keys[i].data;
+        size_t array_size = unaligned_load<size_t>(pos);
+        pos += sizeof(size_t);
+        for (size_t j = 0; j < array_size; j++) {
+            auto null_flag = unaligned_load<uint8_t>(pos);
+            pos += sizeof(uint8_t);
+            if (null_flag) {
+                DCHECK(data->is_nullable()) << data->get_name();
+                get_data().insert_default();
+            } else {
+                size_t it_sz = item_sz;
+                if (data->is_variable_length()) {
+                    it_sz = unaligned_load<size_t>(pos);
+                    pos += sizeof(it_sz);
+                }
+                get_data().insert_data(pos, it_sz);
+                pos += it_sz;
+            }
+        }
+        get_offsets().push_back(get_offsets().back() + array_size);
+        keys[i].data = pos;
+        keys[i].size -= (keys[i].data - original_ptr);
+    }
+}
+
 const char* ColumnArray::deserialize_and_insert_from_arena(const char* pos) {
     size_t array_size = unaligned_load<size_t>(pos);
     pos += sizeof(array_size);
@@ -307,16 +559,11 @@ const char* ColumnArray::deserialize_and_insert_from_arena(const char* pos) {
     return pos;
 }
 
-void ColumnArray::update_hash_with_value(size_t n, SipHash& hash) const {
-    size_t array_size = size_at(n);
-    size_t offset = offset_at(n);
 
-    for (size_t i = 0; i < array_size; ++i) get_data().update_hash_with_value(offset + i, hash);
-}
 
-// for every array row calculate xxHash
+
 void ColumnArray::update_xxHash_with_value(size_t start, size_t end, uint64_t& hash,
-                                           const uint8_t* __restrict null_data) const {
+                                          const uint8_t* __restrict null_data) const {
     auto& offsets_column = get_offsets();
     if (null_data) {
         for (size_t i = start; i < end; ++i) {
@@ -324,10 +571,10 @@ void ColumnArray::update_xxHash_with_value(size_t start, size_t end, uint64_t& h
                 size_t elem_size = offsets_column[i] - offsets_column[i - 1];
                 if (elem_size == 0) {
                     hash = HashUtil::xxHash64WithSeed(reinterpret_cast<const char*>(&elem_size),
-                                                      sizeof(elem_size), hash);
+                                                     sizeof(elem_size), hash);
                 } else {
-                    get_data().update_xxHash_with_value(offsets_column[i - 1], offsets_column[i],
-                                                        hash, nullptr);
+                    get_data().update_xxHash_with_value(offsets_column[i - 1], offsets_column[i], hash,
+                                                       nullptr);
                 }
             }
         }
@@ -336,10 +583,10 @@ void ColumnArray::update_xxHash_with_value(size_t start, size_t end, uint64_t& h
             size_t elem_size = offsets_column[i] - offsets_column[i - 1];
             if (elem_size == 0) {
                 hash = HashUtil::xxHash64WithSeed(reinterpret_cast<const char*>(&elem_size),
-                                                  sizeof(elem_size), hash);
+                                                 sizeof(elem_size), hash);
             } else {
                 get_data().update_xxHash_with_value(offsets_column[i - 1], offsets_column[i], hash,
-                                                    nullptr);
+                                                   nullptr);
             }
         }
     }
@@ -1139,6 +1386,15 @@ ColumnPtr ColumnArray::permute(const Permutation& perm, size_t limit) const {
         res->data = data->permute(nested_perm, nested_perm.size());
     }
     return res;
+}
+
+void ColumnArray::update_hash_with_value(size_t n, SipHash& hash) const {
+    size_t size = size_at(n);
+    size_t offset = offset_at(n);
+    hash.update(reinterpret_cast<const char*>(&size), sizeof(size));
+    for (size_t i = 0; i < size; ++i) {
+        get_data().update_hash_with_value(offset + i, hash);
+    }
 }
 
 } // namespace doris::vectorized

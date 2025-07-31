@@ -43,15 +43,13 @@
 #include "vec/io/io_helper.h"
 #include "vec/io/var_int.h"
 
-namespace doris {
-namespace vectorized {
+namespace doris::vectorized {
 class Arena;
 class BufferReadable;
 class BufferWritable;
 template <typename T>
 class ColumnDecimal;
-} // namespace vectorized
-} // namespace doris
+} // namespace doris::vectorized
 template <typename T>
 struct HashCRC32;
 
@@ -62,15 +60,23 @@ namespace doris::vectorized {
 template <typename T>
 struct AggregateFunctionUniqExactData {
     static constexpr bool is_string_key = std::is_same_v<T, String>;
-    using Key = std::conditional_t<is_string_key, UInt128, T>;
+    static constexpr bool is_array_key = std::is_same_v<T, Array>;
+    static constexpr bool is_boolean_key = std::is_same_v<T, bool>;
+    using Key = std::conditional_t<
+            is_string_key, UInt128,
+            std::conditional_t<is_array_key, UInt64, std::conditional_t<is_boolean_key, UInt8, T>>>;
     using Hash = HashCRC32<Key>;
 
     using Set = flat_hash_set<Key, Hash>;
 
-    // TODO: replace SipHash with xxhash to speed up
     static UInt128 ALWAYS_INLINE get_key(const StringRef& value) {
         auto hash_value = XXH_INLINE_XXH128(value.data, value.size, 0);
         return UInt128 {hash_value.high64, hash_value.low64};
+    }
+    static UInt64 ALWAYS_INLINE get_key(const IColumn& column, size_t row_num) {
+        UInt64 hash_value = 0;
+        column.update_xxHash_with_value(row_num, row_num + 1, hash_value, nullptr);
+        return hash_value;
     }
 
     Set set;
@@ -89,6 +95,8 @@ struct OneAdder {
         if constexpr (std::is_same_v<T, String>) {
             StringRef value = column.get_data_at(row_num);
             data.set.insert(Data::get_key(value));
+        } else if constexpr (std::is_same_v<T, Array>) {
+            data.set.insert(Data::get_key(column, row_num));
         } else if constexpr (IsDecimalNumber<T>) {
             data.set.insert(assert_cast<const ColumnDecimal<T>&>(column).get_data()[row_num]);
         } else {
@@ -104,7 +112,11 @@ template <typename T, typename Data>
 class AggregateFunctionUniq final
         : public IAggregateFunctionDataHelper<Data, AggregateFunctionUniq<T, Data>> {
 public:
-    using KeyType = std::conditional_t<std::is_same_v<T, String>, UInt128, T>;
+    static constexpr bool is_string_key = std::is_same_v<T, String>;
+    static constexpr bool is_array_key = std::is_same_v<T, Array>;
+
+    using KeyType =
+            std::conditional_t<is_string_key, UInt128, std::conditional_t<is_array_key, UInt64, T>>;
     AggregateFunctionUniq(const DataTypes& argument_types_)
             : IAggregateFunctionDataHelper<Data, AggregateFunctionUniq<T, Data>>(argument_types_) {}
 
@@ -124,6 +136,12 @@ public:
             for (size_t i = 0; i != batch_size; ++i) {
                 StringRef value = column.get_data_at(i);
                 keys_container[i] = Data::get_key(value);
+            }
+            return keys_container.data();
+        } else if constexpr (is_array_key) {
+            keys_container.resize(batch_size);
+            for (size_t i = 0; i != batch_size; ++i) {
+                keys_container[i] = Data::get_key(column, i);
             }
             return keys_container.data();
         } else {

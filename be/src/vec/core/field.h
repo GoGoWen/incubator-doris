@@ -266,6 +266,7 @@ template <typename T>
 class DecimalField {
 public:
     DecimalField(T value, UInt32 scale_) : dec(value), scale(scale_) {}
+    DecimalField(T value) : DecimalField(value, 0) {}
 
     operator T() const { return dec; }
     T get_value() const { return dec; }
