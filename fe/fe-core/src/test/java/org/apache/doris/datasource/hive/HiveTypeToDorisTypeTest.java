@@ -39,6 +39,7 @@ public class HiveTypeToDorisTypeTest {
         Assert.assertEquals(Type.TINYINT, hiveTypeToDorisType("tinyint", 0));
         Assert.assertEquals(Type.TINYINT, hiveTypeToDorisType("tinyint(3,0)", 0));
         Assert.assertEquals(Type.SMALLINT, hiveTypeToDorisType("smallint", 0));
+        Assert.assertEquals(ScalarType.SMALLINT, hiveTypeToDorisType("smallint(5)", 0));
         Assert.assertEquals(Type.INT, hiveTypeToDorisType("int", 0));
         Assert.assertEquals(Type.INT, hiveTypeToDorisType("int(10,0)", 0));
         Assert.assertEquals(Type.BIGINT, hiveTypeToDorisType("bigint", 0));
@@ -50,6 +51,8 @@ public class HiveTypeToDorisTypeTest {
         Assert.assertEquals(Type.DOUBLE, hiveTypeToDorisType("double", 0));
         Assert.assertEquals(ScalarType.createStringType(), hiveTypeToDorisType("string", 0));
         Assert.assertEquals(ScalarType.createStringType(), hiveTypeToDorisType("binary", 0));
+        Assert.assertEquals(ScalarType.BIGINT, hiveTypeToDorisType("bigint(20) unsigned", 0));
+        Assert.assertEquals(ScalarType.createDatetimeV2Type(6), hiveTypeToDorisType("datetime", 6));
     }
 
     @Test

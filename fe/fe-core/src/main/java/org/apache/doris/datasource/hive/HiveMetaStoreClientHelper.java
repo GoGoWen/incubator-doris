@@ -636,6 +636,7 @@ public class HiveMetaStoreClientHelper {
                 return Type.BIGINT;
             case "date":
                 return ScalarType.createDateV2Type();
+            case "datetime":
             case "timestamp":
                 return ScalarType.createDatetimeV2Type(timeScale);
             case "float":
@@ -721,6 +722,9 @@ public class HiveMetaStoreClientHelper {
         }
         if (lowerCaseType.startsWith("tinyint")) {
             return Type.TINYINT;
+        }
+        if (lowerCaseType.startsWith("smallint")) {
+            return Type.SMALLINT;
         }
         if (lowerCaseType.startsWith("timestamp")) {
             return ScalarType.createDatetimeV2Type(timeScale);
