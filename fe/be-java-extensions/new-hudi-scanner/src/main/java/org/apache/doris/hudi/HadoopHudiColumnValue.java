@@ -65,6 +65,10 @@ public class HadoopHudiColumnValue implements ColumnValue {
         return ((PrimitiveObjectInspector) fieldInspector).getPrimitiveJavaObject(fieldData);
     }
 
+    public ZoneId getZoneId() {
+        return zoneId;
+    }
+
     @Override
     public boolean getBoolean() {
         return (boolean) inspectObject();

@@ -25,6 +25,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
@@ -112,8 +113,11 @@ public class HadoopHudiJniScanner extends JniScanner {
 
         this.hudiColumnNames = params.get("hudi_column_names");
         this.hudiColumnTypes = params.get("hudi_column_types").split("#");
-        this.requiredFields = params.get("required_fields").split(",");
-
+        if (StringUtils.isEmpty(params.get("required_fields"))) {
+            this.requiredFields = params.get("hudi_primary_keys").split(",");
+        } else {
+            this.requiredFields = params.get("required_fields").split(",");
+        }
         this.fieldInspectors = new ObjectInspector[requiredFields.length];
         this.structFields = new StructField[requiredFields.length];
         this.fsOptionsProps = Maps.newHashMap();
@@ -137,6 +141,66 @@ public class HadoopHudiJniScanner extends JniScanner {
         this.classLoader = this.getClass().getClassLoader();
         this.hadoopUserName = params.get("HADOOP_USER_NAME");
         this.hadoopUserToken = params.get("HADOOP_USER_TOKEN");
+    }
+
+    public String getBasePath() {
+        return basePath;
+    }
+
+    public String getDataFilePath() {
+        return dataFilePath;
+    }
+
+    public long getDataFileLength() {
+        return dataFileLength;
+    }
+
+    public String[] getDeltaFilePaths() {
+        return deltaFilePaths;
+    }
+
+    public String getInstantTime() {
+        return instantTime;
+    }
+
+    public String getSerde() {
+        return serde;
+    }
+
+    public String getInputFormat() {
+        return inputFormat;
+    }
+
+    public String getHudiColumnNames() {
+        return hudiColumnNames;
+    }
+
+    public String[] getHudiColumnTypes() {
+        return hudiColumnTypes;
+    }
+
+    public String[] getRequiredFields() {
+        return requiredFields;
+    }
+
+    public Map<String, String> getFsOptionsProps() {
+        return fsOptionsProps;
+    }
+
+    public int getFetchSize() {
+        return fetchSize;
+    }
+
+    public HadoopHudiColumnValue getColumnValue() {
+        return columnValue;
+    }
+
+    public String getHadoopUserName() {
+        return hadoopUserName;
+    }
+
+    public String getHadoopUserToken() {
+        return hadoopUserToken;
     }
 
     @Override

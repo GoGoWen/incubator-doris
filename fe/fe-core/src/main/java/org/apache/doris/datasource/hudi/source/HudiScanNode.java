@@ -68,6 +68,8 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.StringUtils;
+import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.org.apache.avro.Schema;
 import org.apache.logging.log4j.LogManager;
@@ -108,6 +110,7 @@ public class HudiScanNode extends HiveScanNode {
     private String serdeLib;
     private List<String> columnNames;
     private List<String> columnTypes;
+    private List<String> primaryKeys;
 
     private boolean partitionInit = false;
     private HoodieTimeline timeline;
@@ -159,6 +162,7 @@ public class HudiScanNode extends HiveScanNode {
         }
     }
 
+    @VisibleForTesting
     @Override
     protected void doInitialize() throws UserException {
         ExternalTable table = (ExternalTable) desc.getTable();
@@ -179,6 +183,7 @@ public class HudiScanNode extends HiveScanNode {
         boolean queryWithoutCacheLayer = false;
         Map<String, String> storageDescriptorParameters =
                 hmsTable.getRemoteTable().getSd().getSerdeInfo().getParameters();
+
         Map<String, String> paras = hmsTable.getRemoteTable().getParameters();
         String key = "hoodie.query.without.cache.layer.enabled";
         if (paras != null) {
@@ -186,6 +191,14 @@ public class HudiScanNode extends HiveScanNode {
             if (!queryWithoutCacheLayer && storageDescriptorParameters != null) {
                 queryWithoutCacheLayer = Boolean.valueOf(storageDescriptorParameters.getOrDefault(key, "false"));
             }
+        }
+        String primaryKey = "hoodie.datasource.write.recordkey.field";
+        if (paras != null) {
+            String primaryKeyStr = paras.getOrDefault(primaryKey, "");
+            if (StringUtils.isNullOrEmpty(primaryKeyStr)) {
+                throw new AnalysisException("Primary key is not set in hudi table " + hmsTable.getFullQualifiers());
+            }
+            primaryKeys = Arrays.asList(primaryKeyStr.split(","));
         }
         storageStrategy = HoodieStorageStrategyFactory.getInstant(hudiClient, queryWithoutCacheLayer);
         columnNames = new ArrayList<>();
@@ -276,6 +289,7 @@ public class HudiScanNode extends HiveScanNode {
         fileDesc.setDeltaLogs(hudiSplit.getHudiDeltaLogs());
         fileDesc.setColumnNames(hudiSplit.getHudiColumnNames());
         fileDesc.setColumnTypes(hudiSplit.getHudiColumnTypes());
+        fileDesc.setPrimaryKeys(hudiSplit.getPrimaryKeys());
         // TODO(gaoxin): support complex types
         // fileDesc.setNestedFields(hudiSplit.getNestedFields());
         tableFormatFileDesc.setHudiParams(fileDesc);
@@ -550,6 +564,7 @@ public class HudiScanNode extends HiveScanNode {
         split.setBasePath(basePath);
         split.setHudiColumnNames(columnNames);
         split.setHudiColumnTypes(columnTypes);
+        split.setPrimaryKeys(primaryKeys);
         split.setInstantTime(queryInstant);
         return split;
     }
@@ -562,5 +577,10 @@ public class HudiScanNode extends HiveScanNode {
             return super.getNodeExplainString(prefix, detailLevel)
                     + String.format("%shudiNativeReadSplits=%d/%d\n", prefix, noLogsSplitNum.get(), selectedSplitNum);
         }
+    }
+
+    @VisibleForTesting
+    protected List<String> getPrimaryKeys() {
+        return primaryKeys;
     }
 }

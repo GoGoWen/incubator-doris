@@ -50,7 +50,6 @@ HudiJniReader::HudiJniReader(const TFileScanRangeParams& scan_params,
     for (auto& desc : _file_slot_descs) {
         required_fields.emplace_back(desc->col_name());
     }
-
     std::map<String, String> params = {
             {"query_id", print_id(_state->query_id())},
             {"base_path", _hudi_params.base_path},
@@ -59,6 +58,7 @@ HudiJniReader::HudiJniReader(const TFileScanRangeParams& scan_params,
             {"delta_file_paths", join(_hudi_params.delta_logs, ",")},
             {"hudi_column_names", join(_hudi_params.column_names, ",")},
             {"hudi_column_types", join(_hudi_params.column_types, "#")},
+            {"hudi_primary_keys", join(_hudi_params.primary_keys, ",")},
             {"required_fields", join(required_fields, ",")},
             {"instant_time", _hudi_params.instant_time},
             {"serde", _hudi_params.serde},
