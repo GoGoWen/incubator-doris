@@ -2073,6 +2073,11 @@ public:
                                         reinterpret_cast<const char*>(str.data + pre_offset + 1),
                                         (size_t)offset - pre_offset - 1},
                                 i, res_chars, res_offsets);
+                    } else if (num == 0) {
+                        StringOP::push_value_string(
+                                std::string_view {reinterpret_cast<const char*>(str.data),
+                                                  str.size},
+                                i, res_chars, res_offsets);
                     } else {
                         StringOP::push_null_string(i, res_chars, res_offsets, null_map_data);
                     }
@@ -2102,6 +2107,11 @@ public:
                                 std::string_view {reinterpret_cast<const char*>(
                                                           str.data + pre_offset + delimiter.size),
                                                   (size_t)offset - pre_offset - delimiter.size},
+                                i, res_chars, res_offsets);
+                    } else if (num == 0) {
+                        StringOP::push_value_string(
+                                std::string_view {reinterpret_cast<const char*>(str.data),
+                                                  str.size},
                                 i, res_chars, res_offsets);
                     } else {
                         StringOP::push_null_string(i, res_chars, res_offsets, null_map_data);
@@ -2142,6 +2152,10 @@ public:
                                         (size_t)pre_offset - offset - delimiter.size)},
                                 i, res_chars, res_offsets);
                     }
+                } else if (num == 0) {
+                    StringOP::push_value_string(
+                            std::string_view {reinterpret_cast<const char*>(str.data), str.size}, i,
+                            res_chars, res_offsets);
                 } else {
                     StringOP::push_null_string(i, res_chars, res_offsets, null_map_data);
                 }

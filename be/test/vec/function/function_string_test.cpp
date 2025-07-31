@@ -1283,4 +1283,42 @@ TEST(function_string_test, function_strcmp_test) {
     }
 }
 
+TEST(function_string_test, function_split_part_test) {
+    std::string func_name = "split_part";
+    InputTypeSet input_types = {TypeIndex::String, TypeIndex::String,
+                                TypeIndex::Int32};
+
+    DataSet data_set = {
+        {{std::string("no-delimiter"), std::string(","), 1},
+         std::string("no-delimiter")},
+        {{std::string("single-word"), std::string("|"), 1},
+         std::string("single-word")},
+        {{std::string("test"), std::string("::"), 1}, std::string("test")},
+        {{std::string("hello"), std::string(","), -1}, std::string("hello")},
+        {{std::string("world"), std::string("::"), -1}, std::string("world")},
+
+        {{std::string("a,b,c"), std::string(","), 1}, std::string("a")},
+        {{std::string("a,b,c"), std::string(","), 2}, std::string("b")},
+        {{std::string("a,b,c"), std::string(","), 3}, std::string("c")},
+        {{std::string("a,b,c"), std::string(","), 4}, Null()},
+
+        {{std::string("hello::world::test"), std::string("::"), 1},
+         std::string("hello")},
+        {{std::string("hello::world::test"), std::string("::"), 2},
+         std::string("world")},
+
+        {{std::string("a,b,c"), std::string(","), -1}, std::string("c")},
+        {{std::string("a,b,c"), std::string(","), -2}, std::string("b")},
+
+        {{std::string("a,b,c"), std::string(","), 0}, Null()},
+
+        {{Null(), std::string(","), 1}, Null()},
+        {{std::string("a,b,c"), Null(), 1}, Null()},
+        {{std::string("a,b,c"), std::string(","), Null()}, Null()}};
+
+    // Note: split_part returns nullable string, so we set nullable=true
+    static_cast<void>(
+        check_function<DataTypeString, true>(func_name, input_types, data_set));
+}
+
 } // namespace doris::vectorized
