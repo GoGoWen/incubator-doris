@@ -80,7 +80,8 @@ TEST(FunctionJsonTEST, GetJsonStringTest) {
              VARCHAR("v1")},
             {{VARCHAR("[{\"k1\":\"v1\"}, {\"k2\":\"v2\"}, {\"k1\":\"v3\"}, {\"k1\":\"v4\"}]"),
               VARCHAR("$.k1")},
-             VARCHAR("[\"v1\",\"v3\",\"v4\"]")}};
+             VARCHAR("[\"v1\",\"v3\",\"v4\"]")},
+            {{VARCHAR("{\"k1\":\"v1\\nv2\", \"k2\":\"v2\"}"), VARCHAR("$.k1")}, VARCHAR("v1\nv2")}};
 
     static_cast<void>(check_function<DataTypeString, true>(func_name, input_types, data_set));
 }

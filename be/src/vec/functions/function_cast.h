@@ -585,9 +585,53 @@ struct ConvertImplGenericFromString {
             format_options.converted_from_string = true;
             format_options.escape_char = '\\';
 
+            auto json_escape_processor = [](std::string_view input) -> std::string {
+                std::string output;
+                output.reserve(input.size() + 16);
+
+                enum State { NORMAL, IN_STRING, ESCAPED } state = NORMAL;
+
+                for (char c : input) {
+                    switch (state) {
+                    case NORMAL:
+                        if (c == '"') {
+                            state = IN_STRING;
+                        }
+                        output += c;
+                        break;
+
+                    case IN_STRING:
+                        if (c == '\\') {
+                            state = ESCAPED;
+                            output += c;
+                        } else if (c == '"') {
+                            state = NORMAL;
+                            output += c;
+                        } else {
+                            if (c == '\n') {
+                                output += "\\n";
+                            } else if (c == '\r') {
+                                output += "\\r";
+                            } else {
+                                output += c;
+                            }
+                        }
+                        break;
+
+                    case ESCAPED:
+                        output += c;
+                        state = IN_STRING;
+                        break;
+                    }
+                }
+                return output;
+            };
+
             for (size_t i = 0; i < size; ++i) {
                 const auto& val = col_from_string->get_data_at(i);
                 // Note: here we should handle the null element
+                std::string_view raw_value(val.data, val.size);
+                std::string processed = json_escape_processor(raw_value);
                 if (val.size == 0) {
                     col_to->insert_default();
                     // empty string('') is an invalid format for complex type, set null_map to 1
@@ -596,15 +640,17 @@ struct ConvertImplGenericFromString {
                     }
                     continue;
                 }
-                Slice string_slice(val.data, val.size);
+
+                Slice string_slice(processed.data(), processed.size());
                 Status st = serde->deserialize_one_cell_from_json(*col_to, string_slice,
                                                                   format_options);
-                // if parsing failed, will return null
-                (*vec_null_map_to)[i] = !st.ok();
+
                 if (!st.ok()) {
+                    (*vec_null_map_to)[i] = 1;
                     col_to->insert_default();
                 }
             }
+
             block.get_by_position(result).column =
                     ColumnNullable::create(std::move(col_to), std::move(col_null_map_to));
         } else {
@@ -663,6 +709,7 @@ struct ConvertImplStringToJsonbAsJsonbString {
     static Status execute(FunctionContext* context, Block& block, const ColumnNumbers& arguments,
                           const size_t result, size_t input_rows_count) {
         auto data_type_to = block.get_by_position(result).type;
+
         const auto& col_with_type_and_name = block.get_by_position(arguments[0]);
         const IColumn& col_from = *col_with_type_and_name.column;
         auto dst = ColumnString::create();
@@ -671,11 +718,18 @@ struct ConvertImplStringToJsonbAsJsonbString {
         JsonbWriter writer;
         for (size_t i = 0; i < input_rows_count; i++) {
             auto str_ref = from_string->get_data_at(i);
+            std::string_view raw_value(str_ref.data, str_ref.size);
+
             writer.reset();
             // write raw string to jsonb
             writer.writeStartString();
             writer.writeString(str_ref.data, str_ref.size);
             writer.writeEndString();
+
+            const char* jsonb_buffer = writer.getOutput()->getBuffer();
+            size_t jsonb_size = writer.getOutput()->getSize();
+            std::string_view jsonb_value(jsonb_buffer, jsonb_size);
+
             dst_str->insert_data(writer.getOutput()->getBuffer(), writer.getOutput()->getSize());
         }
         block.replace_by_position(result, std::move(dst));
@@ -1730,11 +1784,11 @@ private:
             /// that will not throw an exception but return NULL in case of malformed input.
             function = FunctionConvertFromString<DataType, NameCast>::create();
         } else if (requested_result_is_nullable &&
-                   (IsTimeType<DataType> || IsTimeV2Type<DataType>)&&!(
-                           check_and_get_data_type<DataTypeDateTime>(from_type.get()) ||
-                           check_and_get_data_type<DataTypeDate>(from_type.get()) ||
-                           check_and_get_data_type<DataTypeDateV2>(from_type.get()) ||
-                           check_and_get_data_type<DataTypeDateTimeV2>(from_type.get()))) {
+                   (IsTimeType<DataType> || IsTimeV2Type<DataType>) && !(
+                            check_and_get_data_type<DataTypeDateTime>(from_type.get()) ||
+                            check_and_get_data_type<DataTypeDate>(from_type.get()) ||
+                            check_and_get_data_type<DataTypeDateV2>(from_type.get()) ||
+                            check_and_get_data_type<DataTypeDateTimeV2>(from_type.get()))) {
             function = FunctionConvertToTimeType<DataType, NameCast>::create();
         } else {
             function = FunctionTo<DataType>::Type::create();
@@ -1753,7 +1807,9 @@ private:
         FunctionPtr function = FunctionToString::create();
 
         /// Check conversion using underlying function
-        { function->get_return_type(ColumnsWithTypeAndName(1, {nullptr, from_type, ""})); }
+        {
+            function->get_return_type(ColumnsWithTypeAndName(1, {nullptr, from_type, ""}));
+        }
 
         return [function](FunctionContext* context, Block& block, const ColumnNumbers& arguments,
                           const size_t result, size_t input_rows_count) {
