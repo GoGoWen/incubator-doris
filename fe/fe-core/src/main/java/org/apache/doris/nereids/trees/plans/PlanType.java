@@ -162,5 +162,6 @@ public enum PlanType {
 
     PREPARED_COMMAND,
     EXECUTE_COMMAND,
-    USE_COMMAND
+    USE_COMMAND,
+    SWITCH_COMMAND
 }

@@ -141,6 +141,7 @@ statementBase
     | SHOW CONSTRAINTS FROM table=multipartIdentifier                     #showConstraint
     | unsupportedStatement                                                #unsupported
     | USE (catalog=identifier DOT)? database=identifier                   #useDatabase
+    | SWITCH catalog = identifier							              #switchCatalog
     ;
 
 unsupportedStatement
