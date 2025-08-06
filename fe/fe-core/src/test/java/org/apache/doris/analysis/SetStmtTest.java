@@ -73,4 +73,49 @@ public class SetStmtTest {
         stmt.analyze(analyzer);
         Assert.fail("No exception throws.");
     }
+
+    @Test
+    public void testDottedValueParsing() throws UserException, AnalysisException {
+        // Test case 1: Simple identifier - should work (OK: SET erp=aaa)
+        SlotRef simpleSlotRef = new SlotRef(null, "aaa");
+        SetVar simpleSetVar = new SetVar("erp", simpleSlotRef);
+        simpleSetVar.analyze(analyzer);
+
+        // Should work and return the simple identifier
+        Assert.assertEquals("aaa", ((StringLiteral) simpleSetVar.getValue()).getStringValue());
+
+        // Test case 2: Regular StringLiteral with dots should work (OK: SET erp='aaa.aaa')
+        SetVar quotedDottedVar = new SetVar("erp", new StringLiteral("aaa.aaa"));
+        quotedDottedVar.analyze(analyzer);
+
+        Assert.assertEquals("aaa.aaa", ((StringLiteral) quotedDottedVar.getValue()).getStringValue());
+
+        // Test case 3: Regular StringLiteral should work unchanged
+        SetVar stringSetVar = new SetVar("erp", new StringLiteral("literal_value"));
+        stringSetVar.analyze(analyzer);
+
+        Assert.assertEquals("literal_value", ((StringLiteral) stringSetVar.getValue()).getStringValue());
+    }
+
+    @Test(expected = AnalysisException.class)
+    public void testDottedIdentifierThrowsException() throws UserException, AnalysisException {
+        // Test case: Dotted identifier should throw exception (Exception: SET erp=abc.bf)
+        TableName tableName = new TableName(null, null, "abc");
+        SlotRef dottedSlotRef = new SlotRef(tableName, "bf");
+        SetVar dottedSetVar = new SetVar("erp", dottedSlotRef);
+
+        // Should throw AnalysisException
+        dottedSetVar.analyze(analyzer);
+    }
+
+    @Test(expected = AnalysisException.class)
+    public void testMultiDottedIdentifierThrowsException() throws UserException, AnalysisException {
+        // Test case: Multi-dotted identifier should throw exception (Exception: SET erp=aa.a.a)
+        TableName tableName = new TableName(null, "aa", "a");
+        SlotRef multiDottedSlotRef = new SlotRef(tableName, "a");
+        SetVar multiDottedSetVar = new SetVar("erp", multiDottedSlotRef);
+
+        // Should throw AnalysisException
+        multiDottedSetVar.analyze(analyzer);
+    }
 }

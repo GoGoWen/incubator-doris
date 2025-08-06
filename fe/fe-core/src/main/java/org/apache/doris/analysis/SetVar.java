@@ -144,7 +144,21 @@ public class SetVar {
 
         // For the case like "set character_set_client = utf8", we change SlotRef to StringLiteral.
         if (value instanceof SlotRef) {
-            value = new StringLiteral(((SlotRef) value).getColumnName());
+            SlotRef slotRef = (SlotRef) value;
+
+            try {
+                TableName tableName = slotRef.getTableName();
+                if (tableName != null) {
+                    throw new AnalysisException("Dotted identifiers are not supported in SET statements. "
+                            + "Use quoted strings instead. For example: SET " + variable + " = '"
+                            + tableName.getTbl() + "." + slotRef.getColumnName() + "'");
+                }
+            } catch (IllegalStateException e) {
+                // This means tblName is null (simple identifier), which is OK
+                // Continue with normal processing
+            }
+
+            value = new StringLiteral(slotRef.getColumnName());
         }
 
         value.analyze(analyzer);
