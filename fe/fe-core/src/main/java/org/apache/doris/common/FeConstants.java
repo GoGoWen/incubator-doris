@@ -77,6 +77,9 @@ public class FeConstants {
     public static final String FS_PREFIX_GFS = "gfs";
     public static final String FS_PREFIX_JFS = "jfs";
     public static final String FS_PREFIX_HDFS = "hdfs";
+
+    public static final String FS_PREFIX_CHUBAOFS = "chubaofs";
+
     public static final String FS_PREFIX_VIEWFS = "viewfs";
     public static final String FS_PREFIX_FILE = "file";
 

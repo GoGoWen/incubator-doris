@@ -513,7 +513,8 @@ public abstract class FileQueryScanNode extends FileScanNode {
         return locations;
     }
 
-    private TFileRangeDesc createFileRangeDesc(FileSplit fileSplit, List<String> columnsFromPath,
+    @VisibleForTesting
+    protected TFileRangeDesc createFileRangeDesc(FileSplit fileSplit, List<String> columnsFromPath,
                                                List<String> columnsFromPathKeys) {
         TFileRangeDesc rangeDesc = new TFileRangeDesc();
         rangeDesc.setStartOffset(fileSplit.getStart());
@@ -523,15 +524,18 @@ public abstract class FileQueryScanNode extends FileScanNode {
         rangeDesc.setFileSize(fileSplit.getFileLength());
         rangeDesc.setColumnsFromPath(columnsFromPath);
         rangeDesc.setColumnsFromPathKeys(columnsFromPathKeys);
-
         rangeDesc.setFileType(fileSplit.getLocationType());
         rangeDesc.setPath(fileSplit.getPath().toStorageLocation().toString());
+        setFsNameForRangeDesc(fileSplit, rangeDesc);
+        rangeDesc.setModificationTime(fileSplit.getModificationTime());
+        return rangeDesc;
+    }
+
+    public void setFsNameForRangeDesc(FileSplit fileSplit, TFileRangeDesc rangeDesc) {
         if (fileSplit.getLocationType() == TFileType.FILE_HDFS) {
             URI fileUri = fileSplit.getPath().getPath().toUri();
             rangeDesc.setFsName(fileUri.getScheme() + "://" + fileUri.getAuthority());
         }
-        rangeDesc.setModificationTime(fileSplit.getModificationTime());
-        return rangeDesc;
     }
 
     // To Support Hive 1.x orc internal column name like (_col0, _col1, _col2...)

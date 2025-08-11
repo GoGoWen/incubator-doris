@@ -20,6 +20,7 @@ package org.apache.doris.common.util;
 import org.apache.doris.catalog.HdfsResource;
 import org.apache.doris.common.util.LocationPath.Scheme;
 import org.apache.doris.fs.FileSystemType;
+import org.apache.doris.thrift.TFileType;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -202,5 +203,15 @@ public class LocationPathTest {
         // BE
         String beLocation = locationPath.toStorageLocation().toString();
         Assertions.assertTrue(beLocation.equalsIgnoreCase("/path/to/local"));
+    }
+
+    @Test
+    public void testChubaoFsLocationConvert() {
+        LocationPath locationPath = new LocationPath("hdfs://test.com/test.orc");
+        Assertions.assertEquals(locationPath.getScheme(), Scheme.HDFS);
+        Assertions.assertEquals(TFileType.FILE_HDFS, locationPath.getTFileTypeForBE());
+        locationPath = new LocationPath("chubaofs://test.com/test.orc");
+        Assertions.assertEquals(locationPath.getScheme(), Scheme.CHUBAOFS);
+        Assertions.assertEquals(TFileType.FILE_HDFS, locationPath.getTFileTypeForBE());
     }
 }

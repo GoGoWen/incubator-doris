@@ -2977,4 +2977,17 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"是否允许获取hdfs的文件元数据信息时忽略隐藏目录",
             "whether to enable list hdfs files ignore hidden directory"})
     public static boolean enable_list_hdfs_files_ignore_hidden_directory = true;
+
+    /**
+     * Max pool size for loading hudi client cache
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static int max_hudi_client_cache_pool_size = 64;
+
+    /**
+     *  The expiration time of a cache object after last write of it.
+     *  For hudi client cache.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static long external_hudi_client_cache_expire_time_minutes_after_write = 3; // 3 mins
 }

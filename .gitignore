@@ -91,6 +91,7 @@ fe/fe-core/src/main/antlr4/org/apache/doris/nereids/gen/
 fe/fe-common/src/main/java/org/apache/doris/thrift
 fe/fe-common/src/main/java/org/apache/parquet
 fe/fe-core/src/main/java/org/apache/parquet
+fe/.joycode/
 
 # BE
 be/build*/
@@ -102,6 +103,7 @@ be/tags
 be/test/olap/test_data/tablet_meta_test.hdr
 be/.devcontainer/
 be/src/apache-orc/
+be/.joycode/
 
 ## tools
 tools/ssb-tools/ssb-data/

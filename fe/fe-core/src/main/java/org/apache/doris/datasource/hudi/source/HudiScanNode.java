@@ -44,6 +44,7 @@ import org.apache.doris.statistics.StatisticalType;
 import org.apache.doris.thrift.TExplainLevel;
 import org.apache.doris.thrift.TFileFormatType;
 import org.apache.doris.thrift.TFileRangeDesc;
+import org.apache.doris.thrift.TFileType;
 import org.apache.doris.thrift.THudiFileDesc;
 import org.apache.doris.thrift.TTableFormatFileDesc;
 
@@ -76,6 +77,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.net.URI;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,6 +86,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -126,6 +129,8 @@ public class HudiScanNode extends HiveScanNode {
     private TableScanParams scanParams;
     private IncrementalRelation incrementalRelation;
     private HoodieStorageStrategy storageStrategy;
+
+    private String chubaoFsOwner;
 
     /**
      * External file scan node for Query Hudi table
@@ -174,12 +179,15 @@ public class HudiScanNode extends HiveScanNode {
         computeColumnsFilter();
         initBackendPolicy();
         initSchemaParams();
-
         hudiClient = HiveMetaStoreClientHelper.getHudiClient(hmsTable);
         hudiClient.reloadActiveTimeline();
         basePath = hmsTable.getRemoteTable().getSd().getLocation();
         inputFormat = hmsTable.getRemoteTable().getSd().getInputFormat();
         serdeLib = hmsTable.getRemoteTable().getSd().getSerdeInfo().getSerializationLib();
+        chubaoFsOwner = hudiClient.getTableConfig().getChubaoFsOwner();
+        if (chubaoFsOwner != null && chubaoFsOwner.contains(":")) {
+            chubaoFsOwner = chubaoFsOwner.split(":")[1];
+        }
         boolean queryWithoutCacheLayer = false;
         Map<String, String> storageDescriptorParameters =
                 hmsTable.getRemoteTable().getSd().getSerdeInfo().getParameters();
@@ -570,6 +578,19 @@ public class HudiScanNode extends HiveScanNode {
     }
 
     @Override
+    public void setFsNameForRangeDesc(FileSplit fileSplit, TFileRangeDesc rangeDesc) {
+        if (fileSplit.getLocationType() == TFileType.FILE_HDFS) {
+            URI fileUri = fileSplit.getPath().getPath().toUri();
+            if (Objects.equals(fileUri.getScheme(), "chubaofs")) {
+                rangeDesc.setFsName(fileUri.getScheme() + "://" + chubaoFsOwner + "@" + fileUri.getAuthority());
+            } else {
+                rangeDesc.setFsName(fileUri.getScheme() + "://" + fileUri.getAuthority());
+            }
+        }
+    }
+
+
+    @Override
     public String getNodeExplainString(String prefix, TExplainLevel detailLevel) {
         if (isBatchMode()) {
             return super.getNodeExplainString(prefix, detailLevel);
@@ -583,4 +604,15 @@ public class HudiScanNode extends HiveScanNode {
     protected List<String> getPrimaryKeys() {
         return primaryKeys;
     }
+
+    @VisibleForTesting
+    protected void setChubaoFsOwner(String chubaoFsOwner) {
+        this.chubaoFsOwner = chubaoFsOwner;
+    }
+
+    @VisibleForTesting
+    protected String getChubaoFsOwner() {
+        return chubaoFsOwner;
+    }
+
 }

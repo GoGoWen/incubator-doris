@@ -21,6 +21,7 @@ import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.analysis.TupleId;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.UserException;
+import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.datasource.hive.HMSExternalCatalog;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.source.HiveScanNode;
@@ -30,6 +31,8 @@ import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
 import org.apache.doris.system.Backend;
+import org.apache.doris.thrift.TFileRangeDesc;
+import org.apache.doris.thrift.TFileType;
 
 import com.google.common.collect.Multimap;
 import mockit.Expectations;
@@ -42,6 +45,7 @@ import org.junit.jupiter.api.Assertions;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class FileQueryScanNodeTest {
@@ -188,5 +192,60 @@ public class FileQueryScanNodeTest {
         Assert.assertEquals(defaultAssignment, scanNode.getScanRangeAssignment(splits));
         Config.enable_enhanced_round_robin_backend_policy = true;
         Assert.assertEquals(roundRobinAssignment, scanNode.getScanRangeAssignment(splits));
+    }
+
+    @Test
+    public void testCreateFileRangeDesc(@Injectable Multimap<Backend, Split> roundRobinAssignment,
+                                           @Injectable Multimap<Backend, Split> defaultAssignment,
+                                           @Injectable SessionVariable sessionVariable,
+                                           @Injectable TupleDescriptor tupleDesc,
+                                           @Injectable HMSExternalTable table,
+                                           @Injectable ExternalCatalog catalog,
+                                           @Injectable Split split) throws UserException {
+        new MockUp<EnhancedRoundRobinBackendPolicy>() {
+
+            @Mock
+            Multimap<Backend, Split> computeScanRangeAssignment(List<Split> splits) {
+                return roundRobinAssignment;
+            }
+
+        };
+
+        new MockUp<FederationBackendPolicy>() {
+            @Mock
+            Multimap<Backend, Split> computeScanRangeAssignment(List<Split> splits) {
+                return defaultAssignment;
+            }
+        };
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+            }
+        };
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+        FileSplit hdfsFileSplit = new FileSplit(new LocationPath(
+                "hdfs://HDFSO1101/usr/hive/warehouse/clickbench.db/hits_orc/part-00000-3e77f7d8.snappy.orc"),
+                0, 112140970, 112140970, 0, null, Collections.emptyList());
+        TFileRangeDesc rangeDesc = scanNode.createFileRangeDesc(hdfsFileSplit, Collections.emptyList(),
+                Collections.emptyList());
+        Assertions.assertEquals(0, rangeDesc.getStartOffset());
+        Assertions.assertEquals(112140970, rangeDesc.getSize());
+        Assertions.assertEquals(112140970, rangeDesc.getFileSize());
+        Assertions.assertTrue(rangeDesc.getColumnsFromPath().isEmpty());
+        Assertions.assertTrue(rangeDesc.getColumnsFromPathKeys().isEmpty());
+        Assertions.assertEquals(TFileType.FILE_HDFS, rangeDesc.getFileType());
+        Assertions.assertEquals("hdfs://HDFSO1101", rangeDesc.getFsName());
+        Assertions.assertEquals(0, rangeDesc.getModificationTime());
     }
 }

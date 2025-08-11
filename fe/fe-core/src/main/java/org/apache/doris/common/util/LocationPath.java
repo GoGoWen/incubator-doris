@@ -74,6 +74,7 @@ public class LocationPath {
         S3A,
         S3N,
         VIEWFS,
+        CHUBAOFS, // ChubaoFS
         UNKNOWN,
         NOSCHEME // no scheme info
     }
@@ -101,6 +102,9 @@ public class LocationPath {
         switch (scheme) {
             case "":
                 this.scheme = Scheme.NOSCHEME;
+                break;
+            case FeConstants.FS_PREFIX_CHUBAOFS:
+                this.scheme = Scheme.CHUBAOFS;
                 break;
             case FeConstants.FS_PREFIX_HDFS:
                 this.scheme = Scheme.HDFS;
@@ -234,6 +238,7 @@ public class LocationPath {
             case LAKEFS:
                 // now we only support S3 client for object storage on BE
                 return TFileType.FILE_S3;
+            case CHUBAOFS:
             case HDFS:
             case OSS_HDFS: // if hdfs service is enabled on oss, use hdfs lib to access oss.
             case VIEWFS:

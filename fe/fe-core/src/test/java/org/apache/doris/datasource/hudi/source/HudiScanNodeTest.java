@@ -20,11 +20,14 @@ package org.apache.doris.datasource.hudi.source;
 import org.apache.doris.analysis.TableSnapshot;
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.analysis.TupleId;
+import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.datasource.ExternalCatalog;
+import org.apache.doris.datasource.FileSplit;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.SessionVariable;
+import org.apache.doris.thrift.TFileRangeDesc;
 
 import com.google.common.collect.Maps;
 import mockit.Expectations;
@@ -37,6 +40,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hudi.common.storage.HoodieDefaultStorageStrategy;
 import org.apache.hudi.common.storage.HoodieStorageStrategy;
 import org.apache.hudi.common.storage.HoodieStorageStrategyFactory;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.util.Option;
@@ -48,6 +52,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +63,7 @@ public class HudiScanNodeTest {
     public void testDoInitialize(@Injectable SessionVariable sessionVariable,
             @Injectable TupleDescriptor tupleDesc, @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog, @Injectable HoodieTableMetaClient client,
+            @Injectable HoodieTableConfig tableConfig,
             @Injectable org.apache.hadoop.hive.metastore.api.Table hiveTable,
             @Injectable StorageDescriptor storageDescriptor, @Injectable SerDeInfo serDeInfo) {
         Map<String, String> para1 = Maps.newHashMap();
@@ -88,6 +94,12 @@ public class HudiScanNodeTest {
                 result = false;
 
                 client.reloadActiveTimeline();
+
+                client.getTableConfig();
+                result = tableConfig;
+
+                tableConfig.getChubaoFsOwner();
+                result = "test:test";
 
                 table.getRemoteTable();
                 result = hiveTable;
@@ -171,9 +183,52 @@ public class HudiScanNodeTest {
             Assertions.assertEquals(primaryKeys.length, scanNode.getPrimaryKeys().size());
             Assertions.assertEquals(primaryKeys[0], scanNode.getPrimaryKeys().get(0));
             Assertions.assertEquals(primaryKeys[1], scanNode.getPrimaryKeys().get(1));
+            Assertions.assertEquals("test", scanNode.getChubaoFsOwner());
         } catch (Exception e) {
             Assertions.assertEquals("", ExceptionUtils.getStackTrace(e));
             Assertions.fail(e);
         }
+    }
+
+    @Test
+    public void testSetFsNameForRangeDesc(@Injectable SessionVariable sessionVariable,
+                                          @Injectable TupleDescriptor tupleDesc, @Injectable HMSExternalTable table,
+                                          @Injectable ExternalCatalog catalog) {
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                table.isHoodieCowTable();
+                result = true;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.useHiveSyncPartition();
+                result = true;
+            }
+        };
+        HudiScanNode scanNode = new HudiScanNode(new PlanNodeId(1), tupleDesc,
+                false, Optional.empty(), Optional.empty(), sessionVariable);
+        scanNode.setChubaoFsOwner("test");
+        FileSplit chubaoFileSplit = new FileSplit(new LocationPath(
+                    "chubaofs://CHUBAO1101/usr/hive/warehouse/clickbench.db/hits_orc/part-00000-3e24f7d5.snappy.orc"),
+                0, 112140970, 112140970, 0, null, Collections.emptyList());
+        TFileRangeDesc rangeDesc = new TFileRangeDesc();
+        scanNode.setFsNameForRangeDesc(chubaoFileSplit, rangeDesc);
+        Assertions.assertEquals("chubaofs://test@CHUBAO1101", rangeDesc.getFsName());
+
+        FileSplit hdfsFileSplit = new FileSplit(new LocationPath(
+                    "hdfs://HDFSO1101/usr/hive/warehouse/clickbench.db/hits_orc/part-00000-3e77f7d8.snappy.orc"),
+                0, 112140970, 112140970, 0, null, Collections.emptyList());
+        scanNode.setFsNameForRangeDesc(hdfsFileSplit, rangeDesc);
+        Assertions.assertEquals("hdfs://HDFSO1101", rangeDesc.getFsName());
     }
 }
