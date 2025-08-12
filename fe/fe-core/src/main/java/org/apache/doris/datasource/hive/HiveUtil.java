@@ -125,7 +125,7 @@ public final class HiveUtil {
         Preconditions.checkState(kv.length == 2, String.format("Malformed partition name %s", part));
         try {
             // hive partition value maybe contains special characters like '=' and '/'
-            return URLDecoder.decode(kv[1], StandardCharsets.UTF_8.name());
+            return URLDecoder.decode(kv[1].replace("+", "%2B"), StandardCharsets.UTF_8.name());
         } catch (UnsupportedEncodingException e) {
             // It should not be here
             throw new RuntimeException(e);
