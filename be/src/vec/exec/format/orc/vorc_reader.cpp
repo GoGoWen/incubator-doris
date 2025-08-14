@@ -113,6 +113,15 @@ static constexpr int decimal_scale_for_hive11 = 10;
     M(TypeIndex::Float64, Float64, orc::DoubleVectorBatch)
 
 void ORCFileInputStream::read(void* buf, uint64_t length, uint64_t offset) {
+    if (hitCacheBuffer(offset, length)) {
+        size_t idx = offset - _cache_offset;
+        memcpy(buf, _cache_buffer.data() + idx, length);
+    } else {
+        pread(buf, length, offset);
+    }
+}
+
+void ORCFileInputStream::pread(void* buf, uint64_t length, uint64_t offset) {
     _statistics->fs_read_calls++;
     _statistics->fs_read_bytes += length;
     SCOPED_RAW_TIMER(&_statistics->fs_read_time);
@@ -138,6 +147,15 @@ void ORCFileInputStream::read(void* buf, uint64_t length, uint64_t offset) {
         throw orc::ParseError(strings::Substitute("Try to read $0 bytes from $1, actually read $2",
                                                   length, has_read, _file_name));
     }
+}
+
+void ORCFileInputStream::preadCache(CacheType cacheType, uint64_t offset, uint64_t length) {
+    const size_t cache_max_size = config::orc_file_cache_buffer_size;
+    if (length > cache_max_size) return;
+    if (hitCacheBuffer(offset, length)) return;
+    _cache_buffer.resize(length);
+    _cache_offset = offset;
+    pread(_cache_buffer.data(), length, offset);
 }
 
 OrcReader::OrcReader(RuntimeProfile* profile, RuntimeState* state,
@@ -1370,7 +1388,7 @@ Status OrcReader::_decode_int32_column(const std::string& col_name,
         auto origin_size = column_data.size();
         column_data.resize(origin_size + num_values);
         for (int i = 0; i < num_values; ++i) {
-            column_data[origin_size + i] = (Int32)cvb_data[i];
+            column_data[origin_size + i] = static_cast<Int32>(cvb_data[i]);
         }
         return Status::OK();
     } else {

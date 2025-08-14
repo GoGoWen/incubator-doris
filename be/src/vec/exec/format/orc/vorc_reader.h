@@ -641,7 +641,9 @@ public:
               _file_reader(inner_reader),
               _statistics(statistics),
               _io_ctx(io_ctx),
-              _profile(profile) {}
+              _profile(profile),
+              _cache_buffer(0),
+              _cache_offset(0) {}
 
     ~ORCFileInputStream() override {
         if (_file_reader != nullptr) {
@@ -654,6 +656,18 @@ public:
     uint64_t getNaturalReadSize() const override { return config::orc_natural_read_size_mb << 20; }
 
     void read(void* buf, uint64_t length, uint64_t offset) override;
+
+    void pread(void* buf, uint64_t length, uint64_t offset);
+
+    void preadCache(CacheType cacheType, uint64_t offset, uint64_t length) override;
+
+    bool hitCacheBuffer(uint64_t offset, uint64_t length) {
+        if (!_cache_buffer.empty() && offset >= _cache_offset
+            && offset + length <= _cache_offset + _cache_buffer.size()) {
+            return true;
+        }
+        return false;
+    }
 
     const std::string& getName() const override { return _file_name; }
 
@@ -679,5 +693,7 @@ private:
     OrcReader::Statistics* _statistics = nullptr;
     const io::IOContext* _io_ctx = nullptr;
     RuntimeProfile* _profile = nullptr;
+    std::vector<char> _cache_buffer;
+    uint64_t _cache_offset;
 };
 } // namespace doris::vectorized
