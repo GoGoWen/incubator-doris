@@ -108,6 +108,17 @@ public class TableStatsMeta implements Writable, GsonPostProcessable {
         idxId = 0;
     }
 
+    @VisibleForTesting
+    public TableStatsMeta(long id, String cName, String dName, String tName) {
+        ctlId = 0;
+        ctlName = cName;
+        dbId = 0;
+        dbName = dName;
+        tblId = id;
+        tblName = tName;
+        idxId = 0;
+    }
+
     // It's necessary to store these fields separately from AnalysisInfo, since the lifecycle between AnalysisInfo
     // and TableStats is quite different.
     public TableStatsMeta(long rowCount, AnalysisInfo analyzedJob, TableIf table) {
