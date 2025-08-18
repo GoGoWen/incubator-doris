@@ -192,21 +192,36 @@ public class HiveMetaStoreClientHelper {
         }
     }
 
-    private static LoadingCache<HudiClientKey, HoodieTableMetaClient> hudiClientCache = Caffeine.newBuilder()
-            .maximumSize(Config.max_hudi_client_cache_pool_size)
-            .expireAfterWrite(Duration.ofMinutes(Config.external_hudi_client_cache_expire_time_minutes_after_write))
-            .build(clientKey -> {
-                String hudiBasePath = clientKey.getTable().getRemoteTable().getSd().getLocation();
-                Configuration conf = getConfiguration(clientKey.getTable());
-                BDPAuthContext bdpAuthContext = BDPAuthContext.get();
-                Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
-                UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
-                        null, bdpAuthContext.getUserToken());
-                conf.set("BEE_SOURCE", bdpAuthContext.getSource());
-                conf.set("BEE_USER", bdpAuthContext.getErp());
-                return ugi.doAs((PrivilegedAction<HoodieTableMetaClient>) () ->
-                        HoodieTableMetaClient.builder().setConf(conf).setBasePath(hudiBasePath).build());
-            });
+    private static volatile LoadingCache<HudiClientKey, HoodieTableMetaClient> hudiClientCache;
+
+    private static LoadingCache<HudiClientKey, HoodieTableMetaClient> getOrCreateHudiClientCache() {
+        if (hudiClientCache == null) {
+            synchronized (HiveMetaStoreClientHelper.class) {
+                if (hudiClientCache == null) {
+                    hudiClientCache = createHudiClientCache();
+                }
+            }
+        }
+        return hudiClientCache;
+    }
+
+    private static LoadingCache<HudiClientKey, HoodieTableMetaClient> createHudiClientCache() {
+        return Caffeine.newBuilder()
+                .maximumSize(Config.max_hudi_client_cache_pool_size)
+                .expireAfterWrite(Duration.ofMinutes(Config.external_hudi_client_cache_expire_time_minutes_after_write))
+                .build(clientKey -> {
+                    String hudiBasePath = clientKey.getTable().getRemoteTable().getSd().getLocation();
+                    Configuration conf = getConfiguration(clientKey.getTable());
+                    BDPAuthContext bdpAuthContext = BDPAuthContext.get();
+                    Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
+                    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
+                            null, bdpAuthContext.getUserToken());
+                    conf.set("BEE_SOURCE", bdpAuthContext.getSource());
+                    conf.set("BEE_USER", bdpAuthContext.getErp());
+                    return ugi.doAs((PrivilegedAction<HoodieTableMetaClient>) () ->
+                            HoodieTableMetaClient.builder().setConf(conf).setBasePath(hudiBasePath).build());
+                });
+    }
 
 
     /**
@@ -915,8 +930,8 @@ public class HiveMetaStoreClientHelper {
     public static HoodieTableMetaClient getHudiClient(HMSExternalTable table) {
         BDPAuthContext bdpAuthContext = BDPAuthContext.get();
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
-        return hudiClientCache.get(new HudiClientKey(bdpAuthContext.getHadoopUserName(), bdpAuthContext.getSource(),
-                bdpAuthContext.getErp(), table));
+        return getOrCreateHudiClientCache().get(new HudiClientKey(bdpAuthContext.getHadoopUserName(),
+                bdpAuthContext.getSource(), bdpAuthContext.getErp(), table));
     }
 
     public static Configuration getConfiguration(HMSExternalTable table) {

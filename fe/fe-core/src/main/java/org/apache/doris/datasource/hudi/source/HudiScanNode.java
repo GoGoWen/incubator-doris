@@ -24,6 +24,7 @@ import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.PartitionItem;
 import org.apache.doris.catalog.Type;
 import org.apache.doris.common.AnalysisException;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.datasource.ExternalTable;
@@ -332,6 +333,13 @@ public class HudiScanNode extends HiveScanNode {
                             true);
                     Collection<Long> filteredPartitionIds = pruner.prune();
                     this.selectedPartitionNum = filteredPartitionIds.size();
+                    if (this.selectedPartitionNum > Config.max_selected_partition_num_for_lakehouse_table) {
+                        throw new AnalysisException("the selected partition num: "
+                                + this.selectedPartitionNum + " for " + hmsTable.getDbName() + "."
+                                + hmsTable.getName() + " has "
+                                + "exceed max selected partition num for single Hudi table: "
+                                + Config.max_selected_partition_num_for_lakehouse_table);
+                    }
                     // 3. get partitions from cache
                     String dbName = hmsTable.getDbName();
                     String tblName = hmsTable.getName();
@@ -374,7 +382,23 @@ public class HudiScanNode extends HiveScanNode {
                 incrementalRelation.getEndTs())).collect(Collectors.toList());
     }
 
-    private void getPartitionSplits(HivePartition partition, List<Split> splits) throws IOException {
+    // Data class to hold partition metadata
+    private static class PartitionMetadata {
+        final String partitionName;
+        final List<FileStatus> statuses;
+        final HivePartition partition;
+        final long totalSize;
+
+        PartitionMetadata(String partitionName, List<FileStatus> statuses,
+                        HivePartition partition, long totalSize) {
+            this.partitionName = partitionName;
+            this.statuses = statuses;
+            this.partition = partition;
+            this.totalSize = totalSize;
+        }
+    }
+
+    private PartitionMetadata getPartitionMetadata(HivePartition partition) throws IOException {
         String partitionName;
         if (partition.isDummyPartition()) {
             partitionName = "";
@@ -383,12 +407,14 @@ public class HudiScanNode extends HiveScanNode {
                     new Path(partition.getPath()));
         }
         String relativePath = storageStrategy.getRelativePath(new Path(partition.getPath()));
-        List<FileStatus> statuses =  new ArrayList<>();
+        List<FileStatus> statuses = new ArrayList<>();
         BDPAuthContext bdpAuthContext = BDPAuthContext.get();
         Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
                 null, bdpAuthContext.getUserToken());
-        storageStrategy.getAllLocations(relativePath, true).forEach(path -> {
+
+        long totalSize = 0;
+        for (Path path : storageStrategy.getAllLocations(relativePath, true)) {
             try {
                 FileSystem innerFs = ugi.doAs((PrivilegedAction<FileSystem>) () -> {
                     try {
@@ -397,53 +423,113 @@ public class HudiScanNode extends HiveScanNode {
                         throw new RuntimeException(e);
                     }
                 });
-                statuses.addAll(Arrays.stream(innerFs.listStatus(path)).collect(Collectors.toList()));
+                FileStatus[] fileStatuses = innerFs.listStatus(path);
+                for (FileStatus status : fileStatuses) {
+                    statuses.add(status);
+                    totalSize += status.getLen();
+                }
             } catch (IOException e) {
                 throw new HoodieIOException("hudi get filesystem error", e);
             }
-        });
+        }
+
+        return new PartitionMetadata(partitionName, statuses, partition, totalSize);
+    }
+
+    private void processPartitionWithMetadata(PartitionMetadata metadata, List<Split> splits) {
         HoodieTableFileSystemView fileSystemView = new HoodieTableFileSystemView(hudiClient,
-                timeline, statuses.toArray(new FileStatus[0]), storageStrategy);
+                timeline, metadata.statuses.toArray(new FileStatus[0]), storageStrategy);
 
         if (isCowOrRoTable) {
-            fileSystemView.getLatestBaseFilesBeforeOrOn(partitionName, queryInstant).forEach(baseFile -> {
+            fileSystemView.getLatestBaseFilesBeforeOrOn(metadata.partitionName, queryInstant).forEach(baseFile -> {
                 noLogsSplitNum.incrementAndGet();
                 String filePath = baseFile.getPath();
                 long fileSize = baseFile.getFileSize();
                 // Need add hdfs host to location
                 LocationPath locationPath = new LocationPath(filePath, hmsTable.getCatalogProperties());
                 splits.add(new FileSplit(locationPath, 0, fileSize, fileSize, 0,
-                        new String[0], partition.getPartitionValues()));
+                        new String[0], metadata.partition.getPartitionValues()));
             });
         } else {
-            fileSystemView.getLatestMergedFileSlicesBeforeOrOn(partitionName, queryInstant)
+            fileSystemView.getLatestMergedFileSlicesBeforeOrOn(metadata.partitionName, queryInstant)
                     .forEach(fileSlice -> {
                         splits.add(
-                                generateHudiSplit(fileSlice, partition.getPartitionValues(), queryInstant));
+                                generateHudiSplit(fileSlice, metadata.partition.getPartitionValues(), queryInstant));
                     });
         }
     }
 
-    private void getPartitionsSplits(List<HivePartition> partitions, List<Split> splits) {
+    private void getPartitionsSplits(List<HivePartition> partitions, List<Split> splits) throws AnalysisException {
         Executor executor = Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor();
-        CountDownLatch countDownLatch = new CountDownLatch(partitions.size());
-        AtomicReference<Throwable> throwable = new AtomicReference<>();
+
+        // Phase 1: Get file statuses concurrently and collect metadata
+        List<PartitionMetadata> metadataList = Collections.synchronizedList(new ArrayList<>());
+        CountDownLatch phase1Latch = new CountDownLatch(partitions.size());
+        AtomicReference<Throwable> phase1Error = new AtomicReference<>();
+
         partitions.forEach(partition -> executor.execute(() -> {
             try {
-                getPartitionSplits(partition, splits);
+                PartitionMetadata metadata = getPartitionMetadata(partition);
+                metadataList.add(metadata);
             } catch (Throwable t) {
-                throwable.set(t);
+                phase1Error.compareAndSet(null, t);
             } finally {
-                countDownLatch.countDown();
+                phase1Latch.countDown();
             }
         }));
+
         try {
-            countDownLatch.await();
+            phase1Latch.await();
         } catch (InterruptedException e) {
-            throw new RuntimeException(e.getMessage(), e);
+            throw new AnalysisException("Interrupted while getting partition metadata: " + e.getMessage(), e);
         }
-        if (throwable.get() != null) {
-            throw new RuntimeException(throwable.get().getMessage(), throwable.get());
+
+        if (phase1Error.get() != null) {
+            Throwable t = phase1Error.get();
+            if (t instanceof AnalysisException) {
+                throw (AnalysisException) t;
+            }
+            throw new AnalysisException("Failed to get partition metadata: " + t.getMessage(), t);
+        }
+
+        long totalSize = 0;
+        for (PartitionMetadata metadata : metadataList) {
+            totalSize += metadata.totalSize;
+        }
+
+        if (totalSize > Config.max_selected_total_file_size_for_lakehouse_table) {
+            throw new AnalysisException("the total scan bytes: " + totalSize
+                    + " for " + hmsTable.getDbName() + "." + hmsTable.getName()
+                    + " has exceed max bytes for single hudi table: "
+                    + Config.max_selected_total_file_size_for_lakehouse_table);
+        }
+
+        // Phase 2: Process partitions with FileSystemView concurrently
+        CountDownLatch phase2Latch = new CountDownLatch(metadataList.size());
+        AtomicReference<Throwable> phase2Error = new AtomicReference<>();
+
+        metadataList.forEach(metadata -> executor.execute(() -> {
+            try {
+                processPartitionWithMetadata(metadata, splits);
+            } catch (Throwable t) {
+                phase2Error.compareAndSet(null, t);
+            } finally {
+                phase2Latch.countDown();
+            }
+        }));
+
+        try {
+            phase2Latch.await();
+        } catch (InterruptedException e) {
+            throw new AnalysisException("Interrupted while processing partitions: " + e.getMessage(), e);
+        }
+
+        if (phase2Error.get() != null) {
+            Throwable t = phase2Error.get();
+            if (t instanceof AnalysisException) {
+                throw (AnalysisException) t;
+            }
+            throw new AnalysisException("Failed to process partitions: " + t.getMessage(), t);
         }
     }
 
@@ -467,10 +553,12 @@ public class HudiScanNode extends HiveScanNode {
                     });
             partitionInit = true;
         }
+
         List<Split> splits = Collections.synchronizedList(new ArrayList<>());
         getPartitionsSplits(prunedPartitions, splits);
         return splits;
     }
+
 
     @Override
     public void startSplit(int numBackends) {
@@ -493,7 +581,8 @@ public class HudiScanNode extends HiveScanNode {
                 CompletableFuture.runAsync(() -> {
                     try {
                         List<Split> allFiles = Lists.newArrayList();
-                        getPartitionSplits(partition, allFiles);
+                        PartitionMetadata metadata = getPartitionMetadata(partition);
+                        processPartitionWithMetadata(metadata, allFiles);
                         if (allFiles.size() > numSplitsPerPartition.get()) {
                             numSplitsPerPartition.set(allFiles.size());
                         }

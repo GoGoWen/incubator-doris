@@ -23,6 +23,8 @@ import org.apache.doris.analysis.TableSnapshot;
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.TableIf;
+import org.apache.doris.common.AnalysisException;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.LocationPath;
@@ -217,56 +219,90 @@ public class IcebergScanNode extends FileQueryScanNode {
         boolean isPartitionedTable = icebergTable.spec().isPartitioned();
 
         long realFileSplitSize = getRealFileSplitSize(DEFAULT_SPLIT_SIZE);
-        CloseableIterable<FileScanTask> fileScanTasks = TableScanUtil.splitFiles(scan.planFiles(), realFileSplitSize);
-        try (CloseableIterable<CombinedScanTask> combinedScanTasks =
-                TableScanUtil.planTasks(fileScanTasks, realFileSplitSize, 1, 0)) {
-            combinedScanTasks.forEach(taskGrp -> taskGrp.files().forEach(splitTask -> {
-                List<String> partitionValues = new ArrayList<>();
+
+        try (CloseableIterable<FileScanTask> plannedFiles = scan.planFiles()) {
+            long totalFileSize = 0;
+            HashSet<String> partitionCheckSet = new HashSet<>();
+
+            for (FileScanTask task : plannedFiles) {
+                totalFileSize += task.file().fileSizeInBytes();
+
                 if (isPartitionedTable) {
-                    StructLike structLike = splitTask.file().partition();
-                    List<PartitionField> fields = splitTask.spec().fields();
-                    Types.StructType structType = icebergTable.schema().asStruct();
+                    StructLike partition = task.file().partition();
+                    partitionCheckSet.add(partition.toString());
+                }
 
-                    // set partitionValue for this IcebergSplit
-                    for (int i = 0; i < structLike.size(); i++) {
-                        Object obj = structLike.get(i, Object.class);
-                        String value = String.valueOf(obj);
-                        PartitionField partitionField = fields.get(i);
-                        if (partitionField.transform().isIdentity()) {
-                            Type type = structType.fieldType(partitionField.name());
-                            if (type != null && type.typeId().equals(Type.TypeID.DATE)) {
-                                // iceberg use integer to store date,
-                                // we need transform it to string
-                                value = DateTimeUtil.daysToIsoDate((Integer) obj);
+                if (totalFileSize > Config.max_selected_total_file_size_for_lakehouse_table) {
+                    TableIf table = getTargetTable();
+                    throw new AnalysisException("the total scan bytes: " + totalFileSize
+                            + " for " + table.getDatabase().getFullName() + "." + table.getName() + " has "
+                            + "exceed max bytes for single iceberg table: "
+                            + Config.max_selected_total_file_size_for_lakehouse_table);
+                }
+            }
+
+            if (partitionCheckSet.size() > Config.max_selected_partition_num_for_lakehouse_table) {
+                TableIf table = getTargetTable();
+                throw new AnalysisException("the selected partition num: " + partitionCheckSet.size()
+                        + " for " + table.getDatabase().getFullName() + "." + table.getName() + " has "
+                        + "exceed max selected partition num for single iceberg table: "
+                        + Config.max_selected_partition_num_for_lakehouse_table);
+            }
+
+            try (CloseableIterable<FileScanTask> fileScanTasks =
+                            TableScanUtil.splitFiles(plannedFiles, realFileSplitSize);
+                    CloseableIterable<CombinedScanTask> combinedScanTasks =
+                            TableScanUtil.planTasks(fileScanTasks, realFileSplitSize, 1, 0)) {
+                combinedScanTasks.forEach(taskGrp -> taskGrp.files().forEach(splitTask -> {
+                    List<String> partitionValues = new ArrayList<>();
+                    if (isPartitionedTable) {
+                        StructLike structLike = splitTask.file().partition();
+                        List<PartitionField> fields = splitTask.spec().fields();
+                        Types.StructType structType = icebergTable.schema().asStruct();
+
+                        // set partitionValue for this IcebergSplit
+                        for (int i = 0; i < structLike.size(); i++) {
+                            Object obj = structLike.get(i, Object.class);
+                            String value = String.valueOf(obj);
+                            PartitionField partitionField = fields.get(i);
+                            if (partitionField.transform().isIdentity()) {
+                                Type type = structType.fieldType(partitionField.name());
+                                if (type != null && type.typeId().equals(Type.TypeID.DATE)) {
+                                    // iceberg use integer to store date,
+                                    // we need transform it to string
+                                    value = DateTimeUtil.daysToIsoDate((Integer) obj);
+                                }
                             }
+                            partitionValues.add(value);
                         }
-                        partitionValues.add(value);
-                    }
 
-                    // Counts the number of partitions read
-                    partitionPathSet.add(structLike.toString());
-                }
-                String originalPath = splitTask.file().path().toString();
-                LocationPath locationPath = new LocationPath(originalPath, source.getCatalog().getProperties());
-                IcebergSplit split = new IcebergSplit(
-                        locationPath,
-                        splitTask.start(),
-                        splitTask.length(),
-                        splitTask.file().fileSizeInBytes(),
-                        new String[0],
-                        formatVersion,
-                        source.getCatalog().getProperties(),
-                        partitionValues,
-                        originalPath);
-                split.setTargetSplitSize(realFileSplitSize);
-                if (formatVersion >= MIN_DELETE_FILE_SUPPORT_VERSION) {
-                    split.setDeleteFileFilters(getDeleteFileFilters(splitTask));
-                }
-                split.setTableFormatType(TableFormatType.ICEBERG);
-                splits.add(split);
-            }));
+                        // Counts the number of partitions read
+                        partitionPathSet.add(structLike.toString());
+                    }
+                    String originalPath = splitTask.file().path().toString();
+                    LocationPath locationPath = new LocationPath(originalPath, source.getCatalog().getProperties());
+                    IcebergSplit split = new IcebergSplit(
+                            locationPath,
+                            splitTask.start(),
+                            splitTask.length(),
+                            splitTask.file().fileSizeInBytes(),
+                            new String[0],
+                            formatVersion,
+                            source.getCatalog().getProperties(),
+                            partitionValues,
+                            originalPath);
+                    split.setTargetSplitSize(realFileSplitSize);
+                    if (formatVersion >= MIN_DELETE_FILE_SUPPORT_VERSION) {
+                        split.setDeleteFileFilters(getDeleteFileFilters(splitTask));
+                    }
+                    split.setTableFormatType(TableFormatType.ICEBERG);
+                    splits.add(split);
+                }));
+            } catch (IOException e) {
+                throw new UserException(e.getMessage(), e.getCause());
+            }
         } catch (IOException e) {
-            throw new UserException(e.getMessage(), e.getCause());
+            throw new UserException("Failed to scan files: " + e.getMessage(), e);
         }
 
         TPushAggOp aggOp = getPushDownAggNoGroupingOp();
