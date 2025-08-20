@@ -97,7 +97,8 @@ public class HadoopUGI {
                 return action.run();
             }
         } catch (Exception e) {
-            throw new RuntimeException(e.getMessage(), e);
+            Throwable exception = e.getCause() == null ? e : e.getCause();
+            throw new RuntimeException(exception.getMessage(), exception);
         }
     }
 }

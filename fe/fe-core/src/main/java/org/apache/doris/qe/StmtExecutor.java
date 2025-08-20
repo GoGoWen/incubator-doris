@@ -734,7 +734,7 @@ public class StmtExecutor {
                 }
                 context.getState().setError(e.getMysqlErrorCode(), e.getMessage());
                 throw new NereidsException("Command (" + originStmt.originStmt + ") process failed",
-                        new AnalysisException(e.getMessage(), e));
+                        e instanceof AnalysisException ? e : new AnalysisException(e.getMessage(), e));
             } catch (Exception e) {
                 // Maybe our bug
                 if (LOG.isDebugEnabled()) {
@@ -742,7 +742,8 @@ public class StmtExecutor {
                 }
                 context.getState().setError(ErrorCode.ERR_UNKNOWN_ERROR, e.getMessage());
                 throw new NereidsException("Command (" + originStmt.originStmt + ") process failed.",
-                        new AnalysisException(e.getMessage() == null ? e.toString() : e.getMessage(), e));
+                        new AnalysisException(e.getMessage() == null ? e.toString() :
+                            e.getMessage().replaceFirst("errCode = 2, detailMessage = ", ""), e));
             }
         } else {
             context.getState().setIsQuery(true);

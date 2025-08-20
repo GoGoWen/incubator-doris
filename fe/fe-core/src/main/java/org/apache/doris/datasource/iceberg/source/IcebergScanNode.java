@@ -220,10 +220,10 @@ public class IcebergScanNode extends FileQueryScanNode {
 
         long realFileSplitSize = getRealFileSplitSize(DEFAULT_SPLIT_SIZE);
 
-        try (CloseableIterable<FileScanTask> plannedFiles = scan.planFiles()) {
+        try {
             long totalFileSize = 0;
             HashSet<String> partitionCheckSet = new HashSet<>();
-
+            CloseableIterable<FileScanTask> plannedFiles = scan.planFiles();
             for (FileScanTask task : plannedFiles) {
                 totalFileSize += task.file().fileSizeInBytes();
 
@@ -234,6 +234,7 @@ public class IcebergScanNode extends FileQueryScanNode {
 
                 if (totalFileSize > Config.max_selected_total_file_size_for_lakehouse_table) {
                     TableIf table = getTargetTable();
+                    plannedFiles.close();
                     throw new AnalysisException("the total scan bytes: " + totalFileSize
                             + " for " + table.getDatabase().getFullName() + "." + table.getName() + " has "
                             + "exceed max bytes for single iceberg table: "
@@ -243,15 +244,14 @@ public class IcebergScanNode extends FileQueryScanNode {
 
             if (partitionCheckSet.size() > Config.max_selected_partition_num_for_lakehouse_table) {
                 TableIf table = getTargetTable();
+                plannedFiles.close();
                 throw new AnalysisException("the selected partition num: " + partitionCheckSet.size()
                         + " for " + table.getDatabase().getFullName() + "." + table.getName() + " has "
                         + "exceed max selected partition num for single iceberg table: "
                         + Config.max_selected_partition_num_for_lakehouse_table);
             }
-
-            try (CloseableIterable<FileScanTask> fileScanTasks =
-                            TableScanUtil.splitFiles(plannedFiles, realFileSplitSize);
-                    CloseableIterable<CombinedScanTask> combinedScanTasks =
+            CloseableIterable<FileScanTask> fileScanTasks = TableScanUtil.splitFiles(plannedFiles, realFileSplitSize);
+            try (CloseableIterable<CombinedScanTask> combinedScanTasks =
                             TableScanUtil.planTasks(fileScanTasks, realFileSplitSize, 1, 0)) {
                 combinedScanTasks.forEach(taskGrp -> taskGrp.files().forEach(splitTask -> {
                     List<String> partitionValues = new ArrayList<>();
