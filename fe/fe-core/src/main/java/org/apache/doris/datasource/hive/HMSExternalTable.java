@@ -530,8 +530,6 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
         List<Column> partitionColumns = initPartitionColumns();
         if (dlaType.equals(DLAType.ICEBERG)) {
             columns = getIcebergSchema();
-        } else if (dlaType.equals(DLAType.HUDI)) {
-            columns = getHudiSchema();
         } else {
             columns = getHiveSchema();
             columns.addAll(partitionColumns);
