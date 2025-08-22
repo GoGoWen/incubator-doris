@@ -135,7 +135,8 @@ public:
 
         std::string name_str = name;
         if (enable_decima256) {
-            if (name_str == "sum" || name_str == "avg") {
+            if (name_str == "sum" || name_str == "avg" || name_str == "multi_distinct_sum" ||
+                name_str == "multi_distinct_avg") {
                 name_str += "_decimal256";
             }
         }
