@@ -467,7 +467,6 @@ public class HudiScanNodeTest {
         Mockito.when(storageStrategy.getRelativePath(Mockito.any())).thenReturn("relative/path");
         Mockito.when(storageStrategy.getAllLocations(Mockito.anyString(), Mockito.anyBoolean()))
                 .thenReturn(new HashSet<>(Arrays.asList(new Path("/test/base/path/partition1"))));
-
         // Create test partition
         HivePartition partition = createMockHivePartition("/test/base/path/partition1", Arrays.asList("2024", "01"));
 
@@ -485,7 +484,6 @@ public class HudiScanNodeTest {
         totalSizeField.setAccessible(true);
         long totalSize = (long) totalSizeField.get(metadata);
         Assert.assertEquals(3000L, totalSize); // 1000 + 2000
-
         java.lang.reflect.Field statusesField = partitionMetadataClass.getDeclaredField("statuses");
         statusesField.setAccessible(true);
         List<FileStatus> statuses = (List<FileStatus>) statusesField.get(metadata);
@@ -551,13 +549,11 @@ public class HudiScanNodeTest {
                 result = mockSplits;
             }
         };
-
         // Execute
         List<Split> splits = scanNode.getSplits(3);
 
         // Verify
         Assert.assertEquals(2, splits.size());
-        // Mockito.verify(incrementalRelation).collectSplits();
     }
 
     @Test

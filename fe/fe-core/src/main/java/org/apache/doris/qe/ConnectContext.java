@@ -110,6 +110,9 @@ public class ConnectContext {
     protected volatile LoadTaskInfo streamLoadInfo;
 
     protected volatile TUniqueId queryId = null;
+
+    protected volatile long totalScanBytes = 0;
+
     protected volatile String traceId;
     // id for this connection
     protected volatile int connectionId;
@@ -891,6 +894,19 @@ public class ConnectContext {
             connectScheduler.putTraceId2QueryId(traceId, queryId);
         }
     }
+
+    public void addToTotalScanBytes(long scanBytes) {
+        this.totalScanBytes = this.totalScanBytes + scanBytes;
+    }
+
+    public void resetTotalScanBytes() {
+        this.totalScanBytes = 0;
+    }
+
+    public long getTotalScanBytes() {
+        return totalScanBytes;
+    }
+
 
     public void setTraceId(String traceId) {
         this.traceId = traceId;

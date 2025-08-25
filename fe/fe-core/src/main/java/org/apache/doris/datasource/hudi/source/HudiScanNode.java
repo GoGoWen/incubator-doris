@@ -503,7 +503,9 @@ public class HudiScanNode extends HiveScanNode {
                     + " has exceed max bytes for single hudi table: "
                     + Config.max_selected_total_file_size_for_lakehouse_table);
         }
-
+        if (ConnectContext.get() != null) {
+            ConnectContext.get().addToTotalScanBytes(totalSize);
+        }
         // Phase 2: Process partitions with FileSystemView concurrently
         CountDownLatch phase2Latch = new CountDownLatch(metadataList.size());
         AtomicReference<Throwable> phase2Error = new AtomicReference<>();

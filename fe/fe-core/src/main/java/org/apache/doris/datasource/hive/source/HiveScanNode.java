@@ -424,17 +424,17 @@ public class HiveScanNode extends FileQueryScanNode {
     protected long getFileSplitSize(List<FileCacheValue> fileCaches, boolean needSplit)
             throws AnalysisException {
         long fileSplitSize = DEFAULT_SPLIT_SIZE;
-        long selectFileSize = getSelectedFileSize(fileCaches);
+        long selectedFileSize = getSelectedFileSize(fileCaches);
         if (needSplit && sessionVariable.getFileSplitSize() <= 0) {
-            if (selectFileSize <= Config.file_size_range_to_decide_split_size[0]) {
+            if (selectedFileSize <= Config.file_size_range_to_decide_split_size[0]) {
                 fileSplitSize = TINY_SPLIT_FILE_SIZE;
-            } else if (selectFileSize <= Config.file_size_range_to_decide_split_size[1]) {
+            } else if (selectedFileSize <= Config.file_size_range_to_decide_split_size[1]) {
                 fileSplitSize = SMALL_SPLIT_FILE_SIZE;
-            } else if (selectFileSize <= Config.file_size_range_to_decide_split_size[2]) {
+            } else if (selectedFileSize <= Config.file_size_range_to_decide_split_size[2]) {
                 fileSplitSize = MEDIUM_SPLIT_FILE_SIZE;
-            } else if (selectFileSize <= Config.file_size_range_to_decide_split_size[3]) {
+            } else if (selectedFileSize <= Config.file_size_range_to_decide_split_size[3]) {
                 fileSplitSize = LARGE_SPLIT_FILE_SIZE;
-            } else if (selectFileSize <= Config.file_size_range_to_decide_split_size[4]) {
+            } else if (selectedFileSize <= Config.file_size_range_to_decide_split_size[4]) {
                 fileSplitSize = HUGE_SPLIT_FILE_SIZE;
             } else {
                 fileSplitSize = DEFAULT_SPLIT_SIZE;
@@ -465,6 +465,9 @@ public class HiveScanNode extends FileQueryScanNode {
                     + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
                     + "exceed max bytes for single hive table: "
                     + Config.max_selected_total_file_size_for_hive_table);
+        }
+        if (ConnectContext.get() != null) {
+            ConnectContext.get().addToTotalScanBytes(selectedFileSize);
         }
         return selectedFileSize;
     }

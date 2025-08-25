@@ -648,6 +648,7 @@ public class StmtExecutor {
             LOG.debug("Nereids start to execute query:\n {}", originStmt.originStmt);
         }
         context.setQueryId(queryId);
+        context.resetTotalScanBytes();
         context.setStartTime();
         profile.getSummaryProfile().setQueryBeginTime();
         context.setStmtId(STMT_ID_GENERATOR.incrementAndGet());

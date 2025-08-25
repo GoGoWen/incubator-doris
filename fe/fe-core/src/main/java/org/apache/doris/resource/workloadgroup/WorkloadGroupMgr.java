@@ -69,6 +69,8 @@ public class WorkloadGroupMgr extends MasterDaemon implements Writable, GsonPost
 
     public static final String DEFAULT_GROUP_NAME = "normal";
 
+    public static final String LARGE_QUERY_GROUP_NAME = "large_query";
+
     public static final Long DEFAULT_GROUP_ID = 1L;
 
     public static final ImmutableList<String> WORKLOAD_GROUP_PROC_NODE_TITLE_NAMES = new ImmutableList.Builder<String>()
@@ -302,6 +304,10 @@ public class WorkloadGroupMgr extends MasterDaemon implements Writable, GsonPost
     }
 
     private String getWorkloadGroupNameAndCheckPriv(ConnectContext context) throws AnalysisException {
+        if (Config.enable_workload_group_for_large_and_small_queries
+                && context.getTotalScanBytes() >= Config.selected_total_file_size_indicate_large_query) {
+            return LARGE_QUERY_GROUP_NAME;
+        }
         String groupName = context.getSessionVariable().getWorkloadGroup();
         if (Strings.isNullOrEmpty(groupName)) {
             groupName = Env.getCurrentEnv().getAuth().getWorkloadGroup(context.getQualifiedUser());

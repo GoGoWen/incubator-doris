@@ -38,6 +38,7 @@ import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
 import org.apache.doris.datasource.iceberg.IcebergExternalTable;
 import org.apache.doris.datasource.iceberg.IcebergUtils;
 import org.apache.doris.planner.PlanNodeId;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
@@ -241,7 +242,9 @@ public class IcebergScanNode extends FileQueryScanNode {
                             + Config.max_selected_total_file_size_for_lakehouse_table);
                 }
             }
-
+            if (ConnectContext.get() != null) {
+                ConnectContext.get().addToTotalScanBytes(totalFileSize);
+            }
             if (partitionCheckSet.size() > Config.max_selected_partition_num_for_lakehouse_table) {
                 TableIf table = getTargetTable();
                 plannedFiles.close();

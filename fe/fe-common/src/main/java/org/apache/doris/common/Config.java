@@ -2998,4 +2998,12 @@ public class Config extends ConfigBase {
      */
     @ConfField(mutable = false, masterOnly = false)
     public static long external_hudi_client_cache_expire_time_minutes_after_write = 3; // 3 mins
+
+    @ConfField(mutable = true, description = {"是否启用大小查询资源隔离",
+            "whether to enable resource isolation for large and small queries"})
+    public static boolean enable_workload_group_for_large_and_small_queries = false;
+
+    @ConfField(mutable = true, description = {"是否启用大小查询资源隔离",
+            "whether to enable resource isolation for large and small queries"})
+    public static long selected_total_file_size_indicate_large_query = 100 * 1024 * 1024 * 1024L;
 }

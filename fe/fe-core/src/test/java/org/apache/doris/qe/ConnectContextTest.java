@@ -287,4 +287,13 @@ public class ConnectContextTest {
         Assert.assertNotNull(ConnectContext.get());
         Assert.assertEquals(ctx, ConnectContext.get());
     }
+
+    @Test
+    public void testTotalScanBytes() {
+        ConnectContext context = new ConnectContext();
+        context.resetTotalScanBytes();
+        Assert.assertEquals(0, context.getTotalScanBytes());
+        context.addToTotalScanBytes(1000);
+        Assert.assertEquals(1000, context.getTotalScanBytes());
+    }
 }
