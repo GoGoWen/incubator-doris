@@ -107,7 +107,8 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                     SelectedPartitions selectedPartitions;
                     Set<Expression> conjuncts;
                     // TODO(cmy): support other external table
-                    if (tbl instanceof HMSExternalTable && ((HMSExternalTable) tbl).getDlaType() == DLAType.HIVE) {
+                    if (tbl instanceof HMSExternalTable && (((HMSExternalTable) tbl).getDlaType() == DLAType.HIVE
+                            || ((HMSExternalTable) tbl).getDlaType() == DLAType.HUDI)) {
                         HMSExternalTable hiveTbl = (HMSExternalTable) tbl;
                         selectedPartitions = pruneHivePartitions(hiveTbl, filter, scan,
                                 ctx.cascadesContext, hiveTbl.isViewBased());

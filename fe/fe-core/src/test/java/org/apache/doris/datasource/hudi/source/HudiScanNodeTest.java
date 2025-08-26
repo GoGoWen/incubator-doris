@@ -33,6 +33,7 @@ import org.apache.doris.datasource.TablePartitionValues;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
 import org.apache.doris.datasource.hive.HivePartition;
+import org.apache.doris.datasource.hive.source.HiveScanNode;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.BDPAuthContext;
@@ -40,6 +41,7 @@ import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 import org.apache.doris.thrift.TFileRangeDesc;
 
+import alluxio.core.client.runtime.com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import mockit.Expectations;
 import mockit.Injectable;
@@ -313,11 +315,11 @@ public class HudiScanNodeTest {
             queryInstantField.setAccessible(true);
             queryInstantField.set(scanNode, "20240101000000");
 
-            java.lang.reflect.Field partitionInitField = HudiScanNode.class.getDeclaredField("partitionInit");
+            java.lang.reflect.Field partitionInitField = HiveScanNode.class.getDeclaredField("partitionInit");
             partitionInitField.setAccessible(true);
             partitionInitField.set(scanNode, true);
 
-            java.lang.reflect.Field prunedPartitionsField = HudiScanNode.class.getDeclaredField("prunedPartitions");
+            java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
             prunedPartitionsField.setAccessible(true);
             prunedPartitionsField.set(scanNode, new ArrayList<HivePartition>());
         } catch (Exception e) {
@@ -347,7 +349,7 @@ public class HudiScanNodeTest {
                     createMockHivePartition("/test/base/path/partition1", Arrays.asList("2024", "01"))
             );
 
-            java.lang.reflect.Field prunedPartitionsField = HudiScanNode.class.getDeclaredField("prunedPartitions");
+            java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
             prunedPartitionsField.setAccessible(true);
             prunedPartitionsField.set(scanNode, partitions);
 
@@ -571,7 +573,7 @@ public class HudiScanNodeTest {
             partitions.add(createMockHivePartition("/test/base/path/partition" + i, Arrays.asList("2024", String.valueOf(i))));
         }
 
-        java.lang.reflect.Field prunedPartitionsField = HudiScanNode.class.getDeclaredField("prunedPartitions");
+        java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
         prunedPartitionsField.setAccessible(true);
         prunedPartitionsField.set(scanNode, partitions);
 
@@ -608,7 +610,7 @@ public class HudiScanNodeTest {
                 createMockHivePartition("/test/base/path/partition1", Arrays.asList("2024", "01"))
         );
 
-        java.lang.reflect.Field prunedPartitionsField = HudiScanNode.class.getDeclaredField("prunedPartitions");
+        java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
         prunedPartitionsField.setAccessible(true);
         prunedPartitionsField.set(scanNode, partitions);
 
@@ -683,7 +685,7 @@ public class HudiScanNodeTest {
 
         // Set empty partitions
         List<HivePartition> partitions = new ArrayList<>();
-        java.lang.reflect.Field prunedPartitionsField = HudiScanNode.class.getDeclaredField("prunedPartitions");
+        java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
         prunedPartitionsField.setAccessible(true);
         prunedPartitionsField.set(scanNode, partitions);
 
@@ -725,7 +727,7 @@ public class HudiScanNodeTest {
             };
 
             // Reset partitionInit to false so partition processing runs
-            java.lang.reflect.Field partitionInitField = HudiScanNode.class.getDeclaredField("partitionInit");
+            java.lang.reflect.Field partitionInitField = HiveScanNode.class.getDeclaredField("partitionInit");
             partitionInitField.setAccessible(true);
             partitionInitField.set(scanNode, false);
 
@@ -867,7 +869,7 @@ public class HudiScanNodeTest {
                 createMockHivePartition("/test/base/path/partition2", Arrays.asList("2024", "02"))
         );
 
-        java.lang.reflect.Field prunedPartitionsField = HudiScanNode.class.getDeclaredField("prunedPartitions");
+        java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
         prunedPartitionsField.setAccessible(true);
         prunedPartitionsField.set(scanNode, partitions);
 
@@ -882,5 +884,158 @@ public class HudiScanNodeTest {
 
         // Verify - 5 splits per partition * 2 partitions = 10
         Assert.assertEquals(10, approximateSplits);
+    }
+
+    @Test
+    public void testPrunePartitionsInheritedFromParent(@Injectable SessionVariable sessionVariable,
+                                                      @Injectable TupleDescriptor tupleDesc,
+                                                      @Injectable HMSExternalTable table,
+                                                      @Injectable ExternalCatalog catalog,
+                                                      @Injectable HoodieTableMetaClient client) throws Exception {
+
+        HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
+
+        // Verify that HudiScanNode can access inherited prunedPartitions from HiveScanNode
+        java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
+        prunedPartitionsField.setAccessible(true);
+
+        // Set pruned partitions using inherited field
+        List<HivePartition> testPartitions = Arrays.asList(
+                createMockHivePartition("/test/partition1", Arrays.asList("2024", "01")),
+                createMockHivePartition("/test/partition2", Arrays.asList("2024", "02"))
+        );
+        prunedPartitionsField.set(scanNode, testPartitions);
+
+        // Verify the field is accessible and data is set correctly
+        @SuppressWarnings("unchecked")
+        List<HivePartition> retrievedPartitions = (List<HivePartition>) prunedPartitionsField.get(scanNode);
+        Assert.assertNotNull(retrievedPartitions);
+        Assert.assertEquals(2, retrievedPartitions.size());
+    }
+
+    @Test
+    public void testIsBatchMode(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc, @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog) {
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                table.isHoodieCowTable();
+                result = true;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.useHiveSyncPartition();
+                result = true;
+
+                sessionVariable.getNumPartitionsInBatchMode();
+                result = 1;
+            }
+        };
+        HudiScanNode scanNode = new HudiScanNode(new PlanNodeId(1), tupleDesc,
+                false, Optional.empty(), Optional.empty(), sessionVariable);
+        new MockUp<HudiScanNode>() {
+            @Mock
+            public List<HivePartition> getPartitions() {
+                HivePartition partition1 = new HivePartition("test", "test", false,
+                        "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+                        "hdfs://hk-dev01:8121/user/doris/parquet/partition_table/nation=cn/city=beijing",
+                        Lists.newArrayList("cn", "beijing"), Maps.newHashMap());
+                HivePartition partition2 = new HivePartition("test", "test", false,
+                        "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+                        "hdfs://hk-dev01:8121/user/doris/parquet/partition_table/nation=cn/city=shanghai",
+                        Lists.newArrayList("cn", "shanghai"), Maps.newHashMap());
+                return Lists.newArrayList(partition1, partition2);
+            }
+        };
+        Assertions.assertTrue(scanNode.isBatchMode());
+        new Expectations() {
+            {
+                sessionVariable.getNumPartitionsInBatchMode();
+                result = 1024;
+            }
+        };
+        Assertions.assertFalse(scanNode.isBatchMode());
+        new MockUp<HudiScanNode>() {
+            @Mock
+            public List<HivePartition> getPartitions() {
+                throw new RuntimeException("get partitions failed");
+            }
+        };
+        HudiScanNode scanNode1 = new HudiScanNode(new PlanNodeId(1), tupleDesc,
+                false, Optional.empty(), Optional.empty(), sessionVariable);
+        Assertions.assertFalse(scanNode1.isBatchMode());
+    }
+
+    @Test
+    public void testGetSplits(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc, @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog) {
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                table.isHoodieCowTable();
+                result = true;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.useHiveSyncPartition();
+                result = true;
+            }
+        };
+        HudiScanNode scanNode = new HudiScanNode(new PlanNodeId(1), tupleDesc,
+                false, Optional.empty(), Optional.empty(), sessionVariable);
+        new MockUp<HudiScanNode>() {
+            @Mock
+            public List<HivePartition> getPartitions() {
+                HivePartition partition1 = new HivePartition("test", "test", false,
+                        "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+                        "hdfs://hk-dev01:8121/user/doris/parquet/partition_table/nation=cn/city=beijing",
+                        Lists.newArrayList("cn", "beijing"), Maps.newHashMap());
+                HivePartition partition2 = new HivePartition("test", "test", false,
+                        "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+                        "hdfs://hk-dev01:8121/user/doris/parquet/partition_table/nation=cn/city=shanghai",
+                        Lists.newArrayList("cn", "shanghai"), Maps.newHashMap());
+                return Lists.newArrayList(partition1, partition2);
+            }
+
+            @Mock
+            public void getPartitionsSplits(List<HivePartition> partitions, List<Split> splits)
+                    throws AnalysisException {
+                FileSplit chubaoFileSplit = new FileSplit(new LocationPath(
+                        "chubaofs://CHUBAO1101/usr/hive/warehouse/clickbench.db/hits_orc/part-00000-3e24f7d5.snappy.orc"),
+                        0, 112140970, 112140970, 0, null, Collections.emptyList());
+                FileSplit hdfsFileSplit = new FileSplit(new LocationPath(
+                        "hdfs://HDFSO1101/usr/hive/warehouse/clickbench.db/hits_orc/part-00000-3e77f7d8.snappy.orc"),
+                        0, 112140970, 112140970, 0, null, Collections.emptyList());
+                splits.add(chubaoFileSplit);
+                splits.add(hdfsFileSplit);
+            }
+        };
+        try {
+            List<Split> splits = scanNode.getSplits(1);
+            Assertions.assertFalse(splits.isEmpty());
+            Assertions.assertEquals(2, splits.size());
+        } catch (Exception e) {
+            Assertions.fail(e);
+        }
     }
 }

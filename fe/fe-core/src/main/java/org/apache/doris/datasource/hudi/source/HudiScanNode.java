@@ -38,7 +38,6 @@ import org.apache.doris.datasource.hudi.HudiUtils;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.BDPAuthContext;
-import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
@@ -116,13 +115,11 @@ public class HudiScanNode extends HiveScanNode {
     private List<String> columnTypes;
     private List<String> primaryKeys;
 
-    private boolean partitionInit = false;
     private HoodieTimeline timeline;
     private Option<String> snapshotTimestamp;
     private String queryInstant;
 
     private final AtomicReference<UserException> batchException = new AtomicReference<>(null);
-    private List<HivePartition> prunedPartitions;
     private final Semaphore splittersOnFlight = new Semaphore(NUM_SPLITTERS_ON_FLIGHT);
     private final AtomicInteger numSplitsPerPartition = new AtomicInteger(NUM_SPLITS_PER_PARTITION);
 
@@ -459,7 +456,7 @@ public class HudiScanNode extends HiveScanNode {
         }
     }
 
-    private void getPartitionsSplits(List<HivePartition> partitions, List<Split> splits) throws AnalysisException {
+    public void getPartitionsSplits(List<HivePartition> partitions, List<Split> splits) throws AnalysisException {
         Executor executor = Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor();
 
         // Phase 1: Get file statuses concurrently and collect metadata
@@ -541,21 +538,9 @@ public class HudiScanNode extends HiveScanNode {
             return getIncrementalSplits();
         }
         if (!partitionInit) {
-            BDPAuthContext bdpAuthContext = BDPAuthContext.get();
-            Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
-            UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
-                    null, bdpAuthContext.getUserToken());
-            prunedPartitions = ugi.doAs(
-                    (PrivilegedAction<List<HivePartition>>) () -> {
-                        try {
-                            return getPrunedPartitions(hudiClient, snapshotTimestamp);
-                        } catch (AnalysisException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
+            prunedPartitions = getPartitions();
             partitionInit = true;
         }
-
         List<Split> splits = Collections.synchronizedList(new ArrayList<>());
         getPartitionsSplits(prunedPartitions, splits);
         return splits;
@@ -614,22 +599,14 @@ public class HudiScanNode extends HiveScanNode {
             return false;
         }
         if (!partitionInit) {
-            // Non partition table will get one dummy partition
-            BDPAuthContext bdpAuthContext = BDPAuthContext.get();
-            Preconditions.checkNotNull(bdpAuthContext, "bdp auth info cannot be null");
-            UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bdpAuthContext.getHadoopUserName(),
-                    null, bdpAuthContext.getUserToken());
-            prunedPartitions = ugi.doAs(
-                    (PrivilegedAction<List<HivePartition>>) () -> {
-                        try {
-                            return getPrunedPartitions(hudiClient, snapshotTimestamp);
-                        } catch (AnalysisException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
+            try {
+                prunedPartitions = getPartitions();
+            } catch (Exception e) {
+                return false;
+            }
             partitionInit = true;
         }
-        int numPartitions = ConnectContext.get().getSessionVariable().getNumPartitionsInBatchMode();
+        int numPartitions = sessionVariable.getNumPartitionsInBatchMode();
         return numPartitions >= 0 && prunedPartitions.size() >= numPartitions;
     }
 

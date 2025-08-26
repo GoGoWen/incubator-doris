@@ -351,4 +351,63 @@ public class HiveScanNodeTest {
         Assert.assertEquals("file1.text", allFiles.get(5).getPathString());
         Assert.assertEquals(1024, allFiles.get(5).getLength());
     }
+
+    @Test
+    public void testCheckSelectedPartitionNumLimit(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog) {
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getDlaType();
+                result = HMSExternalTable.DLAType.HUDI;
+
+                table.getDbName();
+                result = "test";
+
+                table.getName();
+                result = "test";
+            }
+        };
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+        scanNode.setSelectedPartitionNum(100);
+        Config.max_selected_partition_num_for_lakehouse_table = 10;
+        try {
+            scanNode.checkSelectedPartitionNumLimit();
+            Assertions.fail();
+        } catch (Exception e) {
+            Assertions.assertEquals("errCode = 2, detailMessage = the selected partition num:"
+                    + " 100 for test.test has exceed max selected partition num for single Hudi table: 10",
+                    e.getMessage());
+        }
+
+        new Expectations() {
+            {
+                table.getDlaType();
+                result = HMSExternalTable.DLAType.HIVE;
+            }
+        };
+
+        Config.max_selected_partition_num_for_hive_table = 50;
+        try {
+            scanNode.checkSelectedPartitionNumLimit();
+            Assertions.fail();
+        } catch (Exception e) {
+            Assertions.assertEquals("errCode = 2, detailMessage = the selected partition num:"
+                            + " 100 for test.test has exceed max selected partition num for single Hive table: 50",
+                    e.getMessage());
+        }
+    }
 }

@@ -659,6 +659,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
         PhysicalHudiScan hudiScan = (PhysicalHudiScan) fileScan;
         ScanNode scanNode = new HudiScanNode(context.nextPlanNodeId(), tupleDescriptor, false,
                 hudiScan.getScanParams(), hudiScan.getIncrementalRelation(), ConnectContext.get().getSessionVariable());
+        ((HudiScanNode) scanNode).setSelectedPartitions(fileScan.getSelectedPartitions());
         if (fileScan.getTableSnapshot().isPresent()) {
             ((FileQueryScanNode) scanNode).setQueryTableSnapshot(fileScan.getTableSnapshot().get());
         }
@@ -672,7 +673,8 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
      */
     public Set<Expression> getConjunctsWithoutPartitionPredicate(PhysicalFileScan fileScan) {
         ExternalTable tbl = fileScan.getTable();
-        if (tbl instanceof HMSExternalTable && ((HMSExternalTable) tbl).getDlaType() == DLAType.HIVE) {
+        if (tbl instanceof HMSExternalTable && (((HMSExternalTable) tbl).getDlaType() == DLAType.HIVE
+                || ((HMSExternalTable) tbl).getDlaType() == DLAType.HUDI)) {
             Map<String, Slot> scanOutput = fileScan.getOutput()
                     .stream()
                     .collect(Collectors.toMap(slot -> slot.getName().toLowerCase(), Function.identity()));

@@ -146,6 +146,16 @@ public class PhysicalPlanTranslatorTest {
         Set<Expression> conjuncts = translator.getConjunctsWithoutPartitionPredicate(fileScan);
         Assertions.assertEquals(1, conjuncts.size());
         Assertions.assertEquals(expression3, conjuncts.toArray()[0]);
+
+        new Expectations() {
+            {
+                table.getDlaType();
+                result = DLAType.HUDI;
+            }
+        };
+        conjuncts = translator.getConjunctsWithoutPartitionPredicate(fileScan);
+        Assertions.assertEquals(1, conjuncts.size());
+        Assertions.assertEquals(expression3, conjuncts.toArray()[0]);
     }
 
     /**

@@ -110,11 +110,11 @@ public class HiveScanNode extends FileQueryScanNode {
 
     // will only be set in Nereids, for lagency planner, it should be null
     @Setter
-    private SelectedPartitions selectedPartitions = null;
+    protected SelectedPartitions selectedPartitions = null;
 
-    private boolean partitionInit = false;
+    protected boolean partitionInit = false;
     private final AtomicReference<UserException> batchException = new AtomicReference<>(null);
-    private List<HivePartition> prunedPartitions;
+    protected List<HivePartition> prunedPartitions;
     private final Semaphore splittersOnFlight = new Semaphore(NUM_SPLITTERS_ON_FLIGHT);
     private final AtomicInteger numSplitsPerPartition = new AtomicInteger(NUM_SPLITS_PER_PARTITION);
 
@@ -199,13 +199,7 @@ public class HiveScanNode extends FileQueryScanNode {
             }
             Preconditions.checkNotNull(partitionItems);
             this.selectedPartitionNum = partitionItems.size();
-            if (this.selectedPartitionNum > Config.max_selected_partition_num_for_hive_table) {
-                throw new AnalysisException("the selected partition num: " + this.selectedPartitionNum
-                        + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
-                        + "exceed max selected partition num for single hive table: "
-                        + Config.max_selected_partition_num_for_hive_table);
-            }
-
+            checkSelectedPartitionNumLimit();
             // get partitions from cache
             List<List<String>> partitionValuesList = Lists.newArrayListWithCapacity(partitionItems.size());
             for (PartitionItem item : partitionItems) {
@@ -238,6 +232,25 @@ public class HiveScanNode extends FileQueryScanNode {
             ConnectContext.get().getExecutor().getSummaryProfile().setGetPartitionsFinishTime();
         }
         return resPartitions;
+    }
+
+    public void checkSelectedPartitionNumLimit() throws AnalysisException {
+        if (hmsTable.getDlaType() == HMSExternalTable.DLAType.HUDI) {
+            if (this.selectedPartitionNum > Config.max_selected_partition_num_for_lakehouse_table) {
+                throw new AnalysisException("the selected partition num: "
+                        + this.selectedPartitionNum + " for " + hmsTable.getDbName() + "."
+                        + hmsTable.getName() + " has "
+                        + "exceed max selected partition num for single Hudi table: "
+                        + Config.max_selected_partition_num_for_lakehouse_table);
+            }
+        } else {
+            if (this.selectedPartitionNum > Config.max_selected_partition_num_for_hive_table) {
+                throw new AnalysisException("the selected partition num: " + this.selectedPartitionNum
+                        + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
+                        + "exceed max selected partition num for single Hive table: "
+                        + Config.max_selected_partition_num_for_hive_table);
+            }
+        }
     }
 
     private boolean isUpdateFileListRecently() {
@@ -418,6 +431,11 @@ public class HiveScanNode extends FileQueryScanNode {
             needSplit = !hmsTable.isOrcOrParquetFileFormat();
         }
         generateFileSplits(allFiles, fileCaches, needSplit, getFileSplitSize(fileCaches, needSplit));
+    }
+
+    @VisibleForTesting
+    protected void setSelectedPartitionNum(long selectedPartitionNum) {
+        this.selectedPartitionNum = selectedPartitionNum;
     }
 
     @VisibleForTesting
