@@ -69,7 +69,7 @@ protected:
                              const std::vector<Path>& remote_files) override;
     Status download_impl(const Path& remote_file, const Path& local_file) override;
 
-private:
+protected:
     BrokerFileSystem(const TNetworkAddress& broker_addr,
                      const std::map<std::string, std::string>& broker_prop);
     std::string error_msg(const std::string& err) const;

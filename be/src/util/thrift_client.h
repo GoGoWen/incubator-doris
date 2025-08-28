@@ -99,7 +99,8 @@ private:
 template <class InterfaceType>
 ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port)
         : ThriftClientImpl(ipaddress, port) {
-    _transport.reset(new apache::thrift::transport::TBufferedTransport(_socket));
+    _transport.reset(new apache::thrift::transport::TBufferedTransport(_socket,
+        std::make_shared<apache::thrift::TConfiguration>(config::thrift_max_message_size)));
     _protocol.reset(new apache::thrift::protocol::TBinaryProtocol(_transport));
     _iface.reset(new InterfaceType(_protocol));
 }
@@ -114,7 +115,8 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
         break;
     case ThriftServer::THREADED:
     case ThriftServer::THREAD_POOL:
-        _transport.reset(new apache::thrift::transport::TBufferedTransport(_socket));
+        _transport.reset(new apache::thrift::transport::TBufferedTransport(_socket,
+            std::make_shared<apache::thrift::TConfiguration>(config::thrift_max_message_size)));
         break;
     default:
         std::stringstream error_msg;
