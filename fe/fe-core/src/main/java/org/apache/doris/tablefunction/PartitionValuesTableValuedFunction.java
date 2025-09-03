@@ -30,6 +30,9 @@ import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.maxcompute.MaxComputeExternalCatalog;
 import org.apache.doris.mysql.privilege.PrivPredicate;
 import org.apache.doris.nereids.exceptions.AnalysisException;
+import org.apache.doris.nereids.trees.expressions.functions.agg.AggregateFunction;
+import org.apache.doris.nereids.trees.expressions.functions.agg.Max;
+import org.apache.doris.nereids.trees.expressions.functions.agg.Min;
 import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.thrift.TBDPAuthContext;
@@ -38,6 +41,7 @@ import org.apache.doris.thrift.TMetadataType;
 import org.apache.doris.thrift.TPartitionValuesMetadataParams;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -187,5 +191,18 @@ public class PartitionValuesTableValuedFunction extends MetadataTableValuedFunct
             }
         }
         return schema;
+    }
+
+    /** PartitionAggOp */
+    public enum PartitionAggOp {
+        MIN_MAX;
+
+        /** supportedFunctions */
+        public static Map<Class<? extends AggregateFunction>, PartitionAggOp> supportedFunctions() {
+            return ImmutableMap.<Class<? extends AggregateFunction>, PartitionAggOp>builder()
+                .put(Min.class, PartitionAggOp.MIN_MAX)
+                .put(Max.class, PartitionAggOp.MIN_MAX)
+                .build();
+        }
     }
 }
