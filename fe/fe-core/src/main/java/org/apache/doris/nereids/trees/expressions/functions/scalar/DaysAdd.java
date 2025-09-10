@@ -19,6 +19,7 @@ package org.apache.doris.nereids.trees.expressions.functions.scalar;
 
 import org.apache.doris.catalog.FunctionSignature;
 import org.apache.doris.common.Config;
+import org.apache.doris.nereids.trees.expressions.Cast;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.functions.ComputeSignatureForDateArithmetic;
 import org.apache.doris.nereids.trees.expressions.functions.ExplicitlyCastableSignature;
@@ -30,6 +31,7 @@ import org.apache.doris.nereids.types.DateTimeV2Type;
 import org.apache.doris.nereids.types.DateType;
 import org.apache.doris.nereids.types.DateV2Type;
 import org.apache.doris.nereids.types.IntegerType;
+import org.apache.doris.qe.ConnectContext;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -71,6 +73,49 @@ public class DaysAdd extends ScalarFunction
     @Override
     public List<FunctionSignature> getSignatures() {
         return SIGNATURES;
+    }
+
+    @Override
+    public FunctionSignature computeSignature(FunctionSignature signature) {
+        if (!isPrestoDialect()) {
+            return ComputeSignatureForDateArithmetic.super.computeSignature(signature);
+        }
+
+        Expression firstChild = child(0);
+
+        if (firstChild.getDataType().isStringLikeType() && firstChild.getDataType().isVarcharType()) {
+            if (Config.enable_date_conversion) {
+                return FunctionSignature.ret(DateV2Type.INSTANCE)
+                        .args(DateV2Type.INSTANCE, IntegerType.INSTANCE);
+            } else {
+                return FunctionSignature.ret(DateType.INSTANCE)
+                        .args(DateType.INSTANCE, IntegerType.INSTANCE);
+            }
+        }
+
+        if (firstChild instanceof Cast) {
+            Cast cast = (Cast) firstChild;
+            if (!cast.isExplicitType()
+                    && cast.child().getDataType().isStringLikeType()
+                    && cast.child().getDataType().isVarcharType()) {
+                // Non-explicit cast from VARCHAR should use DATEV2 in Presto dialect
+                if (Config.enable_date_conversion) {
+                    return FunctionSignature.ret(DateV2Type.INSTANCE)
+                            .args(DateV2Type.INSTANCE, IntegerType.INSTANCE);
+                } else {
+                    return FunctionSignature.ret(DateType.INSTANCE)
+                            .args(DateType.INSTANCE, IntegerType.INSTANCE);
+                }
+            }
+        }
+
+        return ComputeSignatureForDateArithmetic.super.computeSignature(signature);
+    }
+
+    private static boolean isPrestoDialect() {
+        ConnectContext context = ConnectContext.get();
+        return context != null
+                && context.getSessionVariable().getSqlDialect().equalsIgnoreCase("presto");
     }
 
     @Override
