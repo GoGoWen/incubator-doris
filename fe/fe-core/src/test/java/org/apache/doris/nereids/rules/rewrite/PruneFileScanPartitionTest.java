@@ -18,16 +18,24 @@
 package org.apache.doris.nereids.rules.rewrite;
 
 import org.apache.doris.catalog.Column;
+import org.apache.doris.catalog.ListPartitionItem;
+import org.apache.doris.catalog.PartitionItem;
+import org.apache.doris.catalog.PartitionKey;
 import org.apache.doris.catalog.PrimitiveType;
+import org.apache.doris.catalog.Type;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.HMSExternalTable.DLAType;
+import org.apache.doris.datasource.hive.HiveMetaStoreCache;
 import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.trees.expressions.EqualTo;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.LessThan;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
+import org.apache.doris.nereids.trees.expressions.functions.scalar.Lower;
+import org.apache.doris.nereids.trees.expressions.literal.BooleanLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
 import org.apache.doris.nereids.trees.plans.Plan;
@@ -37,6 +45,7 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPart
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
 import org.apache.doris.nereids.types.IntegerType;
 import org.apache.doris.nereids.types.StringType;
+import org.apache.doris.nereids.types.VarcharType;
 import org.apache.doris.nereids.util.MemoPatternMatchSupported;
 import org.apache.doris.nereids.util.MemoTestUtils;
 import org.apache.doris.qe.AutoCloseConnectContext;
@@ -55,7 +64,9 @@ import mockit.MockUp;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -324,5 +335,151 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
         Assertions.assertEquals(1, planList.size());
         Assertions.assertTrue(planList.get(0) instanceof LogicalFileScan);
         Assertions.assertTrue(((LogicalFileScan) planList.get(0)).getConjuncts().isEmpty());
+    }
+
+    @Test
+    void testGetSelectedPartitionItems(@Injectable HMSExternalTable table, @Injectable HiveMetaStoreCache cache,
+            @Injectable HiveMetaStoreCache.HivePartitionValues hivePartitionValues1,
+            @Injectable HiveMetaStoreCache.HivePartitionValues hivePartitionValues2) {
+        Map<Long, PartitionItem> mockPartitionItemMap = new HashMap<>();
+        mockPartitionItemMap.put(1L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap.put(2L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap.put(3L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+
+        Map<Long, PartitionItem> mockPartitionItemMap2 = new HashMap<>();
+        mockPartitionItemMap2.put(1L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+
+        Config.max_partition_num_for_single_hive_table_without_filter = 2;
+
+        Map<Long, PartitionItem> mockPartitionItemMap3 = new HashMap<>();
+        mockPartitionItemMap3.put(1L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap3.put(2L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap3.put(3L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap3.put(4L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+
+        new Expectations() {
+            {
+                table.getName();
+                result = "test";
+                minTimes = 1;
+
+                table.getDbName();
+                result = "test";
+                minTimes = 1;
+
+                table.getPartitionColumnTypes();
+                result = Lists.newArrayList(Type.VARCHAR);
+                minTimes = 1;
+
+                cache.getPartitionValuesByFilter("test", "test", anyString,
+                        Lists.newArrayList("dt"), Lists.newArrayList(Type.VARCHAR));
+                result = mockPartitionItemMap;
+                minTimes = 1;
+
+                cache.getPartitionValues("test", "test", Lists.newArrayList(Type.VARCHAR));
+                result = hivePartitionValues1;
+                minTimes = 1;
+
+                cache.getPartitionValuesWithoutCache("test", "test", Lists.newArrayList(Type.VARCHAR));
+                result = hivePartitionValues2;
+                minTimes = 1;
+
+                hivePartitionValues1.getIdToPartitionItem();
+                result = mockPartitionItemMap2;
+                minTimes = 1;
+
+                hivePartitionValues2.getIdToPartitionItem();
+                result = mockPartitionItemMap3;
+                minTimes = 1;
+
+            }
+        };
+        PruneFileScanPartition pruneFileScanPartition = new PruneFileScanPartition();
+        Map<Long, PartitionItem> partitionItemMap = pruneFileScanPartition.getSelectedPartitionItems(table,
+                Lists.newArrayList("dt"), BooleanLiteral.TRUE, 2000, cache);
+        Assertions.assertEquals(3, partitionItemMap.size());
+
+        partitionItemMap = pruneFileScanPartition.getSelectedPartitionItems(table,
+                Lists.newArrayList("dt"),
+                new EqualTo(new Lower(new SlotReference("dt", VarcharType.SYSTEM_DEFAULT)),
+                        new StringLiteral("2025-10-10")), 1, cache);
+        Assertions.assertEquals(1, partitionItemMap.size());
+        partitionItemMap = pruneFileScanPartition.getSelectedPartitionItems(table,
+                Lists.newArrayList("dt"),
+                new EqualTo(new Lower(new SlotReference("dt", VarcharType.SYSTEM_DEFAULT)),
+                        new StringLiteral("2025-10-10")), 4, cache);
+        Assertions.assertEquals(4, partitionItemMap.size());
+    }
+
+    @Test
+    void testGetSelectedPartitionItemsFromView(@Injectable HMSExternalTable table, @Injectable HiveMetaStoreCache cache,
+            @Injectable HiveMetaStoreCache.HivePartitionValues hivePartitionValues1,
+            @Injectable HiveMetaStoreCache.HivePartitionValues hivePartitionValues2) {
+        Map<Long, PartitionItem> mockPartitionItemMap = new HashMap<>();
+        mockPartitionItemMap.put(1L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap.put(2L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap.put(3L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+
+        Map<Long, PartitionItem> mockPartitionItemMap2 = new HashMap<>();
+        mockPartitionItemMap2.put(1L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+
+        Config.max_partition_num_for_single_hive_table_without_filter = 2;
+
+        Map<Long, PartitionItem> mockPartitionItemMap3 = new HashMap<>();
+        mockPartitionItemMap3.put(1L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap3.put(2L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap3.put(3L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+        mockPartitionItemMap3.put(4L, new ListPartitionItem(Lists.newArrayList(new PartitionKey())));
+
+        new Expectations() {
+            {
+                table.getName();
+                result = "test";
+                minTimes = 1;
+
+                table.getDbName();
+                result = "test";
+                minTimes = 1;
+
+                table.getPartitionColumnTypes();
+                result = Lists.newArrayList(Type.VARCHAR);
+                minTimes = 1;
+
+                cache.getPartitionValuesByFilterFromView("test", "test", anyString, Lists.newArrayList("dt"),
+                        Lists.newArrayList(Type.VARCHAR));
+                result = mockPartitionItemMap;
+                minTimes = 1;
+
+                cache.getPartitionValuesFromView("test", "test", Lists.newArrayList(Type.VARCHAR));
+                result = hivePartitionValues1;
+                minTimes = 1;
+
+                cache.getPartitionValuesFromViewWithoutCache("test", "test", Lists.newArrayList(Type.VARCHAR));
+                result = hivePartitionValues2;
+                minTimes = 1;
+
+                hivePartitionValues1.getIdToPartitionItem();
+                result = mockPartitionItemMap2;
+                minTimes = 1;
+
+                hivePartitionValues2.getIdToPartitionItem();
+                result = mockPartitionItemMap3;
+                minTimes = 1;
+
+            }
+        };
+        PruneFileScanPartition pruneFileScanPartition = new PruneFileScanPartition();
+        Map<Long, PartitionItem> partitionItemMap = pruneFileScanPartition.getSelectedPartitionItemsFromView(table,
+                Lists.newArrayList("dt"), BooleanLiteral.TRUE, 2000, cache);
+        Assertions.assertEquals(3, partitionItemMap.size());
+
+        partitionItemMap = pruneFileScanPartition.getSelectedPartitionItemsFromView(table, Lists.newArrayList("dt"),
+                new EqualTo(new Lower(new SlotReference("dt", VarcharType.SYSTEM_DEFAULT)),
+                        new StringLiteral("2025-10-10")), 1, cache);
+        Assertions.assertEquals(1, partitionItemMap.size());
+        partitionItemMap = pruneFileScanPartition.getSelectedPartitionItemsFromView(table, Lists.newArrayList("dt"),
+                new EqualTo(new Lower(new SlotReference("dt", VarcharType.SYSTEM_DEFAULT)),
+                        new StringLiteral("2025-10-10")), 4, cache);
+        Assertions.assertEquals(4, partitionItemMap.size());
     }
 }

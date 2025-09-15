@@ -54,6 +54,7 @@ import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
+import org.apache.doris.nereids.util.ExpressionUtils;
 import org.apache.doris.qe.AutoCloseConnectContext;
 import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
@@ -195,14 +196,8 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                             hiveTbl.getName(), partitionPredicate.toSql(), partitionColumnNames,
                             hiveTbl.getPartitionColumnTypes());
                 } else {
-                    HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
-                            > Config.max_partition_num_for_single_hive_table_without_filter
-                            ? cache.getPartitionValuesFromViewWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
-                            hiveTbl.getPartitionColumnTypes()) :
-                            cache.getPartitionValuesFromView(
-                                    hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
-                    Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
-                    partitionNum = idToPartitionItem.size();
+                    Map<Long, PartitionItem> idToPartitionItem = getSelectedPartitionItemsFromView(hiveTbl,
+                            partitionColumnNames, partitionPredicate, partitionNum, cache);
                     List<Long> prunedPartitions = Lists.newArrayList();
                     if (PartitionPruner.tryPrune(partitionSlots, partitionPredicate, idToPartitionItem,
                             prunedPartitions, ctx)) {
@@ -299,6 +294,54 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
     }
 
     @VisibleForTesting
+    protected Map<Long, PartitionItem> getSelectedPartitionItems(HMSExternalTable hiveTbl,
+            List<String> partitionColumnNames, Expression partitionPredicate,
+            int partitionNum, HiveMetaStoreCache cache) {
+        Set<Expression> conjuncts = Sets.newHashSet();
+        for (Expression expression : ExpressionUtils.extractConjunction(partitionPredicate)) {
+            if (isFilterSupportedByListPartitions(expression)) {
+                conjuncts.add(expression);
+            }
+        }
+        if (!conjuncts.isEmpty()) {
+            return cache.getPartitionValuesByFilter(hiveTbl.getDbName(), hiveTbl.getName(),
+                    ExpressionUtils.and(conjuncts).toSql(), partitionColumnNames, hiveTbl.getPartitionColumnTypes());
+        } else {
+            HiveMetaStoreCache.HivePartitionValues hivePartitionValues =
+                    partitionNum > Config.max_partition_num_for_single_hive_table_without_filter
+                            ? cache.getPartitionValuesWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
+                            hiveTbl.getPartitionColumnTypes())
+                            : cache.getPartitionValues(hiveTbl.getDbName(), hiveTbl.getName(),
+                                    hiveTbl.getPartitionColumnTypes());
+            return hivePartitionValues.getIdToPartitionItem();
+        }
+    }
+
+    @VisibleForTesting
+    protected Map<Long, PartitionItem> getSelectedPartitionItemsFromView(HMSExternalTable hiveTbl,
+            List<String> partitionColumnNames, Expression partitionPredicate,
+            int partitionNum, HiveMetaStoreCache cache) {
+        Set<Expression> conjuncts = Sets.newHashSet();
+        for (Expression expression : ExpressionUtils.extractConjunction(partitionPredicate)) {
+            if (isFilterSupportedByListPartitions(expression)) {
+                conjuncts.add(expression);
+            }
+        }
+        if (!conjuncts.isEmpty()) {
+            return cache.getPartitionValuesByFilterFromView(hiveTbl.getDbName(), hiveTbl.getName(),
+                    ExpressionUtils.and(conjuncts).toSql(), partitionColumnNames, hiveTbl.getPartitionColumnTypes());
+        } else {
+            HiveMetaStoreCache.HivePartitionValues hivePartitionValues =
+                    partitionNum > Config.max_partition_num_for_single_hive_table_without_filter
+                            ? cache.getPartitionValuesFromViewWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
+                            hiveTbl.getPartitionColumnTypes())
+                            : cache.getPartitionValuesFromView(hiveTbl.getDbName(), hiveTbl.getName(),
+                                    hiveTbl.getPartitionColumnTypes());
+            return hivePartitionValues.getIdToPartitionItem();
+        }
+    }
+
+    @VisibleForTesting
     protected SelectedPartitions pruneHivePartitions(HMSExternalTable hiveTbl,
             LogicalFilter<LogicalFileScan> filter, LogicalFileScan scan, CascadesContext ctx, boolean isViewBased) {
         Map<Long, PartitionItem> selectedPartitionItems = Maps.newHashMap();
@@ -350,14 +393,8 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                             hiveTbl.getName(), partitionPredicate.toSql(), partitionColumnNames,
                             hiveTbl.getPartitionColumnTypes());
                 } else {
-                    HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
-                            > Config.max_partition_num_for_single_hive_table_without_filter
-                            ? cache.getPartitionValuesWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
-                            hiveTbl.getPartitionColumnTypes()) :
-                            cache.getPartitionValues(
-                                    hiveTbl.getDbName(), hiveTbl.getName(), hiveTbl.getPartitionColumnTypes());
-                    Map<Long, PartitionItem> idToPartitionItem = hivePartitionValues.getIdToPartitionItem();
-                    partitionNum = idToPartitionItem.size();
+                    Map<Long, PartitionItem> idToPartitionItem = getSelectedPartitionItems(hiveTbl,
+                            partitionColumnNames, partitionPredicate, partitionNum, cache);
                     List<Long> prunedPartitions = Lists.newArrayList();
                     if (PartitionPruner.tryPrune(partitionSlots, partitionPredicate, idToPartitionItem,
                             prunedPartitions, ctx)) {

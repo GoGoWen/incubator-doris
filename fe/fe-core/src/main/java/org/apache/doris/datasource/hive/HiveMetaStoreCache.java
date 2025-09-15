@@ -298,12 +298,7 @@ public class HiveMetaStoreCache {
 
     private int loadPartitionNum(PartitionNumCacheKey key) {
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
-        if (key.fromView) {
-            ///  todo check here, we dont have getNumPartitionsByFilterFromView
-            return catalog.getClient().listPartitionNamesFromView(key.dbName, key.tblName).size();
-        } else {
-            return catalog.getClient().getNumPartitionsByFilter(key.dbName, key.tblName, "");
-        }
+        return catalog.getClient().getNumPartitionsByFilter(key.dbName, key.tblName, "");
     }
 
     private Map<Long, PartitionItem> loadFilterPartitionValues(FilterPartitionValueCacheKey key) {
