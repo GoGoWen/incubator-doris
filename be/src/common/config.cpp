@@ -1295,6 +1295,8 @@ DEFINE_mInt64(pipeline_task_leakage_detect_period_secs, "60");
 
 DEFINE_mBool(enable_pipeline_task_leakage_detect, "false");
 
+DEFINE_mBool(enable_hdfs_file_handle_cache, "false");
+
 // clang-format off
 #ifdef BE_TEST
 // test s3

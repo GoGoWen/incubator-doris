@@ -49,6 +49,9 @@ public:
     bool hdfs_create_directory_should_fail = false;
     bool hdfs_delete_should_fail = false;
     bool hdfs_rename_should_fail = false;
+    bool hdfs_read_should_fail = false;
+    bool hdfs_pread_should_fail = false;
+    bool hdfs_seek_should_fail = false;
 
     // Mock return values
     int mock_exists_return_value = 0; // 0 means exists, -1 means doesn't exist
@@ -66,6 +69,9 @@ public:
         hdfs_create_directory_should_fail = false;
         hdfs_delete_should_fail = false;
         hdfs_rename_should_fail = false;
+        hdfs_read_should_fail = false;
+        hdfs_pread_should_fail = false;
+        hdfs_seek_should_fail = false;
         mock_exists_return_value = 0;
         mock_file_count = 0;
         mock_fs_handles.clear();
@@ -131,6 +137,9 @@ int mock_hdfsSeek(hdfsFS fs, hdfsFile file, tOffset desiredPos);
 // Mock hdfsTell
 tOffset mock_hdfsTell(hdfsFS fs, hdfsFile file);
 
+// Mock hdfsPread
+tSize mock_hdfsPread(hdfsFS fs, hdfsFile file, tOffset position, void* buffer, tSize length);
+
 } // extern "C"
 
 // Redefine HDFS function names to use mock implementations when testing
@@ -151,4 +160,5 @@ tOffset mock_hdfsTell(hdfsFS fs, hdfsFile file);
 #define hdfsFlush mock_hdfsFlush
 #define hdfsSeek mock_hdfsSeek
 #define hdfsTell mock_hdfsTell
+#define hdfsPread mock_hdfsPread
 #endif

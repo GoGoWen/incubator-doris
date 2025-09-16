@@ -1376,6 +1376,8 @@ DECLARE_mInt64(pipeline_task_leakage_detect_period_secs);
 
 DECLARE_mBool(enable_pipeline_task_leakage_detect);
 
+DECLARE_mBool(enable_hdfs_file_handle_cache);
+
 #ifdef BE_TEST
 // test s3
 DECLARE_String(test_s3_resource);

@@ -165,6 +165,10 @@ tSize mock_hdfsRead(hdfsFS fs, hdfsFile file, void* buffer, tSize length) {
         return -1;
     }
 
+    if (HdfsMockState::instance()->hdfs_read_should_fail) {
+        return -1;
+    }
+
     // Fill buffer with mock data
     memset(buffer, 'A', length);
     return length;
@@ -188,6 +192,11 @@ int mock_hdfsSeek(hdfsFS fs, hdfsFile file, tOffset desiredPos) {
     if (file == nullptr) {
         return -1;
     }
+
+    if (HdfsMockState::instance()->hdfs_seek_should_fail) {
+        return -1;
+    }
+
     return 0; // Success
 }
 
@@ -196,6 +205,21 @@ tOffset mock_hdfsTell(hdfsFS fs, hdfsFile file) {
         return -1;
     }
     return 0; // Mock position
+}
+
+tSize mock_hdfsPread(hdfsFS fs, hdfsFile file, tOffset position, void* buffer, tSize length) {
+    if (fs == nullptr || file == nullptr || buffer == nullptr) {
+        return -1;
+    }
+
+    if (HdfsMockState::instance()->hdfs_pread_should_fail) {
+        return -1;
+    }
+
+    // Fill buffer with mock data (use position to vary data slightly)
+    char pattern = 'A' + (position % 26);
+    memset(buffer, pattern, length);
+    return length;
 }
 
 } // extern "C"

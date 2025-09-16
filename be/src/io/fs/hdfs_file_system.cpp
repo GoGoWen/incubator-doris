@@ -39,6 +39,7 @@
 #include "io/fs/file_system.h"
 #include "io/fs/file_writer.h"
 #include "io/fs/hdfs_file_reader.h"
+#include "io/fs/new_hdfs_file_reader.h"
 #include "io/fs/hdfs_file_writer.h"
 #include "io/fs/local_file_system.h"
 #include "io/hdfs_builder.h"
@@ -184,12 +185,22 @@ Status HdfsFileSystem::open_file_internal(const Path& file, FileReaderSPtr* read
     CHECK_HDFS_HANDLE(_fs_handle);
     Path real_path = convert_path(file, _fs_name);
 
-    FileHandleCache::Accessor accessor;
-    RETURN_IF_ERROR(HdfsFileHandleCache::instance()->get_file(
-            std::static_pointer_cast<HdfsFileSystem>(shared_from_this()), real_path, opts.mtime,
-            opts.file_size, &accessor));
+    if (config::enable_hdfs_file_handle_cache) {
+        FileHandleCache::Accessor accessor;
+        RETURN_IF_ERROR(HdfsFileHandleCache::instance()->get_file(
+                std::static_pointer_cast<HdfsFileSystem>(shared_from_this()), real_path, opts.mtime,
+                opts.file_size, &accessor));
 
-    *reader = std::make_shared<HdfsFileReader>(file, _fs_name, std::move(accessor), _profile);
+        *reader = std::make_shared<HdfsFileReader>(file, _fs_name, std::move(accessor), _profile);
+    } else {
+        std::unique_ptr<ExclusiveHdfsFileHandle> hdfs_file_handle =
+            std::make_unique<ExclusiveHdfsFileHandle>(std::static_pointer_cast<HdfsFileSystem>(shared_from_this())->_fs_handle,
+                real_path.string(), opts.mtime);
+        RETURN_IF_ERROR(hdfs_file_handle->init(opts.file_size));
+        *reader = std::make_shared<NewHdfsFileReader>(file, _fs_name, std::static_pointer_cast<HdfsFileSystem>(shared_from_this()),
+            std::move(hdfs_file_handle), _profile);
+    }
+
     return Status::OK();
 }
 
