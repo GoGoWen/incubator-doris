@@ -3006,4 +3006,8 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"是否启用大小查询资源隔离",
             "whether to enable resource isolation for large and small queries"})
     public static long selected_total_file_size_indicate_large_query = 100 * 1024 * 1024 * 1024L;
+
+    @ConfField(mutable = true, description = {"当执行alter操作的时候是否检查当前db的quota",
+            "whether to enable check database's quota when do alter operation"})
+    public static boolean enable_check_database_quota_for_alter = true;
 }

@@ -18,6 +18,7 @@
 package org.apache.doris.catalog;
 
 import org.apache.doris.catalog.MaterializedIndex.IndexState;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.ExceptionChecker;
 import org.apache.doris.common.FeConstants;
@@ -30,6 +31,8 @@ import org.apache.doris.thrift.TStorageType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import mockit.Expectations;
+import mockit.Mock;
+import mockit.MockUp;
 import mockit.Mocked;
 import org.junit.Assert;
 import org.junit.Before;
@@ -42,6 +45,7 @@ import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class DatabaseTest {
 
@@ -254,5 +258,25 @@ public class DatabaseTest {
         // 3. delete files
         dis.close();
         Files.delete(path);
+    }
+
+    @Test
+    public void testEnableCheckDatabaseQuota() throws DdlException {
+        Config.enable_check_database_quota_for_alter = true;
+        final AtomicInteger invokeTimes = new AtomicInteger(0);
+        new MockUp<Database>() {
+            @Mock
+            public void checkDataSizeQuota() {
+                invokeTimes.incrementAndGet();
+            }
+
+            @Mock
+            public void checkReplicaQuota() {
+                invokeTimes.incrementAndGet();
+            }
+
+        };
+        db.checkQuota();
+        Assert.assertEquals(2, invokeTimes.get());
     }
 }
