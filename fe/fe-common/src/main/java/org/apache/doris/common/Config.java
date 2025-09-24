@@ -2958,6 +2958,10 @@ public class Config extends ConfigBase {
         "print a warning when the duration exceeds the specified time"})
     public static long log_slow_hms_time_ms = 5000;
 
+    @ConfField(mutable = true, description = {"当HMS调用返回的分区数量超过指定阈值时打印日志",
+        "print a warning when HMS call returns more partitions than the specified threshold"})
+    public static int log_huge_hms_partition_num = 10000;
+
     @ConfField(mutable = true, description = {"是否支持自适应生成运行实例并发数",
             "whether to enable generate num of instances adaptively"})
     public static boolean enable_adaptive_generate_num_instances = false;
