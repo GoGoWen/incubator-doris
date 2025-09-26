@@ -134,6 +134,202 @@ public class ErrorCodeMapper {
                 ErrorCode.ERR_PARSE_EXCEPTION);
         errorMap.put(Pattern.compile("failed to get table.*MetaException.*权限"),
                 ErrorCode.ERR_MetaException);
+
+        errorMap.put(Pattern.compile("Query timeout|query timeout"), ErrorCode.ERR_QUERY_TIMEOUT);
+        errorMap.put(Pattern.compile("cancel query by user from"), ErrorCode.ERR_USER_CANCEL);
+        errorMap.put(Pattern.compile("query is cancelled"), ErrorCode.ERR_QUERY_CANCELLED);
+        errorMap.put(Pattern.compile("Read hdfs file failed"), ErrorCode.ERR_READ_HDFS_FILE_FAILED_CN);
+        errorMap.put(Pattern.compile("fail to offer request to the work pool"),
+                ErrorCode.ERR_WORK_POOL_OFFER_FAILED);
+        errorMap.put(Pattern.compile("column must use with specific function"),
+                ErrorCode.ERR_COLUMN_MUST_WITH_SPEC_FUNC);
+        errorMap.put(Pattern.compile("Failed to submit scanner to scanner pool reason"),
+                ErrorCode.ERR_SUBMIT_SCANNER_FAILED);
+        errorMap.put(Pattern.compile("Could not compile regexp pattern"),
+                ErrorCode.ERR_REGEX_COMPILE_FAILED);
+        errorMap.put(Pattern.compile("UDF failed to evaluate"),
+                ErrorCode.ERR_UDF_EVALUATE_FAILED_CN);
+        errorMap.put(Pattern.compile("prune hive partitions failed"),
+                ErrorCode.ERR_PRUNE_HIVE_PARTITIONS_FAILED);
+        errorMap.put(Pattern.compile("Infinity result is invalid"),
+                ErrorCode.ERR_INFINITY_RESULT_INVALID);
+        errorMap.put(Pattern.compile("date/datetime literal is invalid"),
+                ErrorCode.ERR_INVALID_DATE_LITERAL);
+        errorMap.put(Pattern.compile("Invalid regex expression"),
+                ErrorCode.ERR_INVALID_REGEX_EXPRESSION);
+        errorMap.put(Pattern.compile("Can not build PartitionsTableValuedFunction by partition_values"),
+                ErrorCode.ERR_BUILD_TVF_BY_PARTITION_VALUES_FAILED);
+        errorMap.put(Pattern.compile("date_trunc function second param only support"),
+                ErrorCode.ERR_DATE_TRUNC_SECOND_PARAM_UNSUPPORTED);
+        errorMap.put(Pattern.compile("the second parameter of date_trunc function must be a string constant"),
+                ErrorCode.ERR_DATE_TRUNC_SECOND_PARAM_MUST_STRING_CONST);
+        errorMap.put(Pattern.compile("can not cast from origin type TEXT to target type=UNSUPPORTED"),
+                ErrorCode.ERR_CAST_TEXT_TO_UNSUPPORTED);
+        errorMap.put(Pattern.compile("Doris process failed: Connection reset by peer"),
+                ErrorCode.ERR_CONN_RESET_BY_PEER);
+        errorMap.put(Pattern.compile("Catalog .* does not exist"),
+                ErrorCode.ERR_CATALOG_NOT_EXIST_CN);
+        errorMap.put(Pattern.compile("Decode url failed"),
+                ErrorCode.ERR_DECODE_URL_FAILED);
+        errorMap.put(Pattern.compile("Couldn't deserialize thrift msg"),
+                ErrorCode.ERR_THRIFT_DESERIALIZE_FAILED);
+        errorMap.put(Pattern.compile("column_type not match"),
+                ErrorCode.ERR_COLUMN_TYPE_NOT_MATCH);
+        errorMap.put(Pattern.compile("GROUP BY expression must not contain aggregate functions"),
+                ErrorCode.ERR_GROUP_BY_NOT_CONTAIN_AGG);
+        errorMap.put(Pattern.compile("Required field 'queryId' was not present"),
+                ErrorCode.ERR_REQUIRED_QUERY_ID_NOT_PRESENT);
+        errorMap.put(Pattern.compile("maximum_expression_tree"),
+                ErrorCode.ERR_MAX_EXPRESSION_TREE);
+        errorMap.put(Pattern.compile("function: substring_index|substring_index"),
+                ErrorCode.ERR_SUBSTRING_INDEX);
+        errorMap.put(Pattern.compile("query queue timeout"),
+                ErrorCode.ERR_QUERY_QUEUE_TIMEOUT);
+        errorMap.put(Pattern.compile("no table auth"),
+                ErrorCode.ERR_NO_TABLE_AUTH);
+        errorMap.put(Pattern.compile("can not cast from origin type ARRAY"),
+                ErrorCode.ERR_CAST_ARRAY_FAILED);
+        errorMap.put(Pattern.compile("Json path error: Invalid Json Path for value"),
+                ErrorCode.ERR_INVALID_JSON_PATH_VALUE);
+        errorMap.put(Pattern.compile("Doris process failed: Broken pipe"), ErrorCode.ERR_BROKEN_PIPE);
+        errorMap.put(Pattern.compile("Unknown error 255"),
+                ErrorCode.ERR_UNKNOWN_ERROR_255);
+        errorMap.put(Pattern.compile("analysis err"),
+                ErrorCode.ERR_ANALYSIS_ERR_CN);
+        errorMap.put(Pattern.compile("Lzo decompression failed: MalformedInputException"),
+                ErrorCode.ERR_LZO_DECOMPRESS_FAILED);
+        errorMap.put(Pattern.compile("lowestCostPlans with physicalProperties"),
+                ErrorCode.ERR_LOWEST_COST_PLANS);
+        errorMap.put(Pattern.compile("Invalid call to"),
+                ErrorCode.ERR_INVALID_CALL);
+        errorMap.put(Pattern.compile("GC wg for hard limit"),
+                ErrorCode.ERR_GC_WG_HARD_LIMIT);
+        errorMap.put(Pattern.compile("Expected EQ 1 to be returned by expression"),
+                ErrorCode.ERR_EXPECT_EQ1_BY_EXPR);
+        errorMap.put(Pattern.compile("table not found"),
+                ErrorCode.ERR_TABLE_NOT_FOUND_CN);
+        errorMap.put(Pattern.compile("aggregate function cannot contain aggregate parameters"),
+                ErrorCode.ERR_AGG_FUNC_CONTAIN_AGG_PARAMS);
+        errorMap.put(Pattern.compile("Operands have unequal number of columns"),
+                ErrorCode.ERR_OPERANDS_UNEQUAL_COLUMNS);
+        errorMap.put(Pattern.compile("unsupport chubaofs"),
+                ErrorCode.ERR_UNSUPPORT_CHUBAOFs);
+        errorMap.put(Pattern.compile("exceed max bytes for single hudi table"),
+                ErrorCode.ERR_EXCEED_MAX_BYTES_SINGLE_HUDI);
+        errorMap.put(Pattern.compile(" return type is Nullable"),
+                ErrorCode.ERR_RETURN_TYPE_NULLABLE);
+        errorMap.put(Pattern.compile("COUNT DISTINCT could not process type"),
+                ErrorCode.ERR_COUNT_DISTINCT_TYPE_UNSUPPORTED);
+        errorMap.put(Pattern.compile("cannot be cast to class org.apache.doris.nereids.types.StructType"),
+                ErrorCode.ERR_CANNOT_CAST_TO_STRUCTTYPE);
+        errorMap.put(Pattern.compile("LOGICAL_PROJECT can not contains TableGeneratingFunction expression"),
+                ErrorCode.ERR_LOGICAL_PROJECT_TGF);
+        errorMap.put(Pattern.compile("LEFT OUTER JOIN requires an ON or USING clause"),
+                ErrorCode.ERR_LEFT_OUTER_JOIN_NEED_ON);
+        errorMap.put(Pattern.compile("No such file or directory"),
+                ErrorCode.ERR_NO_SUCH_FILE_OR_DIR);
+        errorMap.put(Pattern.compile("WindowFrame clause requires OrderBy clause"),
+                ErrorCode.ERR_WINDOWFRAME_NEED_ORDERBY);
+        errorMap.put(Pattern.compile("analytic function is not allowed in LOGICAL_PROJECT"),
+                ErrorCode.ERR_LOGICAL_PROJECT_NO_ANALYTIC);
+        errorMap.put(Pattern.compile("Exceeded the maximum number of child expressions"),
+                ErrorCode.ERR_EXCEEDED_MAX_CHILD_EXPR);
+        errorMap.put(Pattern.compile("Unknown lambda slot"),
+                ErrorCode.ERR_UNKNOWN_LAMBDA_SLOT);
+        errorMap.put(Pattern.compile("doesn't support order by expression"),
+                ErrorCode.ERR_UNSUPPORTED_ORDER_BY_EXPR);
+        errorMap.put(Pattern.compile("No matching function with signature"),
+                ErrorCode.ERR_NO_MATCHING_FUNCTION_SIGNATURE);
+        errorMap.put(Pattern.compile("string cannot be cast to double"),
+                ErrorCode.ERR_STRING_CANNOT_CAST_TO_DOUBLE);
+        errorMap.put(Pattern.compile("IllegalArgumentException: Expecting scale"),
+                ErrorCode.ERR_EXPECTING_SCALE);
+        errorMap.put(Pattern.compile("has no permission on column"),
+                ErrorCode.ERR_NO_COLUMN_PERMISSION);
+        errorMap.put(Pattern.compile("type UNSUPPORTED is unsupported for Nereids"),
+                ErrorCode.ERR_TYPE_UNSUPPORTED_FOR_NEREIDS);
+        errorMap.put(Pattern.compile("The requested URL returned error: 404"),
+                ErrorCode.ERR_REQUESTED_URL_404);
+        errorMap.put(Pattern.compile(" Failed to open input stream for file ,such as avro..."),
+                ErrorCode.ERR_FAILED_OPEN_INPUT_STREAM);
+        errorMap.put(Pattern.compile("LOGICAL_SORT can not contains"),
+                ErrorCode.ERR_LOGICAL_SORT_CANNOT_CONTAINS);
+        errorMap.put(Pattern.compile("engine:Coordinator dead"),
+                ErrorCode.ERR_COORDINATOR_DEAD);
+        errorMap.put(Pattern.compile("engine:The select item in correlated subquery"),
+                ErrorCode.ERR_SELECT_ITEM_IN_CORRELATED_SUBQUERY);
+        errorMap.put(Pattern.compile("Arithmetic overflow when converting value"),
+                ErrorCode.ERR_ARITHMETIC_OVERFLOW);
+        errorMap.put(Pattern.compile("engine:Output slots of table function node is empty"),
+                ErrorCode.ERR_TABLE_FUNCTION_OUTPUT_EMPTY);
+        errorMap.put(Pattern.compile("No value present"),
+                ErrorCode.ERR_NO_VALUE_PRESENT);
+        errorMap.put(Pattern.compile("string column length is too large"),
+                ErrorCode.ERR_STRING_COLUMN_LENGTH_TOO_LARGE);
+        errorMap.put(Pattern.compile("LOGICAL_FILTER can not contains AggregateFunction expression"),
+                ErrorCode.ERR_LOGICAL_FILTER_CONTAIN_AGG_FUNC);
+        errorMap.put(Pattern.compile("can't support multi distinct"),
+                ErrorCode.ERR_CANT_SUPPORT_MULTI_DISTINCT);
+        errorMap.put(Pattern.compile("DISTINCT not allowed in analytic function"),
+                ErrorCode.ERR_DISTINCT_NOT_ALLOWED_IN_ANALYTIC);
+        errorMap.put(Pattern.compile("Function eq get failed"),
+                ErrorCode.ERR_FUNCTION_EQ_GET_FAILED);
+        errorMap.put(Pattern.compile("Failed to fetch internal SQL result"),
+                ErrorCode.ERR_FAILED_FETCH_INTERNAL_SQL_RESULT);
+        errorMap.put(Pattern.compile("Region data is not ready"),
+                ErrorCode.ERR_REGION_DATA_NOT_READY);
+        errorMap.put(Pattern.compile("grouping and/or aggregation LogicalProject"),
+                ErrorCode.ERR_GROUPING_OR_AGG_LOGICAL_PROJECT);
+        errorMap.put(Pattern.compile("unknown qualifier"),
+                ErrorCode.ERR_UNKNOWN_QUALIFIER);
+        errorMap.put(Pattern.compile("count or sum distinct have multi columns"),
+                ErrorCode.ERR_COUNT_OR_SUM_DISTINCT_MULTI_COLUMNS);
+        errorMap.put(Pattern.compile("scalar subquery's correlatedPredicates's operator must be EQ"),
+                ErrorCode.ERR_SCALAR_SUBQUERY_PREDICATE_MUST_EQ);
+        errorMap.put(Pattern.compile("Failed to get next row of data. "
+                + "CAUSED BY: ArrayIndexOutOfBoundsException"),
+                ErrorCode.ERR_GET_NEXT_ROW_ARRAY_INDEX_OOBE);
+        errorMap.put(Pattern.compile("Multiple columns returned by subquery are not yet supported"),
+                ErrorCode.ERR_SUBQUERY_MULTI_COLUMNS_NOT_SUPPORTED);
+        errorMap.put(Pattern.compile("remote table.* storage input format is null"),
+                ErrorCode.ERR_REMOTE_TABLE_STORAGE_INPUT_FORMAT_NULL);
+        errorMap.put(Pattern.compile("query waiting queue is full"),
+                ErrorCode.ERR_QUERY_WAIT_QUEUE_FULL);
+        errorMap.put(Pattern.compile("The depth of the expression tree is too big, make it less than"),
+                ErrorCode.ERR_EXPR_TREE_TOO_DEEP);
+        errorMap.put(Pattern.compile("out of bounds for length"),
+                ErrorCode.ERR_OUT_OF_BOUNDS_FOR_LENGTH);
+        errorMap.put(Pattern.compile("LOGICAL_HAVING can not contains WindowExpression expression"),
+                ErrorCode.ERR_LOGICAL_HAVING_CONTAIN_WINDOW_EXPR);
+        errorMap.put(Pattern.compile("comparison predicate could not contains complex type"),
+                ErrorCode.ERR_COMPARISON_PREDICATE_NOT_CONTAIN_COMPLEX_TYPE);
+        errorMap.put(Pattern.compile("Cannot convert infinity or NaN to decimal"),
+                ErrorCode.ERR_CANNOT_CONVERT_INF_OR_NAN_TO_DECIMAL);
+        errorMap.put(Pattern.compile("Agg Function .* is not implemented"),
+                ErrorCode.ERR_AGG_FUNCTION_NOT_IMPLEMENTED);
+        errorMap.put(Pattern.compile("the second parameter of date_trunc function must be a string constant: "
+                + "date_trunc"),
+                ErrorCode.ERR_DATE_TRUNC_SECOND_PARAM_MUST_STRING_CONST);
+        errorMap.put(Pattern.compile("failed to get next in hadoop hudi jni scanner"),
+                ErrorCode.ERR_HUDI_JNI_SCANNER_GET_NEXT_FAILED);
+        errorMap.put(Pattern.compile("CastExpr cannot be cast to class org.apache.doris.analysis.LiteralExp"),
+                ErrorCode.ERR_CASTEXPR_CANNOT_CAST_TO_LITERAL);
+        errorMap.put(Pattern.compile("empty error"),
+                ErrorCode.ERR_EMPTY_ERROR);
+        errorMap.put(Pattern.compile("Primary key is not set in hudi table"),
+                ErrorCode.ERR_HUDI_PRIMARY_KEY_NOT_SET);
+        errorMap.put(Pattern.compile("failed to convert hive partition"),
+                ErrorCode.ERR_CONVERT_HIVE_PARTITION_FAILED);
+        errorMap.put(Pattern.compile("requires a numeric parameter"),
+                ErrorCode.ERR_REQUIRES_NUMERIC_PARAMETER);
+        errorMap.put(Pattern.compile("Input slot\\(s\\) not in child output"),
+                ErrorCode.ERR_INPUT_SLOTS_NOT_IN_CHILD_OUTPUT);
+        errorMap.put(Pattern.compile("Wrong parquet level format"),
+                ErrorCode.ERR_WRONG_PARQUET_LEVEL_FORMAT);
+        errorMap.put(Pattern.compile("OutOfMemoryError: Java heap space"),
+                ErrorCode.ERR_OOM_JAVA_HEAP_SPACE);
+        errorMap.put(Pattern.compile("can only be used in conjunction with COUNT"),
+                ErrorCode.ERR_CAN_ONLY_USED_WITH_COUNT);
     }
 
     public static ErrorCode getErrorCode(String errorMessage) {
