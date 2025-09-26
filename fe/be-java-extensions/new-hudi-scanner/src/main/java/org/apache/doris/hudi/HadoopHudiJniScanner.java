@@ -55,8 +55,36 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+/**
+ * RowData represents a single row of data read from Hudi reader.
+ */
+private static class RowData {
+    private final NullWritable key;
+    private final ArrayWritable value;
+    
+    public RowData(NullWritable key, ArrayWritable value) {
+        this.key = key;
+        this.value = value;
+    }
+    
+    public NullWritable getKey() {
+        return key;
+    }
+    
+    public ArrayWritable getValue() {
+        return value;
+    }
+}
 
 /**
  * HadoopHudiJniScanner is a JniScanner implementation that reads Hudi data using hudi-hadoop-mr.
@@ -65,6 +93,19 @@ public class HadoopHudiJniScanner extends JniScanner {
     private static final Logger LOG = LoggerFactory.getLogger(HadoopHudiJniScanner.class);
 
     private static final String HADOOP_CONF_PREFIX = "hadoop_conf.";
+    
+    // Shared thread pool for background readers across all scanner instances
+    private static final ThreadPoolExecutor BACKGROUND_READER_POOL = new ThreadPoolExecutor(
+            2, // core pool size
+            10, // maximum pool size  
+            60L, TimeUnit.SECONDS, // keep alive time
+            new LinkedBlockingQueue<>(100), // work queue
+            r -> {
+                Thread t = new Thread(r, "HadoopHudiJniScanner-BackgroundReader-" + System.currentTimeMillis());
+                t.setDaemon(true);
+                return t;
+            }
+    );
 
     // Hudi data info
     private final String basePath;
@@ -97,6 +138,17 @@ public class HadoopHudiJniScanner extends JniScanner {
 
     private final String hadoopUserName;
     private final String hadoopUserToken;
+
+    // Threading related fields
+    private BlockingQueue<RowData> dataQueue;
+    private java.util.concurrent.Future<?> backgroundReaderTask;
+    private final AtomicBoolean isReaderFinished = new AtomicBoolean(false);
+    private final AtomicReference<Exception> readerException = new AtomicReference<>(null);
+    private volatile boolean isClosed = false;
+    private int consecutiveTimeoutCount = 0;
+    private long totalWaitTimeMs = 0;
+    private static final int MAX_CONSECUTIVE_TIMEOUTS = 5;
+    private static final long TIMEOUT_INTERVAL_MS = 100;
 
     public HadoopHudiJniScanner(int fetchSize, Map<String, String> params) {
         this.basePath = params.get("base_path");
@@ -141,6 +193,9 @@ public class HadoopHudiJniScanner extends JniScanner {
         this.classLoader = this.getClass().getClassLoader();
         this.hadoopUserName = params.get("HADOOP_USER_NAME");
         this.hadoopUserToken = params.get("HADOOP_USER_TOKEN");
+
+        // Initialize data queue with reasonable capacity
+        this.dataQueue = new LinkedBlockingQueue<>(fetchSize * 2);
     }
 
     public String getBasePath() {
@@ -220,16 +275,58 @@ public class HadoopHudiJniScanner extends JniScanner {
     @Override
     public int getNext() throws IOException {
         try (ThreadClassLoaderContext ignored = new ThreadClassLoaderContext(classLoader)) {
-            NullWritable key = reader.createKey();
-            ArrayWritable value = reader.createValue();
+            // Check if there's an exception from background reader
+            Exception exception = readerException.get();
+            if (exception != null) {
+                close();
+                throw new IOException("Background reader error: " + exception.getMessage(), exception);
+            }
+
             int numRows = 0;
             for (; numRows < fetchSize; numRows++) {
-                if (!reader.next(key, value)) {
-                    break;
+                RowData rowData;
+                try {
+                    // Try to get data from queue with timeout to avoid hanging forever
+                    rowData = dataQueue.poll(TIMEOUT_INTERVAL_MS, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while waiting for data", e);
                 }
-                Object rowData = deserializer.deserialize(value);
+
+                if (rowData == null) {
+                    // No data available, check if reader is finished
+                    if (isReaderFinished.get()) {
+                        break; // No more data
+                    }
+
+                    // Increment consecutive timeout count and total wait time
+                    consecutiveTimeoutCount++;
+                    totalWaitTimeMs += TIMEOUT_INTERVAL_MS;
+                    LOG.debug("Timeout waiting for data, consecutive timeout count: {}, total wait time: {}ms", 
+                            consecutiveTimeoutCount, totalWaitTimeMs);
+
+                    // Check if we've exceeded the maximum consecutive timeouts
+                    if (consecutiveTimeoutCount >= MAX_CONSECUTIVE_TIMEOUTS) {
+                        if (numRows > 0) {
+                            break;
+                        } else {
+                            return -1;
+                        }
+                    }
+
+                    // Reader is still active but no data yet, continue waiting
+                    numRows--; // Don't count this iteration
+                    continue;
+                }
+
+                // Reset consecutive timeout count and total wait time when we successfully get data
+                consecutiveTimeoutCount = 0;
+                totalWaitTimeMs = 0;
+
+                // Process the row data
+                Object rowObj = deserializer.deserialize(rowData.getValue());
                 for (int i = 0; i < fields.length; i++) {
-                    Object fieldData = rowInspector.getStructFieldData(rowData, structFields[i]);
+                    Object fieldData = rowInspector.getStructFieldData(rowObj, structFields[i]);
                     columnValue.setRow(fieldData);
                     columnValue.setField(types[i], fieldInspectors[i]);
                     appendData(i, columnValue);
@@ -246,6 +343,26 @@ public class HadoopHudiJniScanner extends JniScanner {
     @Override
     public void close() throws IOException {
         try (ThreadClassLoaderContext ignored = new ThreadClassLoaderContext(classLoader)) {
+            // Mark as closed to signal background task to stop
+            isClosed = true;
+
+            // Cancel background task if it's still running
+            if (backgroundReaderTask != null && !backgroundReaderTask.isDone()) {
+                backgroundReaderTask.cancel(true);
+                try {
+                    // Wait for background task to finish with timeout
+                    backgroundReaderTask.get(5000, TimeUnit.MILLISECONDS);
+                } catch (java.util.concurrent.TimeoutException e) {
+                    LOG.warn("Timeout waiting for background reader task to finish");
+                } catch (java.util.concurrent.ExecutionException e) {
+                    LOG.warn("Background reader task execution failed", e.getCause());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    LOG.warn("Interrupted while waiting for background reader task to finish");
+                }
+            }
+
+            // Close the reader
             if (reader != null) {
                 reader.close();
             }
@@ -323,6 +440,9 @@ public class HadoopHudiJniScanner extends JniScanner {
             structFields[i] = field;
             fieldInspectors[i] = field.getFieldObjectInspector();
         }
+
+        // Start background reader thread
+        startBackgroundReader();
     }
 
     private InputFormat<?, ?> getInputFormat(Configuration conf, String inputFormat) throws Exception {
@@ -345,5 +465,51 @@ public class HadoopHudiJniScanner extends JniScanner {
         Preconditions.checkNotNull(deserializer);
         ObjectInspector inspector = deserializer.getObjectInspector();
         return (StructObjectInspector) inspector;
+    }
+
+    /**
+     * Start background task using thread pool to read data from reader.next() and put into queue
+     */
+    private void startBackgroundReader() {
+        backgroundReaderTask = BACKGROUND_READER_POOL.submit(() -> {
+            try (ThreadClassLoaderContext ignored = new ThreadClassLoaderContext(classLoader)) {
+                LOG.debug("Background reader task started");
+                NullWritable key = reader.createKey();
+                ArrayWritable value = reader.createValue();
+
+                while (!isClosed && !Thread.currentThread().isInterrupted()) {
+                    try {
+                        boolean hasNext = reader.next(key, value);
+                        if (!hasNext) {
+                            LOG.debug("No more data available, reader finished");
+                            isReaderFinished.set(true);
+                            break;
+                        }
+
+                        // Create a copy of the data since ArrayWritable might be reused
+                        ArrayWritable valueCopy = new ArrayWritable(value.get());
+                        RowData rowData = new RowData(key, valueCopy);
+
+                        // Put data into queue, this will block if queue is full
+                        dataQueue.put(rowData);
+
+                    } catch (InterruptedException e) {
+                        LOG.debug("Background reader task interrupted");
+                        Thread.currentThread().interrupt();
+                        break;
+                    } catch (Exception e) {
+                        LOG.warn("Error in background reader task", e);
+                        readerException.set(e);
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                LOG.warn("Fatal error in background reader task", e);
+                readerException.set(e);
+            } finally {
+                LOG.debug("Background reader task finished");
+                isReaderFinished.set(true);
+            }
+        });
     }
 }

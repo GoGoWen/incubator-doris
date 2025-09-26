@@ -118,6 +118,13 @@ Status JniConnector::get_next_block(Block* block, size_t* read_rows, bool* eof) 
         meta_address = env->CallLongMethod(_jni_scanner_obj, _jni_scanner_get_next_batch);
     }
     RETURN_ERROR_IF_EXC(env);
+    if (meta_address == -1) {
+        // not get any data with timeout, return false to indicate no data with timeout
+        *read_rows = 0;
+        *eof = false;
+        return Status::OK();
+    }
+    
     if (meta_address == 0) {
         // Address == 0 when there's no data in scanner
         *read_rows = 0;

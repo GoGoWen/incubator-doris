@@ -96,6 +96,11 @@ public abstract class JniScanner {
             releaseTable();
             throw e;
         }
+
+        if (numRows == -1) {
+            return -1;
+        }
+
         if (numRows == 0) {
             releaseTable();
             return 0;
