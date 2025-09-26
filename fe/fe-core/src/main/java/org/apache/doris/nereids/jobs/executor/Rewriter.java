@@ -28,7 +28,6 @@ import org.apache.doris.nereids.rules.analysis.CheckAfterRewrite;
 import org.apache.doris.nereids.rules.analysis.LogicalSubQueryAliasToLogicalProject;
 import org.apache.doris.nereids.rules.analysis.NormalizeAggregate;
 import org.apache.doris.nereids.rules.expression.CheckLegalityAfterRewrite;
-import org.apache.doris.nereids.rules.expression.ExpressionNormalization;
 import org.apache.doris.nereids.rules.expression.ExpressionNormalizationAndOptimization;
 import org.apache.doris.nereids.rules.expression.ExpressionRewrite;
 import org.apache.doris.nereids.rules.rewrite.AddDefaultLimit;
@@ -93,6 +92,7 @@ import org.apache.doris.nereids.rules.rewrite.MergeSetOperationsExcept;
 import org.apache.doris.nereids.rules.rewrite.MergeTopNs;
 import org.apache.doris.nereids.rules.rewrite.NormalizeSort;
 import org.apache.doris.nereids.rules.rewrite.OrExpansion;
+import org.apache.doris.nereids.rules.rewrite.PartitionAggregateRewrite;
 import org.apache.doris.nereids.rules.rewrite.ProjectOtherJoinConditionForNestedLoopJoin;
 import org.apache.doris.nereids.rules.rewrite.PruneEmptyPartition;
 import org.apache.doris.nereids.rules.rewrite.PruneFileScanPartition;
@@ -287,6 +287,21 @@ public class Rewriter extends AbstractBatchJobExecutor {
                         topDown(new ConvertInnerOrCrossJoin()),
                         topDown(new ProjectOtherJoinConditionForNestedLoopJoin())
                 ),
+                topic("Set operation optimization",
+                        // Do MergeSetOperation first because we hope to match pattern of Distinct SetOperator.
+                        topDown(new PushProjectThroughUnion(), new MergeProjects()),
+                        bottomUp(new MergeSetOperations(), new MergeSetOperationsExcept()),
+                        bottomUp(new PushProjectIntoOneRowRelation()),
+                        topDown(new MergeOneRowRelationIntoUnion()),
+                        costBased(topDown(new InferSetOperatorDistinct())),
+                        topDown(new BuildAggForUnion()),
+                        bottomUp(new EliminateEmptyRelation()),
+                        // when union has empty relation child and constantExprsList is not empty,
+                        // after EliminateEmptyRelation, project can be pushed into union
+                        topDown(new PushProjectIntoUnion())
+                ),
+                // putting the "Column pruning and infer predicate" topic behind the "Set operation optimization"
+                // is because that pulling up predicates from union needs EliminateEmptyRelation in union child
                 topic("Column pruning and infer predicate",
                         custom(RuleType.COLUMN_PRUNING, ColumnPruning::new),
                         custom(RuleType.INFER_PREDICATES, InferPredicates::new),
@@ -300,23 +315,10 @@ public class Rewriter extends AbstractBatchJobExecutor {
                         // after eliminate outer join, we can move some filters to join.otherJoinConjuncts,
                         // this can help to translate plan to backend
                         topDown(new PushFilterInsideJoin()),
-                        topDown(new FindHashConditionForJoin()),
-                        topDown(new ExpressionNormalization())
+                        topDown(new FindHashConditionForJoin())
                 ),
-
                 // this rule should invoke after ColumnPruning
                 custom(RuleType.ELIMINATE_UNNECESSARY_PROJECT, EliminateUnnecessaryProject::new),
-
-                topic("Set operation optimization",
-                        // Do MergeSetOperation first because we hope to match pattern of Distinct SetOperator.
-                        topDown(new PushProjectThroughUnion(), new MergeProjects()),
-                        bottomUp(new MergeSetOperations(), new MergeSetOperationsExcept()),
-                        bottomUp(new PushProjectIntoOneRowRelation()),
-                        topDown(new MergeOneRowRelationIntoUnion()),
-                        topDown(new PushProjectIntoUnion()),
-                        costBased(topDown(new InferSetOperatorDistinct())),
-                        topDown(new BuildAggForUnion())
-                ),
 
                 topic("Eliminate GroupBy",
                         topDown(new EliminateGroupBy(),
@@ -430,7 +432,8 @@ public class Rewriter extends AbstractBatchJobExecutor {
                 topic("agg rewrite",
                     // these rules should be put after mv optimization to avoid mv matching fail
                     topDown(new SumLiteralRewrite(),
-                            new MergePercentileToArray())
+                            new MergePercentileToArray(),
+                            new PartitionAggregateRewrite())
                 ),
                 topic("Push project and filter on cte consumer to cte producer",
                         topDown(
