@@ -493,7 +493,7 @@ public class HudiScanNodeTest {
                     java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor()).thenReturn(executor);
+                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
                     return env;
                 }
             };
@@ -1405,7 +1405,7 @@ public class HudiScanNodeTest {
                     java.util.concurrent.ExecutorService faultyExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor()).thenReturn(faultyExecutor);
+                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(faultyExecutor);
                     return env;
                 }
             };
@@ -1503,7 +1503,7 @@ public class HudiScanNodeTest {
                     java.util.concurrent.ExecutorService slowExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor()).thenReturn(slowExecutor);
+                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(slowExecutor);
                     return env;
                 }
             };
@@ -1803,7 +1803,7 @@ public class HudiScanNodeTest {
                     java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor()).thenReturn(executor);
+                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
                     return env;
                 }
             };

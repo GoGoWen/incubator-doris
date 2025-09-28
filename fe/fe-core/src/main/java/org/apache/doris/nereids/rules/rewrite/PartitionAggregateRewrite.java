@@ -19,21 +19,17 @@ package org.apache.doris.nereids.rules.rewrite;
 
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.Env;
-import org.apache.doris.catalog.ListPartitionItem;
 import org.apache.doris.catalog.PartitionItem;
-import org.apache.doris.catalog.PartitionKey;
 import org.apache.doris.common.Config;
+import org.apache.doris.common.util.HMSPartitionsUtil;
 import org.apache.doris.datasource.hive.HMSExternalCatalog;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache;
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
-import org.apache.doris.nereids.trees.expressions.Alias;
-import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.functions.agg.AggregateFunction;
-import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.trees.plans.algebra.SetOperation.Qualifier;
 import org.apache.doris.nereids.trees.plans.logical.LogicalAggregate;
 import org.apache.doris.nereids.trees.plans.logical.LogicalEmptyRelation;
@@ -41,14 +37,12 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalProject;
 import org.apache.doris.nereids.trees.plans.logical.LogicalUnion;
 import org.apache.doris.nereids.types.DataType;
-import org.apache.doris.nereids.util.TypeCoercionUtils;
 import org.apache.doris.tablefunction.PartitionValuesTableValuedFunction.PartitionAggOp;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -170,8 +164,9 @@ public class PartitionAggregateRewrite extends OneRewriteRuleFactory {
 
                     List<NamedExpression> unionOutputs = new ArrayList<>(project.getProjects());
 
-                    List<List<NamedExpression>> constantExprsList = buildConstantExpressionsFromPartitions(
-                            selectedPartitions.values(), partitionColumns, nameToType, unionOutputs);
+                    List<List<NamedExpression>> constantExprsList =
+                            HMSPartitionsUtil.buildConstantExpressionsFromPartitions(selectedPartitions.values(),
+                            partitionColumns, nameToType, unionOutputs);
 
                     // Create LogicalUnion with constantExprsList instead of children
                     LogicalUnion union = new LogicalUnion(Qualifier.ALL, unionOutputs,
@@ -181,50 +176,5 @@ public class PartitionAggregateRewrite extends OneRewriteRuleFactory {
                             project.withChildren(ImmutableList.of(union))
                     ));
                 }).toRule(RuleType.PARTITION_AGGREGATE_WITH_PROJECT_FOR_FILE_SCAN);
-    }
-
-    /**
-     * Build constant expressions list from partition values with type coercion.
-     * This integrates the logic from MergeOneRowRelationIntoUnion to directly create
-     * a union with constantExprsList instead of creating LogicalOneRowRelation children.
-     */
-    private static List<List<NamedExpression>> buildConstantExpressionsFromPartitions(
-            Collection<PartitionItem> selectedPartitions,
-            List<Column> partitionColumns,
-            Map<String, DataType> nameToType,
-            List<NamedExpression> unionOutputs) {
-        ImmutableList.Builder<List<NamedExpression>> constantExprsList = ImmutableList.builder();
-
-        for (PartitionItem partitionItem : selectedPartitions) {
-            PartitionKey partitionKey = ((ListPartitionItem) partitionItem).getItems().get(0);
-            ImmutableList.Builder<NamedExpression> constantExprs = ImmutableList.builder();
-
-            for (int i = 0; i < partitionColumns.size(); i++) {
-                String name = partitionColumns.get(i).getName();
-                if (nameToType.containsKey(name)) {
-                    Literal literal = Literal.of(partitionKey.getKeys().get(i).getRealValue());
-                    Expression castedLiteral = literal.checkedCastTo(nameToType.get(name));
-
-                    // Find the corresponding output to get target type for proper coercion
-                    DataType targetType = null;
-                    for (NamedExpression output : unionOutputs) {
-                        if (output.getName().equals(name)) {
-                            targetType = output.getDataType();
-                            break;
-                        }
-                    }
-
-                    // Apply type coercion like @{MergeOneRowRelationIntoUnion} does
-                    if (targetType != null && !castedLiteral.getDataType().equals(targetType)) {
-                        castedLiteral = TypeCoercionUtils.castIfNotSameType(castedLiteral, targetType);
-                    }
-
-                    constantExprs.add(new Alias(castedLiteral, name));
-                }
-            }
-            constantExprsList.add(constantExprs.build());
-        }
-
-        return constantExprsList.build();
     }
 }

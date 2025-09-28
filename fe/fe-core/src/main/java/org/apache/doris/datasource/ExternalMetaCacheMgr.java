@@ -81,6 +81,9 @@ public class ExternalMetaCacheMgr {
     private ExecutorService rowCountRefreshExecutor;
     private ExecutorService commonRefreshExecutor;
     private ExecutorService fileListingExecutor;
+
+    private ExecutorService fileListingExecutorForManyPartitions;
+
     private ExecutorService scheduleExecutor;
     private ExecutorService expiredFileListClearExecutor;
 
@@ -117,6 +120,14 @@ public class ExternalMetaCacheMgr {
                 Config.max_external_cache_loader_thread_pool_size * 1000,
                 "FileListingExecutor", 10, true));
 
+        // The queue size should be large enough,
+        // because there may be thousands of partitions being queried at the same time.
+        fileListingExecutorForManyPartitions = TtlExecutors.getTtlExecutorService(
+                ThreadPoolManager.newDaemonFixedThreadPool(
+                Config.max_external_file_cache_loader_thread_pool_for_many_partitions_size,
+                Config.max_external_file_cache_loader_thread_pool_for_many_partitions_size * 1000,
+                "FileListingExecutorForManyPartitions", 10, true));
+
         scheduleExecutor = TtlExecutors.getTtlExecutorService(ThreadPoolManager.newDaemonFixedThreadPool(
                 Config.max_external_cache_loader_thread_pool_size,
                 Config.max_external_cache_loader_thread_pool_size * 1000,
@@ -136,6 +147,11 @@ public class ExternalMetaCacheMgr {
         hudiPartitionMgr = new HudiPartitionMgr(commonRefreshExecutor);
         icebergMetadataCacheMgr = new IcebergMetadataCacheMgr(commonRefreshExecutor);
         maxComputeMetadataCacheMgr = new MaxComputeMetadataCacheMgr();
+    }
+
+    public ExecutorService getFileListingExecutor(int partitionNum) {
+        return partitionNum > Config.num_indicate_many_partitions
+                ? fileListingExecutorForManyPartitions : fileListingExecutor;
     }
 
     public ExecutorService getFileListingExecutor() {

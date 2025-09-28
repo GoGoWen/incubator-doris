@@ -99,6 +99,10 @@ public class PartitionValuesTableValuedFunction extends MetadataTableValuedFunct
         }
     }
 
+    public TableIf getPartitionedTable() {
+        return table;
+    }
+
     public static TableIf analyzeAndGetTable(String catalogName, String dbName, String tableName, boolean checkAuth) {
         if (checkAuth) {
             // This method will be called at 2 places:

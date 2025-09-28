@@ -2051,7 +2051,20 @@ public class Config extends ConfigBase {
      * Max thread pool size for loading external file meta cache
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static int max_external_file_cache_loader_thread_pool_size = 1024;
+    public static int max_external_file_cache_loader_thread_pool_size = 4096;
+
+    /**
+     * Max file cache loader thread-pool size for many partitions.
+     * Max thread pool size for loading external file meta cache
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static int max_external_file_cache_loader_thread_pool_for_many_partitions_size = 2048;
+
+
+    @ConfField(mutable = true, masterOnly = false,  description = {"提示许多分区的阈值",
+            "the num which indicate many partitions."})
+    public static int num_indicate_many_partitions = 1024;
+
     /**
      * Max cache num of external catalog's file
      * Decrease this value if FE's memory is small
@@ -2929,6 +2942,14 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"单个hive表能扫描的最大数据量",
             "max scan bytes for single hive table"})
     public static long max_selected_total_file_size_for_hive_table = 1 * 1024 * 1024 * 1024 * 1024L;
+
+    @ConfField(mutable = true, description = {"单个hive表能扫描的最大文件数量",
+            "max selected file number for single hive table"})
+    public static long max_selected_total_file_num_for_hive_table = 50000L;
+
+    @ConfField(mutable = true, description = {"单个hms表能扫描的最大分片数量",
+            "max selected split number for single hms table"})
+    public static long max_selected_total_split_num_for_hms_table = 300000L;
 
     @ConfField(mutable = true, description = {"单个非典型文件格式的hive表能扫描的最大数据量",
             "max scan bytes for single hive table with unrecommended file format"})

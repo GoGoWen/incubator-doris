@@ -26,6 +26,7 @@ import org.apache.doris.catalog.Type;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.UserException;
+import org.apache.doris.common.util.HMSPartitionsUtil;
 import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.datasource.ExternalTable;
 import org.apache.doris.datasource.FileSplit;
@@ -420,7 +421,7 @@ public class HudiScanNode extends HiveScanNode {
     }
 
     public void getPartitionsSplits(List<HivePartition> partitions, List<Split> splits) throws AnalysisException {
-        Executor executor = Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor();
+        Executor executor = Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor(partitions.size());
         List<PartitionMetadata> metadataList = Collections.synchronizedList(new ArrayList<>());
         Path basePath = hudiClient.getBasePathV2();
         for (HivePartition partition : partitions) {
@@ -434,6 +435,7 @@ public class HudiScanNode extends HiveScanNode {
         metadataList.forEach(metadata -> executor.execute(() -> {
             try {
                 processPartitionWithMetadata(fileSystemView, metadata, splits);
+                HMSPartitionsUtil.checkSelectedSplitNumLimit(hmsTable, splits.size());
             } catch (Throwable t) {
                 error.compareAndSet(null, t);
             } finally {

@@ -30,6 +30,7 @@ import org.apache.doris.common.Config;
 import org.apache.doris.common.Pair;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.DebugUtil;
+import org.apache.doris.common.util.HMSPartitionsUtil;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.datasource.FileQueryScanNode;
 import org.apache.doris.datasource.FileSplit;
@@ -409,6 +410,7 @@ public class HiveScanNode extends FileQueryScanNode {
             }
             withCache = withCache && Config.max_external_file_cache_num > 0 && (ConnectContext.get() == null
                     || ConnectContext.get().getSessionVariable().getEnableExternalFileCache());
+            withCache = withCache && partitions.size() <= Config.num_indicate_many_partitions;
             fileCaches = cache.getFilesByPartitions(partitions, withCache, !withCache, bindBrokerName);
         }
         if (tableSample != null) {
@@ -430,6 +432,8 @@ public class HiveScanNode extends FileQueryScanNode {
                 && !(hmsTable.isHiveTransactionalTable() && hmsTable.isFullAcidTable())) {
             needSplit = !hmsTable.isOrcOrParquetFileFormat();
         }
+        HMSPartitionsUtil.checkSelectedFileNumLimit(hmsTable,
+                fileCaches.stream().map(FileCacheValue::getFiles).mapToInt(List::size).sum());
         generateFileSplits(allFiles, fileCaches, needSplit, getFileSplitSize(fileCaches, needSplit));
     }
 
@@ -492,7 +496,7 @@ public class HiveScanNode extends FileQueryScanNode {
 
     @VisibleForTesting
     protected void generateFileSplits(List<Split> allFiles, List<FileCacheValue> fileCaches,
-            boolean needSplit, long fileSplitSize) throws IOException {
+            boolean needSplit, long fileSplitSize) throws IOException, AnalysisException {
         if (!needSplit) {
             normalGenerateFileSplits(allFiles, fileCaches);
         } else {
@@ -501,7 +505,8 @@ public class HiveScanNode extends FileQueryScanNode {
     }
 
     @VisibleForTesting
-    protected void normalGenerateFileSplits(List<Split> allFiles, List<FileCacheValue> fileCaches) throws IOException {
+    protected void normalGenerateFileSplits(List<Split> allFiles, List<FileCacheValue> fileCaches)
+            throws IOException, AnalysisException {
         for (HiveMetaStoreCache.FileCacheValue fileCacheValue : fileCaches) {
             if (fileCacheValue.getFiles() != null) {
                 boolean isSplittable = fileCacheValue.isSplittable();
@@ -516,12 +521,13 @@ public class HiveScanNode extends FileQueryScanNode {
                             new HiveSplitCreator(fileCacheValue.getAcidInfo())));
                 }
             }
+            HMSPartitionsUtil.checkSelectedSplitNumLimit(hmsTable, allFiles.size());
         }
     }
 
     @VisibleForTesting
     protected void generateFileSplitsWithSortByFileSize(List<Split> allFiles, List<FileCacheValue> fileCaches,
-            long fileSplitSize) throws IOException {
+            long fileSplitSize) throws IOException, AnalysisException {
         List<Pair<HiveFileStatus, FileCacheValue>> fileStatusWithFileCacheValueList = fileCaches.stream()
                 .flatMap(fileCache -> fileCache.getFiles().stream()
                         .map(file -> Pair.of(file, fileCache)))
@@ -537,6 +543,7 @@ public class HiveScanNode extends FileQueryScanNode {
                     status.getBlockLocations(), status.getLength(), status.getModificationTime(),
                     true, fileInfo.second.getPartitionValues(),
                     new HiveSplitCreator(fileInfo.second.getAcidInfo())));
+            HMSPartitionsUtil.checkSelectedSplitNumLimit(hmsTable, allFiles.size());
         }
     }
 

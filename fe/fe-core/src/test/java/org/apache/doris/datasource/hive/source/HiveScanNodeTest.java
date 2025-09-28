@@ -20,6 +20,7 @@ package org.apache.doris.datasource.hive.source;
 
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.analysis.TupleId;
+import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.datasource.ExternalCatalog;
@@ -155,7 +156,7 @@ public class HiveScanNodeTest {
     public void testNormalGenerateFileSplits(@Injectable SessionVariable sessionVariable,
             @Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
-            @Injectable ExternalCatalog catalog) throws IOException {
+            @Injectable ExternalCatalog catalog) throws IOException, AnalysisException {
         new Expectations() {
             {
                 tupleDesc.getTable();
@@ -293,7 +294,7 @@ public class HiveScanNodeTest {
     public void testGenerateFileSplitsWithSortByFileSize(@Injectable SessionVariable sessionVariable,
             @Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
-            @Injectable ExternalCatalog catalog) throws IOException {
+            @Injectable ExternalCatalog catalog) throws IOException, AnalysisException {
         new Expectations() {
             {
                 tupleDesc.getTable();

@@ -24,6 +24,7 @@ import org.apache.doris.catalog.PartitionItem;
 import org.apache.doris.catalog.PartitionKey;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
+import org.apache.doris.common.util.HMSPartitionsUtil;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.datasource.CacheException;
 import org.apache.doris.datasource.ExternalTable;
@@ -38,19 +39,9 @@ import org.apache.doris.nereids.rules.expression.rules.PartitionPruneExpressionE
 import org.apache.doris.nereids.rules.expression.rules.PartitionPruner;
 import org.apache.doris.nereids.rules.expression.rules.PredicateRewriteForPartitionFilter;
 import org.apache.doris.nereids.rules.expression.rules.PredicateRewriteForPartitionPrune;
-import org.apache.doris.nereids.trees.expressions.And;
-import org.apache.doris.nereids.trees.expressions.BinaryOperator;
-import org.apache.doris.nereids.trees.expressions.EqualTo;
 import org.apache.doris.nereids.trees.expressions.Expression;
-import org.apache.doris.nereids.trees.expressions.GreaterThan;
-import org.apache.doris.nereids.trees.expressions.GreaterThanEqual;
-import org.apache.doris.nereids.trees.expressions.LessThan;
-import org.apache.doris.nereids.trees.expressions.LessThanEqual;
-import org.apache.doris.nereids.trees.expressions.Or;
 import org.apache.doris.nereids.trees.expressions.Slot;
-import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.expressions.literal.BooleanLiteral;
-import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFilter;
@@ -180,6 +171,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
 
             if (BooleanLiteral.TRUE.equals(partitionPredicate)) {
+                HMSPartitionsUtil.checkSelectedPartitionNumLimit(hiveTbl, partitionNum);
                 HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
                         > Config.max_partition_num_for_single_hive_table_without_filter
                         ? cache.getPartitionValuesFromViewWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
@@ -191,7 +183,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                 // do nothing
             } else {
                 if (partitionNum > Config.max_partition_num_for_single_hive_table_without_filter
-                        && isFilterSupportedByListPartitions(partitionPredicate)) {
+                        && HMSPartitionsUtil.isFilterSupportedByListPartitions(partitionPredicate)) {
                     selectedPartitionItems = cache.getPartitionValuesByFilterFromView(hiveTbl.getDbName(),
                             hiveTbl.getName(), partitionPredicate.toSql(), partitionColumnNames,
                             hiveTbl.getPartitionColumnTypes());
@@ -276,30 +268,13 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
         return partitionRows;
     }
 
-    private boolean isFilterSupportedByListPartitions(Expression expression) {
-        if (expression instanceof SlotReference) {
-            return true;
-        }
-        if (expression instanceof Literal) {
-            return true;
-        }
-        if (expression instanceof And || expression instanceof Or || expression instanceof EqualTo
-                || expression instanceof GreaterThan || expression instanceof GreaterThanEqual
-                || expression instanceof LessThan || expression instanceof LessThanEqual) {
-            BinaryOperator binaryOperator = (BinaryOperator) expression;
-            return isFilterSupportedByListPartitions(binaryOperator.left())
-                    && isFilterSupportedByListPartitions(binaryOperator.right());
-        }
-        return false;
-    }
-
     @VisibleForTesting
     protected Map<Long, PartitionItem> getSelectedPartitionItems(HMSExternalTable hiveTbl,
             List<String> partitionColumnNames, Expression partitionPredicate,
             int partitionNum, HiveMetaStoreCache cache) {
         Set<Expression> conjuncts = Sets.newHashSet();
         for (Expression expression : ExpressionUtils.extractConjunction(partitionPredicate)) {
-            if (isFilterSupportedByListPartitions(expression)) {
+            if (HMSPartitionsUtil.isFilterSupportedByListPartitions(expression)) {
                 conjuncts.add(expression);
             }
         }
@@ -323,7 +298,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             int partitionNum, HiveMetaStoreCache cache) {
         Set<Expression> conjuncts = Sets.newHashSet();
         for (Expression expression : ExpressionUtils.extractConjunction(partitionPredicate)) {
-            if (isFilterSupportedByListPartitions(expression)) {
+            if (HMSPartitionsUtil.isFilterSupportedByListPartitions(expression)) {
                 conjuncts.add(expression);
             }
         }
@@ -377,6 +352,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
             partitionPredicate = PredicateRewriteForPartitionFilter.rewrite(partitionPredicate, ctx);
 
             if (BooleanLiteral.TRUE.equals(partitionPredicate)) {
+                HMSPartitionsUtil.checkSelectedPartitionNumLimit(hiveTbl, partitionNum);
                 HiveMetaStoreCache.HivePartitionValues hivePartitionValues = partitionNum
                         > Config.max_partition_num_for_single_hive_table_without_filter
                         ? cache.getPartitionValuesWithoutCache(hiveTbl.getDbName(), hiveTbl.getName(),
@@ -388,7 +364,7 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
                 // do nothing
             } else {
                 if (partitionNum > Config.max_partition_num_for_single_hive_table_without_filter
-                        && isFilterSupportedByListPartitions(partitionPredicate)) {
+                        && HMSPartitionsUtil.isFilterSupportedByListPartitions(partitionPredicate)) {
                     selectedPartitionItems = cache.getPartitionValuesByFilter(hiveTbl.getDbName(),
                             hiveTbl.getName(), partitionPredicate.toSql(), partitionColumnNames,
                             hiveTbl.getPartitionColumnTypes());
@@ -414,10 +390,9 @@ public class PruneFileScanPartition extends OneRewriteRuleFactory {
         }
         if (!isDirectlyByFilter) {
             BDPAuthContext bdpAuthContext = ConnectContext.get().getBdpAuthContext();
-            try (AutoCloseConnectContext r = StatisticsUtil.buildConnectContext()) {
+            try (AutoCloseConnectContext r = StatisticsUtil.buildConnectContext(bdpAuthContext)) {
                 partitionPredicate = PartitionPruneExpressionExtractor.extract(filter.getPredicate(),
                         ImmutableSet.copyOf(partitionSlots), ctx);
-                r.connectContext.setBdpAuthContext(bdpAuthContext);
                 Map<String, String> params = new HashMap<>();
                 params.put("catalogName", hiveTbl.getCatalog().getName());
                 params.put("dbName", hiveTbl.getDbName());

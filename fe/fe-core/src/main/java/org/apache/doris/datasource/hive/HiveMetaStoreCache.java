@@ -711,8 +711,10 @@ public class HiveMetaStoreCache {
                 fileLists = new ArrayList<>(fileCacheRef.get().getAll(keys).values());
             } else {
                 if (concurrent) {
+                    ExecutorService executor =
+                            Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor(partitions.size());
                     List<Future<FileCacheValue>> pList = keys.stream().map(
-                            key -> fileListingExecutor.submit(() -> loadFiles(key))).collect(Collectors.toList());
+                            key -> executor.submit(() -> loadFiles(key))).collect(Collectors.toList());
                     fileLists = Lists.newArrayListWithExpectedSize(keys.size());
                     for (Future<FileCacheValue> p : pList) {
                         fileLists.add(p.get());

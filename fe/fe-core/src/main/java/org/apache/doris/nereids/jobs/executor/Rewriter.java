@@ -93,6 +93,7 @@ import org.apache.doris.nereids.rules.rewrite.MergeTopNs;
 import org.apache.doris.nereids.rules.rewrite.NormalizeSort;
 import org.apache.doris.nereids.rules.rewrite.OrExpansion;
 import org.apache.doris.nereids.rules.rewrite.PartitionAggregateRewrite;
+import org.apache.doris.nereids.rules.rewrite.PartitionValuesRewrite;
 import org.apache.doris.nereids.rules.rewrite.ProjectOtherJoinConditionForNestedLoopJoin;
 import org.apache.doris.nereids.rules.rewrite.PruneEmptyPartition;
 import org.apache.doris.nereids.rules.rewrite.PruneFileScanPartition;
@@ -433,7 +434,8 @@ public class Rewriter extends AbstractBatchJobExecutor {
                     // these rules should be put after mv optimization to avoid mv matching fail
                     topDown(new SumLiteralRewrite(),
                             new MergePercentileToArray(),
-                            new PartitionAggregateRewrite())
+                            new PartitionAggregateRewrite(),
+                            new PartitionValuesRewrite())
                 ),
                 topic("Push project and filter on cte consumer to cte producer",
                         topDown(
