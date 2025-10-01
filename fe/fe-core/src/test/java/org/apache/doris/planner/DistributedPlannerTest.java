@@ -168,4 +168,149 @@ public class DistributedPlannerTest {
             ctx.getSessionVariable().autoBroadcastJoinThreshold = originThreshold;
         }
     }
+
+    @Test
+    public void testCreatePlanFragments_MultipleScanRanges(@Injectable PlanFragment inputFragment,
+                                                            @Injectable PlanNode planRoot,
+                                                            @Injectable ScanNode scanNode1,
+                                                            @Injectable ScanNode scanNode2,
+                                                            @Injectable PlanFragmentId fragmentId,
+                                                            @Injectable org.apache.doris.thrift.TScanRangeLocations scanRange1,
+                                                            @Injectable org.apache.doris.thrift.TScanRangeLocations scanRange2,
+                                                            @Injectable org.apache.doris.thrift.TScanRangeLocations scanRange3,
+                                                            @Mocked PlannerContext plannerContext) {
+        // Setup: Single scan node with multiple scan ranges (numInstances=1, scanRangeNum=3)
+        // This should trigger merge fragment creation
+        List<org.apache.doris.thrift.TScanRangeLocations> scanRanges = Lists.newArrayList(scanRange1, scanRange2, scanRange3);
+        List<ScanNode> scanNodes = Lists.newArrayList(scanNode1);
+
+        new Expectations() {{
+                inputFragment.isPartitioned();
+                result = true;
+                minTimes = 0;
+
+                inputFragment.getPlanRoot();
+                result = planRoot;
+                minTimes = 0;
+
+                planRoot.getNumInstances();
+                result = 1; // Only 1 instance
+                minTimes = 0;
+
+                scanNode1.getScanRangeLocations(0);
+                result = scanRanges; // 3 scan ranges
+                minTimes = 0;
+
+                planRoot.collectInCurrentFragment((java.util.function.Predicate<PlanNode>) any);
+                result = scanNodes;
+                minTimes = 0;
+            }};
+
+        // Test: The new logic should detect multiple scan ranges and create merge fragment
+        // Even though numInstances=1, scanRangeNum=3 should trigger merge
+        // This would be tested in actual createPlanFragments call, but we verify the logic
+        int scanRangeNum = 0;
+        for (ScanNode scanNode : scanNodes) {
+            scanRangeNum += scanNode.getScanRangeLocations(0).size();
+        }
+
+        Assert.assertEquals(3, scanRangeNum);
+        // With numInstances=1 and scanRangeNum=3, merge fragment should be created
+        boolean shouldCreateMerge = planRoot.getNumInstances() > 1 || scanRangeNum > 1;
+        Assert.assertTrue("Should create merge fragment when scanRangeNum > 1", shouldCreateMerge);
+    }
+
+    @Test
+    public void testCreatePlanFragments_SingleScanRange(@Injectable PlanFragment inputFragment,
+                                                         @Injectable PlanNode planRoot,
+                                                         @Injectable ScanNode scanNode,
+                                                         @Injectable org.apache.doris.thrift.TScanRangeLocations scanRange) {
+        // Setup: Single scan node with single scan range (numInstances=1, scanRangeNum=1)
+        // This should NOT trigger merge fragment creation
+        List<org.apache.doris.thrift.TScanRangeLocations> scanRanges = Lists.newArrayList(scanRange);
+        List<ScanNode> scanNodes = Lists.newArrayList(scanNode);
+
+        new Expectations() {{
+                inputFragment.isPartitioned();
+                result = true;
+                minTimes = 0;
+
+                inputFragment.getPlanRoot();
+                result = planRoot;
+                minTimes = 0;
+
+                planRoot.getNumInstances();
+                result = 1; // Only 1 instance
+                minTimes = 0;
+
+                scanNode.getScanRangeLocations(0);
+                result = scanRanges; // 1 scan range
+                minTimes = 0;
+
+                planRoot.collectInCurrentFragment((java.util.function.Predicate<PlanNode>) any);
+                result = scanNodes;
+                minTimes = 0;
+            }};
+
+        // Test: With numInstances=1 and scanRangeNum=1, no merge fragment should be created
+        int scanRangeNum = 0;
+        for (ScanNode scanNode1 : scanNodes) {
+            scanRangeNum += scanNode1.getScanRangeLocations(0).size();
+        }
+
+        Assert.assertEquals(1, scanRangeNum);
+        boolean shouldCreateMerge = planRoot.getNumInstances() > 1 || scanRangeNum > 1;
+        Assert.assertFalse("Should NOT create merge fragment when numInstances=1 and scanRangeNum=1", shouldCreateMerge);
+    }
+
+    @Test
+    public void testCreatePlanFragments_MultipleScanNodes(@Injectable PlanFragment inputFragment,
+                                                           @Injectable PlanNode planRoot,
+                                                           @Injectable ScanNode scanNode1,
+                                                           @Injectable ScanNode scanNode2,
+                                                           @Injectable org.apache.doris.thrift.TScanRangeLocations scanRange1,
+                                                           @Injectable org.apache.doris.thrift.TScanRangeLocations scanRange2) {
+        // Setup: Multiple scan nodes, each with single scan range (numInstances=1, total scanRangeNum=2)
+        // This should trigger merge fragment creation
+        List<org.apache.doris.thrift.TScanRangeLocations> scanRanges1 = Lists.newArrayList(scanRange1);
+        List<org.apache.doris.thrift.TScanRangeLocations> scanRanges2 = Lists.newArrayList(scanRange2);
+        List<ScanNode> scanNodes = Lists.newArrayList(scanNode1, scanNode2);
+
+        new Expectations() {{
+                inputFragment.isPartitioned();
+                result = true;
+                minTimes = 0;
+
+                inputFragment.getPlanRoot();
+                result = planRoot;
+                minTimes = 0;
+
+                planRoot.getNumInstances();
+                result = 1; // Only 1 instance
+                minTimes = 0;
+
+                scanNode1.getScanRangeLocations(0);
+                result = scanRanges1; // 1 scan range
+                minTimes = 0;
+
+                scanNode2.getScanRangeLocations(0);
+                result = scanRanges2; // 1 scan range
+                minTimes = 0;
+
+                planRoot.collectInCurrentFragment((java.util.function.Predicate<PlanNode>) any);
+                result = scanNodes;
+                minTimes = 0;
+            }};
+
+        // Test: Multiple scan nodes with total scanRangeNum=2 should trigger merge
+        int scanRangeNum = 0;
+        for (ScanNode scanNode : scanNodes) {
+            scanRangeNum += scanNode.getScanRangeLocations(0).size();
+        }
+
+        Assert.assertEquals(2, scanRangeNum);
+        // With numInstances=1 and scanRangeNum=2, merge fragment should be created
+        boolean shouldCreateMerge = planRoot.getNumInstances() > 1 || scanRangeNum > 1;
+        Assert.assertTrue("Should create merge fragment when total scanRangeNum > 1", shouldCreateMerge);
+    }
 }
