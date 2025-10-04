@@ -158,6 +158,8 @@ public class HadoopHudiJniScanner extends JniScanner {
         for (Map.Entry<String, String> entry : params.entrySet()) {
             if (entry.getKey().startsWith(HADOOP_CONF_PREFIX)) {
                 fsOptionsProps.put(entry.getKey().substring(HADOOP_CONF_PREFIX.length()), entry.getValue());
+            } else if (entry.getKey().equals("hoodie_memory_spillable_map_path")) {
+                fsOptionsProps.put("hoodie.memory.spillable.map.path", entry.getValue());
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("get hudi params {}: {}", entry.getKey(), entry.getValue());

@@ -932,6 +932,8 @@ DEFINE_mInt32(cold_data_compaction_interval_sec, "1800");
 
 DEFINE_String(tmp_file_dir, "tmp");
 
+DEFINE_String(hoodie_memory_spillable_map_path, "/tmp/hudi_spill");
+
 DEFINE_Int32(s3_transfer_executor_pool_size, "2");
 
 DEFINE_Bool(enable_time_lut, "true");

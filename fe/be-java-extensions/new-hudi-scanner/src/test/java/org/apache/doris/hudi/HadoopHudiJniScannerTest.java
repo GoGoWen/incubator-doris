@@ -161,6 +161,24 @@ public class HadoopHudiJniScannerTest {
         scanner.close();
     }
 
+    @Test
+    public void testHoodieMemorySpillableMapPath() {
+        Map<String, String> params = buildMinimalParams();
+        params.put("hoodie_memory_spillable_map_path", "/custom/hudi/spill/path");
+
+        HadoopHudiJniScanner scanner = new HadoopHudiJniScanner(1024, params);
+        try {
+            Map<String, String> fsOptionsProps = scanner.getFsOptionsProps();
+            Assertions.assertEquals("/custom/hudi/spill/path", fsOptionsProps.get("hoodie.memory.spillable.map.path"));
+        } finally {
+            try {
+                scanner.close();
+            } catch (IOException e) {
+                // Ignore
+            }
+        }
+    }
+
     public static class SlowInputFormat implements InputFormat<NullWritable, ArrayWritable> {
 
         private static final long DEFAULT_DELAY_MS = 2000;

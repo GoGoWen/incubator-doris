@@ -20,6 +20,7 @@
 #include <map>
 #include <ostream>
 
+#include "common/config.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime_state.h"
 #include "runtime/types.h"
@@ -47,7 +48,7 @@ HudiJniReader::HudiJniReader(const TFileScanRangeParams& scan_params,
           _scan_params(scan_params),
           _hudi_params(hudi_params) {
     std::vector<std::string> required_fields;
-    for (auto& desc : _file_slot_descs) {
+    for (const auto& desc : _file_slot_descs) {
         required_fields.emplace_back(desc->col_name());
     }
     std::map<String, String> params = {
@@ -63,8 +64,10 @@ HudiJniReader::HudiJniReader(const TFileScanRangeParams& scan_params,
             {"instant_time", _hudi_params.instant_time},
             {"serde", _hudi_params.serde},
             {"input_format", _hudi_params.input_format}};
+
     params["HADOOP_USER_NAME"] = scan_params.hdfs_params.user;
     params["hudi_init_reader_timeout_ms"] = std::to_string(config::hudi_init_reader_timeout_ms);
+    params["hoodie_memory_spillable_map_path"] = config::hoodie_memory_spillable_map_path;
     for (const THdfsConf& conf : scan_params.hdfs_params.hdfs_conf) {
         if (conf.key == "HADOOP_USER_TOKEN") {
             params["HADOOP_USER_TOKEN"] = conf.value;
@@ -95,7 +98,7 @@ Status HudiJniReader::get_next_block(Block* block, size_t* read_rows, bool* eof)
 
 Status HudiJniReader::get_columns(std::unordered_map<std::string, TypeDescriptor>* name_to_type,
                                   std::unordered_set<std::string>* missing_cols) {
-    for (auto& desc : _file_slot_descs) {
+    for (const auto& desc : _file_slot_descs) {
         name_to_type->emplace(desc->col_name(), desc->type());
     }
     return Status::OK();

@@ -1321,6 +1321,8 @@ DECLARE_mInt32(s3_read_max_wait_time_ms);
 // write as inverted index tmp directory
 DECLARE_String(tmp_file_dir);
 
+DECLARE_String(hoodie_memory_spillable_map_path);
+
 // the file paths(one or more) of CA cert, splite using ";" aws s3 lib use it to init s3client
 DECLARE_mString(ca_cert_file_paths);
 
