@@ -35,6 +35,7 @@ import org.apache.doris.nereids.trees.expressions.Cast;
 import org.apache.doris.nereids.trees.expressions.ComparisonPredicate;
 import org.apache.doris.nereids.trees.expressions.CompoundPredicate;
 import org.apache.doris.nereids.trees.expressions.Divide;
+import org.apache.doris.nereids.trees.expressions.EqualTo;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.InPredicate;
 import org.apache.doris.nereids.trees.expressions.IntegralDivide;
@@ -963,7 +964,7 @@ public class TypeCoercionUtils {
         right = comparisonPredicate.right();
 
         Optional<DataType> commonType = findWiderTypeForTwoForComparison(
-                left.getDataType(), right.getDataType(), false);
+                left.getDataType(), right.getDataType(), comparisonPredicate instanceof EqualTo);
 
         if (commonType.isPresent()) {
             commonType = Optional.of(downgradeDecimalAndDateLikeType(

@@ -34,6 +34,7 @@ import org.apache.doris.nereids.trees.expressions.literal.DateV2Literal;
 import org.apache.doris.nereids.trees.expressions.literal.DecimalLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.DecimalV3Literal;
 import org.apache.doris.nereids.trees.expressions.literal.DoubleLiteral;
+import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.VarcharLiteral;
 import org.apache.doris.nereids.types.ArrayType;
@@ -825,5 +826,16 @@ public class TypeCoercionUtilsTest {
         smallIntString = (InPredicate) TypeCoercionUtils.processInPredicate(smallIntString);
         Assertions.assertEquals(DecimalV3Type.createDecimalV3Type(23, 3), smallIntString.getCompareExpr().getDataType());
         Assertions.assertEquals(DecimalV3Type.createDecimalV3Type(23, 3), smallIntString.getOptions().get(0).getDataType());
+    }
+
+    @Test
+    public void testProcessEquealToStringCoercoin() {
+        EqualTo equalTo = new EqualTo(
+                new SlotReference("c1", StringType.INSTANCE),
+                new IntegerLiteral(3)
+        );
+        EqualTo expression = (EqualTo) TypeCoercionUtils.processComparisonPredicate(equalTo);
+        Assertions.assertEquals(StringType.INSTANCE, expression.left().getDataType());
+        Assertions.assertEquals(StringType.INSTANCE, expression.right().getDataType());
     }
 }
