@@ -64,7 +64,8 @@ HudiJniReader::HudiJniReader(const TFileScanRangeParams& scan_params,
             {"serde", _hudi_params.serde},
             {"input_format", _hudi_params.input_format}};
     params["HADOOP_USER_NAME"] = scan_params.hdfs_params.user;
-    for(const THdfsConf& conf : scan_params.hdfs_params.hdfs_conf) {
+    params["hudi_init_reader_timeout_ms"] = std::to_string(config::hudi_init_reader_timeout_ms);
+    for (const THdfsConf& conf : scan_params.hdfs_params.hdfs_conf) {
         if (conf.key == "HADOOP_USER_TOKEN") {
             params["HADOOP_USER_TOKEN"] = conf.value;
         } else if (conf.key == "BEE_USER" || conf.key == "BEE_SOURCE") {
@@ -72,7 +73,7 @@ HudiJniReader::HudiJniReader(const TFileScanRangeParams& scan_params,
         }
     }
     // Use compatible hadoop client to read data
-    for (auto& kv : _scan_params.properties) {
+    for (const auto& kv : _scan_params.properties) {
         if (kv.first.starts_with(HOODIE_CONF_PREFIX)) {
             params[kv.first] = kv.second;
         } else {
@@ -80,8 +81,8 @@ HudiJniReader::HudiJniReader(const TFileScanRangeParams& scan_params,
         }
     }
 
-    _jni_connector = std::make_unique<JniConnector>("org/apache/doris/hudi/HadoopHudiJniScanner", params,
-                                                    required_fields);
+    _jni_connector = std::make_unique<JniConnector>("org/apache/doris/hudi/HadoopHudiJniScanner",
+                                                    params, required_fields);
 }
 
 Status HudiJniReader::get_next_block(Block* block, size_t* read_rows, bool* eof) {

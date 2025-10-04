@@ -25,6 +25,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -55,6 +56,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -97,6 +105,32 @@ public class HadoopHudiJniScanner extends JniScanner {
 
     private final String hadoopUserName;
     private final String hadoopUserToken;
+
+    private final long initReaderTimeoutMs;
+
+    public static int HUDI_READER_INIT_CORE_THREAD_NUM = 20;
+    public static int HUDI_READER_INIT_MAXIMUM_THREAD_NUM = 256;
+    public static int HUDI_READER_INIT_QUEUE_CAPACITY = 102400;
+
+    private static final ExecutorService hudiReaderInitExecutorService = buildHudiReaderInitExecutor();
+
+    private static ExecutorService buildHudiReaderInitExecutor() {
+        BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(HUDI_READER_INIT_QUEUE_CAPACITY);
+        ThreadFactory threadFactory = new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("HudiReaderInit-%d")
+                .build();
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                HUDI_READER_INIT_CORE_THREAD_NUM,
+                HUDI_READER_INIT_MAXIMUM_THREAD_NUM,
+                60L,
+                TimeUnit.SECONDS,
+                queue,
+                threadFactory,
+                new ThreadPoolExecutor.AbortPolicy()
+        );
+        return executor;
+    }
 
     public HadoopHudiJniScanner(int fetchSize, Map<String, String> params) {
         this.basePath = params.get("base_path");
@@ -141,6 +175,7 @@ public class HadoopHudiJniScanner extends JniScanner {
         this.classLoader = this.getClass().getClassLoader();
         this.hadoopUserName = params.get("HADOOP_USER_NAME");
         this.hadoopUserToken = params.get("HADOOP_USER_TOKEN");
+        this.initReaderTimeoutMs = Long.parseLong(params.getOrDefault("hudi_init_reader_timeout_ms", "30000"));
     }
 
     public String getBasePath() {
@@ -303,18 +338,29 @@ public class HadoopHudiJniScanner extends JniScanner {
 
         JobConf jobConf = new JobConf(new Configuration());
         properties.stringPropertyNames().forEach(name -> jobConf.set(name, properties.getProperty(name)));
+
         InputFormat<?, ?> inputFormatClass = getInputFormat(jobConf, inputFormat);
         UserGroupInformation ugi = UserGroupInformation.createRemoteUser(hadoopUserName,
                 null, hadoopUserToken);
-        reader = ugi.doAs(
-                (PrivilegedAction<RecordReader<NullWritable, ArrayWritable>>) () -> {
+
+        // Build reader via async with timeout to avoid hang in init because of scan-log (MOR or fallback)
+        Future<RecordReader<NullWritable, ArrayWritable>> buildReaderFuture = hudiReaderInitExecutorService.submit(() ->
+                ugi.doAs((PrivilegedAction<RecordReader<NullWritable, ArrayWritable>>) () -> {
                     try {
                         return (RecordReader<NullWritable, ArrayWritable>) inputFormatClass.getRecordReader(
                                 hudiSplit, jobConf, Reporter.NULL);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
-                });
+                })
+        );
+        try {
+            reader = buildReaderFuture.get(initReaderTimeoutMs, TimeUnit.MILLISECONDS);
+        } catch (Exception ex) {
+            buildReaderFuture.cancel(true);
+            LOG.warn("Failed to init Hudi RecordReader", ex);
+            throw ex;
+        }
 
         deserializer = initDeserializer(jobConf, properties);
         rowInspector = initRowObjectInspector();

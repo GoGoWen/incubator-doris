@@ -906,7 +906,6 @@ DECLARE_String(kafka_api_version_request);
 DECLARE_String(kafka_broker_version_fallback);
 DECLARE_mString(kafka_debug);
 
-
 DECLARE_mInt64(max_chunk_size_for_broker);
 // The number of pool siz of routine load consumer.
 // If you meet the error describe in https://github.com/edenhill/librdkafka/issues/3608
@@ -1042,6 +1041,9 @@ DECLARE_Bool(enable_java_support);
 DECLARE_Bool(enable_fuzzy_mode);
 
 DECLARE_Bool(enable_debug_points);
+
+// Hudi MOR init reader timeout (ms), default 30000
+DECLARE_mInt64(hudi_init_reader_timeout_ms);
 
 DECLARE_Int32(pipeline_executor_size);
 
