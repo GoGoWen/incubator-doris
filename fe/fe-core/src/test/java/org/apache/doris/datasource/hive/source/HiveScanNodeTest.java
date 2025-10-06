@@ -27,22 +27,35 @@ import org.apache.doris.datasource.ExternalCatalog;
 import org.apache.doris.datasource.FileScanNode;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache.FileCacheValue;
+import org.apache.doris.datasource.hive.HivePartition;
 import org.apache.doris.fs.remote.RemoteFile;
 import org.apache.doris.planner.PlanNodeId;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 
 import mockit.Expectations;
 import mockit.Injectable;
+import mockit.Mocked;
 import org.apache.hadoop.fs.Path;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
+import org.apache.logging.log4j.core.layout.PatternLayout;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class HiveScanNodeTest {
 
@@ -410,5 +423,541 @@ public class HiveScanNodeTest {
                             + " 100 for test.test has exceed max selected partition num for single Hive table: 50",
                     e.getMessage());
         }
+    }
+
+    // ========== Tests for logIfGetNoFileFromEmptyPartitions ==========
+
+    /**
+     * Thread-safe test appender for capturing log events
+     */
+    private static class TestAppender extends AbstractAppender {
+        private final List<LogEvent> events = new CopyOnWriteArrayList<>();
+
+        public TestAppender(String name) {
+            super(name, null, PatternLayout.createDefaultLayout(), true, Property.EMPTY_ARRAY);
+        }
+
+        @Override
+        public void append(LogEvent event) {
+            events.add(event.toImmutable()); // Store immutable copy for thread safety
+        }
+
+        public List<LogEvent> getEvents() {
+            return new ArrayList<>(events);
+        }
+
+        public void clearEvents() {
+            events.clear();
+        }
+
+        public List<String> getFormattedMessages() {
+            return events.stream()
+                    .map(event -> event.getMessage().getFormattedMessage())
+                    .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+        }
+
+        public boolean hasLoggedMessage(String expectedMessage) {
+            return events.stream()
+                    .anyMatch(event -> event.getMessage().getFormattedMessage().contains(expectedMessage));
+        }
+
+        public long getEventCount(Level level) {
+            return events.stream()
+                    .filter(event -> event.getLevel().equals(level))
+                    .count();
+        }
+    }
+
+    private boolean originalConfigValue;
+    private TestAppender testAppender;
+    private Logger logger;
+
+    @Before
+    public void setUpLogTest() {
+        // Save original config value
+        originalConfigValue = Config.enable_log_empty_partition_when_list_file;
+
+        // Get the specific logger for HiveScanNode
+        logger = (Logger) LogManager.getLogger(HiveScanNode.class);
+
+        // Create and configure test appender
+        testAppender = new TestAppender("TestAppender");
+        testAppender.start();
+
+        // Add appender to logger
+        logger.addAppender(testAppender);
+        logger.setLevel(Level.INFO); // Ensure INFO level is captured
+    }
+
+    @After
+    public void tearDownLogTest() {
+        // Restore original config value
+        Config.enable_log_empty_partition_when_list_file = originalConfigValue;
+
+        // Clear thread local BDPAuthContext
+        BDPAuthContext.clear();
+
+        // Clean up: remove test appender
+        if (logger != null && testAppender != null) {
+            logger.removeAppender(testAppender);
+            testAppender.stop();
+        }
+    }
+
+    @Test
+    public void testLogEmptyPartitionWithEmptyFiles(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Mocked HivePartition partition) {
+        // Setup: Enable logging
+        Config.enable_log_empty_partition_when_list_file = true;
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getDbName();
+                result = "test_db";
+
+                table.getName();
+                result = "test_table";
+
+                partition.getPath();
+                result = "/user/hive/warehouse/test_db.db/test_table/partition1";
+
+                partition.getLastModifiedTime();
+                result = 1609459200000L; // 2021-01-01 00:00:00
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create empty file cache
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue emptyFileCache = new FileCacheValue();
+        fileCaches.add(emptyFileCache);
+
+        List<HivePartition> partitions = new ArrayList<>();
+        partitions.add(partition);
+
+        // Test: Call method with empty partition
+        scanNode.logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
+
+        // Verify: Should log for empty partition
+        Assertions.assertEquals(1, testAppender.getEventCount(Level.INFO),
+                "Should generate one INFO log event for empty partition");
+
+        String logMessage = testAppender.getFormattedMessages().get(0);
+        Assertions.assertTrue(logMessage.contains("/user/hive/warehouse/test_db.db/test_table/partition1"),
+                "Log should contain partition path");
+        Assertions.assertTrue(logMessage.contains("test_db"),
+                "Log should contain database name");
+        Assertions.assertTrue(logMessage.contains("test_table"),
+                "Log should contain table name");
+    }
+
+    @Test
+    public void testLogEmptyPartitionWithNonEmptyFiles(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Mocked HivePartition partition) {
+        // Setup: Enable logging
+        Config.enable_log_empty_partition_when_list_file = true;
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create non-empty file cache
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue fileCache = new FileCacheValue();
+        RemoteFile file = new RemoteFile("file1", true, 1024, 1024);
+        file.setPath(new Path("file1.parquet"));
+        fileCache.addFile(file, new LocationPath("file1.parquet"));
+        fileCaches.add(fileCache);
+
+        List<HivePartition> partitions = new ArrayList<>();
+        partitions.add(partition);
+
+        // Test: Call method with non-empty partition
+        scanNode.logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
+
+        // Verify: Should NOT log for non-empty partition
+        Assertions.assertEquals(0, testAppender.getEvents().size(),
+                "Should not generate log events for non-empty partition");
+    }
+
+    @Test
+    public void testLogEmptyPartitionWithMultipleEmptyPartitions(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Mocked HivePartition partition1,
+            @Mocked HivePartition partition2) {
+        // Setup: Enable logging
+        Config.enable_log_empty_partition_when_list_file = true;
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getDbName();
+                result = "test_db";
+
+                table.getName();
+                result = "test_table";
+
+                partition1.getPath();
+                result = "/path/partition1";
+
+                partition1.getLastModifiedTime();
+                result = 1609459200000L;
+
+                partition2.getPath();
+                result = "/path/partition2";
+
+                partition2.getLastModifiedTime();
+                result = 1609545600000L;
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create multiple empty file caches
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue emptyCache1 = new FileCacheValue();
+        FileCacheValue emptyCache2 = new FileCacheValue();
+        fileCaches.add(emptyCache1);
+        fileCaches.add(emptyCache2);
+
+        List<HivePartition> partitions = new ArrayList<>();
+        partitions.add(partition1);
+        partitions.add(partition2);
+
+        // Test: Call method with multiple empty partitions
+        scanNode.logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
+
+        // Verify: Should log for all empty partitions
+        Assertions.assertEquals(2, testAppender.getEventCount(Level.INFO),
+                "Should generate 2 INFO log events for 2 empty partitions");
+
+        List<String> messages = testAppender.getFormattedMessages();
+        Assertions.assertTrue(messages.get(0).contains("/path/partition1"),
+                "First log should be for partition1");
+        Assertions.assertTrue(messages.get(1).contains("/path/partition2"),
+                "Second log should be for partition2");
+    }
+
+    @Test
+    public void testLogEmptyPartitionWithMixedPartitions(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Mocked HivePartition partition1,
+            @Mocked HivePartition partition2,
+            @Mocked HivePartition partition3) {
+        // Setup: Enable logging
+        Config.enable_log_empty_partition_when_list_file = true;
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getDbName();
+                result = "test_db";
+
+                table.getName();
+                result = "test_table";
+
+                partition1.getPath();
+                result = "/path/partition1";
+
+                partition1.getLastModifiedTime();
+                result = 1609459200000L;
+
+                partition3.getPath();
+                result = "/path/partition3";
+
+                partition3.getLastModifiedTime();
+                result = 1609459200000L;
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create mixed file caches: empty, non-empty, empty
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+
+        // Partition 1: Empty
+        FileCacheValue emptyCache1 = new FileCacheValue();
+        fileCaches.add(emptyCache1);
+
+        // Partition 2: Non-empty
+        FileCacheValue nonEmptyCache = new FileCacheValue();
+        RemoteFile file = new RemoteFile("file2", true, 1024, 1024);
+        file.setPath(new Path("file2.parquet"));
+        nonEmptyCache.addFile(file, new LocationPath("file2.parquet"));
+        fileCaches.add(nonEmptyCache);
+
+        // Partition 3: Empty
+        FileCacheValue emptyCache2 = new FileCacheValue();
+        fileCaches.add(emptyCache2);
+
+        List<HivePartition> partitions = new ArrayList<>();
+        partitions.add(partition1);
+        partitions.add(partition2);
+        partitions.add(partition3);
+
+        // Test: Call method with mixed partitions
+        scanNode.logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
+
+        // Verify: Should log for 2 empty partitions only
+        Assertions.assertEquals(2, testAppender.getEventCount(Level.INFO),
+                "Should generate 2 INFO log events for 2 empty partitions");
+
+        List<String> messages = testAppender.getFormattedMessages();
+        Assertions.assertTrue(messages.get(0).contains("/path/partition1"),
+                "First log should be for partition1");
+        Assertions.assertTrue(messages.get(1).contains("/path/partition3"),
+                "Second log should be for partition3");
+    }
+
+    @Test
+    public void testLogEmptyPartitionWithBDPAuthContext(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Mocked HivePartition partition) {
+        // Setup: Enable logging
+        Config.enable_log_empty_partition_when_list_file = true;
+
+        // Set up BDPAuthContext
+        BDPAuthContext authContext = new BDPAuthContext("test_user", "test_cluster", "test_tenant", "token123");
+        authContext.setThreadLocalInfo();
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getDbName();
+                result = "test_db";
+
+                table.getName();
+                result = "test_table";
+
+                partition.getPath();
+                result = "/path/partition1";
+
+                partition.getLastModifiedTime();
+                result = 1609459200000L;
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create empty file cache
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue emptyCache = new FileCacheValue();
+        fileCaches.add(emptyCache);
+
+        List<HivePartition> partitions = new ArrayList<>();
+        partitions.add(partition);
+
+        // Test: Call method with BDPAuthContext present
+        scanNode.logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
+
+        // Verify: Should log with context information (not N/A)
+        Assertions.assertEquals(1, testAppender.getEventCount(Level.INFO),
+                "Should generate one INFO log event");
+
+        String logMessage = testAppender.getFormattedMessages().get(0);
+        // When BDPAuthContext is present, should not contain N/A
+        Assertions.assertFalse(logMessage.contains("HMS client information: N/A"),
+                "Context should not be N/A when BDPAuthContext is present");
+    }
+
+    @Test
+    public void testLogEmptyPartitionWithoutBDPAuthContext(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Mocked HivePartition partition) {
+        // Setup: Enable logging
+        Config.enable_log_empty_partition_when_list_file = true;
+
+        // Ensure no BDPAuthContext
+        BDPAuthContext.clear();
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getDbName();
+                result = "test_db";
+
+                table.getName();
+                result = "test_table";
+
+                partition.getPath();
+                result = "/path/partition1";
+
+                partition.getLastModifiedTime();
+                result = 1609459200000L;
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create empty file cache
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue emptyCache = new FileCacheValue();
+        fileCaches.add(emptyCache);
+
+        List<HivePartition> partitions = new ArrayList<>();
+        partitions.add(partition);
+
+        // Test: Call method without BDPAuthContext
+        scanNode.logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
+
+        // Verify: Should log with N/A for context
+        Assertions.assertEquals(1, testAppender.getEventCount(Level.INFO),
+                "Should generate one INFO log event");
+
+        String logMessage = testAppender.getFormattedMessages().get(0);
+        Assertions.assertTrue(logMessage.contains("HMS client information: N/A"),
+                "Context should be N/A when BDPAuthContext is null");
+    }
+
+    @Test
+    public void testLogEmptyPartitionCompleteMessageFormat(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Mocked HivePartition partition) {
+        // Setup: Enable logging
+        Config.enable_log_empty_partition_when_list_file = true;
+        BDPAuthContext.clear(); // Ensure predictable N/A values
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getDbName();
+                result = "analytics_db";
+
+                table.getName();
+                result = "events_table";
+
+                partition.getPath();
+                result = "/warehouse/analytics_db/events_table/dt=2025-01-01";
+
+                partition.getLastModifiedTime();
+                result = 1735689600000L; // 2025-01-01
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create empty file cache
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue emptyCache = new FileCacheValue();
+        fileCaches.add(emptyCache);
+
+        List<HivePartition> partitions = new ArrayList<>();
+        partitions.add(partition);
+
+        // Test: Call method
+        scanNode.logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
+
+        // Verify complete log structure
+        String logMessage = testAppender.getFormattedMessages().get(0);
+
+        // Check all expected components are present
+        Assertions.assertTrue(logMessage.contains("/warehouse/analytics_db/events_table/dt=2025-01-01"),
+                "Should contain partition path");
+        Assertions.assertTrue(logMessage.contains("partition last modified time 1735689600000"),
+                "Should contain last modified time");
+        Assertions.assertTrue(logMessage.contains("dbName analytics_db"),
+                "Should contain database name");
+        Assertions.assertTrue(logMessage.contains("tableName events_table"),
+                "Should contain table name");
+        Assertions.assertTrue(logMessage.contains("HMS client information: N/A"),
+                "Should contain HMS client info (N/A in test)");
     }
 }

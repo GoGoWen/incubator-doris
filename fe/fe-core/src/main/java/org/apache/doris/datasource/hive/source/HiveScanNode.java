@@ -48,6 +48,7 @@ import org.apache.doris.datasource.hive.source.HiveSplit.HiveSplitCreator;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
+import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
@@ -391,6 +392,26 @@ public class HiveScanNode extends FileQueryScanNode {
         return numSplitsPerPartition.get() * prunedPartitions.size();
     }
 
+
+    protected void logIfGetNoFileFromEmptyPartitions(List<FileCacheValue> fileCacheValues,
+            List<HivePartition> partitions) {
+        for (int i = 0; i < fileCacheValues.size(); i++) {
+            if (fileCacheValues.get(i).getFiles().isEmpty()) {
+                BDPAuthContext context = BDPAuthContext.get();
+                String logMsg = "Path {} list no files, "
+                        + "partition last modified time {}, dbName {}, tableName {}, HMS client information: {}";
+                Object[] params = {
+                        partitions.get(i).getPath(),
+                        partitions.get(i).getLastModifiedTime(),
+                        hmsTable.getDbName(),
+                        hmsTable.getName(),
+                        (context != null) ? context : "N/A"
+                };
+                LOG.info(logMsg, params);
+            }
+        }
+    }
+
     protected void getFileSplitByPartitions(HiveMetaStoreCache cache, List<HivePartition> partitions,
             List<Split> allFiles, String bindBrokerName, boolean withCache,
             int numBackends) throws IOException, UserException {
@@ -412,6 +433,9 @@ public class HiveScanNode extends FileQueryScanNode {
                     || ConnectContext.get().getSessionVariable().getEnableExternalFileCache());
             withCache = withCache && partitions.size() <= Config.num_indicate_many_partitions;
             fileCaches = cache.getFilesByPartitions(partitions, withCache, !withCache, bindBrokerName);
+            if (Config.enable_log_empty_partition_when_list_file) {
+                logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
+            }
         }
         if (tableSample != null) {
             List<HiveMetaStoreCache.HiveFileStatus> hiveFileStatuses = selectFiles(fileCaches);
