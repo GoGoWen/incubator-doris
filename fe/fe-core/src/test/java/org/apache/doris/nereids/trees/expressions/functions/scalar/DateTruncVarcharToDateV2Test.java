@@ -93,10 +93,9 @@ public class DateTruncVarcharToDateV2Test {
 
         FunctionSignature signature = dateTrunc.getSignature();
 
-        // Should use DATEV2 signature even when cast is to DATETIMEV2
         if (Config.enable_date_conversion) {
-            Assertions.assertEquals(DateV2Type.INSTANCE, signature.returnType);
-            Assertions.assertEquals(DateV2Type.INSTANCE, signature.argumentsTypes.get(0));
+            Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.returnType);
+            Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.argumentsTypes.get(0));
         } else {
             Assertions.assertEquals(DateType.INSTANCE, signature.returnType);
             Assertions.assertEquals(DateType.INSTANCE, signature.argumentsTypes.get(0));
@@ -170,9 +169,8 @@ public class DateTruncVarcharToDateV2Test {
 
         FunctionSignature signature = dateTrunc.getSignature();
 
-        // Should use DateType.INSTANCE when Config.enable_date_conversion is false
-        Assertions.assertEquals(DateType.INSTANCE, signature.returnType);
-        Assertions.assertEquals(DateType.INSTANCE, signature.argumentsTypes.get(0));
+        Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.returnType);
+        Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.argumentsTypes.get(0));
         Assertions.assertEquals(VarcharType.SYSTEM_DEFAULT, signature.argumentsTypes.get(1));
     }
 
@@ -209,6 +207,49 @@ public class DateTruncVarcharToDateV2Test {
         // Should use default signature computation (not the Presto-specific override)
         // This will depend on the default behavior of ExplicitlyCastableSignature
         Assertions.assertNotNull(signature);
+        Assertions.assertEquals(VarcharType.SYSTEM_DEFAULT, signature.argumentsTypes.get(1));
+    }
+
+    @Test
+    public void testNonExplicitCastToDateV2TypeUsesDateV2Signature() {
+        // Setup Presto dialect
+        ConnectContext context = new ConnectContext();
+        context.getSessionVariable().setSqlDialect("presto");
+        context.setThreadLocalInfo();
+
+        // Test non-explicit Cast from VARCHAR to DateV2Type (covers lines 123-125)
+        SlotReference varcharColumn = new SlotReference("date_col", VarcharType.SYSTEM_DEFAULT);
+        Cast implicitCast = new Cast(varcharColumn, DateV2Type.INSTANCE, false); // isExplicitType = false
+        DateTrunc dateTrunc = new DateTrunc(implicitCast, new VarcharLiteral("day"));
+
+        FunctionSignature signature = dateTrunc.getSignature();
+
+        // Should use DATEV2 signature when cast is to DateV2Type
+        Assertions.assertEquals(DateV2Type.INSTANCE, signature.returnType);
+        Assertions.assertEquals(DateV2Type.INSTANCE, signature.argumentsTypes.get(0));
+        Assertions.assertEquals(VarcharType.SYSTEM_DEFAULT, signature.argumentsTypes.get(1));
+    }
+
+    @Test
+    public void testNonExplicitCastToDateTypeUsesDateSignature() {
+        // Set config to false to test the else branch (covers lines 127-128)
+        Config.enable_date_conversion = false;
+
+        // Setup Presto dialect
+        ConnectContext context = new ConnectContext();
+        context.getSessionVariable().setSqlDialect("presto");
+        context.setThreadLocalInfo();
+
+        // Test non-explicit Cast from VARCHAR to DateType
+        SlotReference varcharColumn = new SlotReference("date_col", VarcharType.SYSTEM_DEFAULT);
+        Cast implicitCast = new Cast(varcharColumn, DateType.INSTANCE, false); // isExplicitType = false
+        DateTrunc dateTrunc = new DateTrunc(implicitCast, new VarcharLiteral("day"));
+
+        FunctionSignature signature = dateTrunc.getSignature();
+
+        // Should use DateType signature when cast is to DateType and enable_date_conversion is false
+        Assertions.assertEquals(DateType.INSTANCE, signature.returnType);
+        Assertions.assertEquals(DateType.INSTANCE, signature.argumentsTypes.get(0));
         Assertions.assertEquals(VarcharType.SYSTEM_DEFAULT, signature.argumentsTypes.get(1));
     }
 }

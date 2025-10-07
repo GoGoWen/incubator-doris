@@ -93,10 +93,9 @@ public class DaysAddVarcharToDateV2Test {
 
         FunctionSignature signature = daysAdd.getSignature();
 
-        // Should use DATEV2 signature even when cast is to DATETIMEV2
         if (Config.enable_date_conversion) {
-            Assertions.assertEquals(DateV2Type.INSTANCE, signature.returnType);
-            Assertions.assertEquals(DateV2Type.INSTANCE, signature.argumentsTypes.get(0));
+            Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.returnType);
+            Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.argumentsTypes.get(0));
         } else {
             Assertions.assertEquals(DateType.INSTANCE, signature.returnType);
             Assertions.assertEquals(DateType.INSTANCE, signature.argumentsTypes.get(0));
@@ -208,9 +207,8 @@ public class DaysAddVarcharToDateV2Test {
 
         FunctionSignature signature = daysAdd.getSignature();
 
-        // Should use DateType.INSTANCE when Config.enable_date_conversion is false
-        Assertions.assertEquals(DateType.INSTANCE, signature.returnType);
-        Assertions.assertEquals(DateType.INSTANCE, signature.argumentsTypes.get(0));
+        Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.returnType);
+        Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.argumentsTypes.get(0));
         Assertions.assertEquals(IntegerType.INSTANCE, signature.argumentsTypes.get(1));
     }
 
@@ -254,8 +252,8 @@ public class DaysAddVarcharToDateV2Test {
         FunctionSignature signature = daysSub.getSignature();
 
         // Should use DateType.INSTANCE when Config.enable_date_conversion is false
-        Assertions.assertEquals(DateType.INSTANCE, signature.returnType);
-        Assertions.assertEquals(DateType.INSTANCE, signature.argumentsTypes.get(0));
+        Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.returnType);
+        Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.argumentsTypes.get(0));
         Assertions.assertEquals(IntegerType.INSTANCE, signature.argumentsTypes.get(1));
     }
 
@@ -274,6 +272,92 @@ public class DaysAddVarcharToDateV2Test {
         // This tests the super.computeSignature() fallback path
         Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.returnType);
         Assertions.assertEquals(DateTimeV2Type.SYSTEM_DEFAULT, signature.argumentsTypes.get(0));
+        Assertions.assertEquals(IntegerType.INSTANCE, signature.argumentsTypes.get(1));
+    }
+
+    @Test
+    public void testNonExplicitCastToDateV2TypeUsesDateV2SignatureForDaysAdd() {
+        // Setup Presto dialect
+        ConnectContext context = new ConnectContext();
+        context.getSessionVariable().setSqlDialect("presto");
+        context.setThreadLocalInfo();
+
+        // Test non-explicit Cast from VARCHAR to DateV2Type (covers lines 106-108 in DaysAdd)
+        SlotReference varcharColumn = new SlotReference("cal_dt", VarcharType.SYSTEM_DEFAULT);
+        Cast implicitCast = new Cast(varcharColumn, DateV2Type.INSTANCE, false); // isExplicitType = false
+        DaysAdd daysAdd = new DaysAdd(implicitCast, new IntegerLiteral(1));
+
+        FunctionSignature signature = daysAdd.getSignature();
+
+        // Should use DATEV2 signature when cast is to DateV2Type
+        Assertions.assertEquals(DateV2Type.INSTANCE, signature.returnType);
+        Assertions.assertEquals(DateV2Type.INSTANCE, signature.argumentsTypes.get(0));
+        Assertions.assertEquals(IntegerType.INSTANCE, signature.argumentsTypes.get(1));
+    }
+
+    @Test
+    public void testNonExplicitCastToDateTypeUsesDateSignatureForDaysAdd() {
+        // Set config to false to test the else branch (covers lines 110-111 in DaysAdd)
+        Config.enable_date_conversion = false;
+
+        // Setup Presto dialect
+        ConnectContext context = new ConnectContext();
+        context.getSessionVariable().setSqlDialect("presto");
+        context.setThreadLocalInfo();
+
+        // Test non-explicit Cast from VARCHAR to DateType
+        SlotReference varcharColumn = new SlotReference("cal_dt", VarcharType.SYSTEM_DEFAULT);
+        Cast implicitCast = new Cast(varcharColumn, DateType.INSTANCE, false); // isExplicitType = false
+        DaysAdd daysAdd = new DaysAdd(implicitCast, new IntegerLiteral(1));
+
+        FunctionSignature signature = daysAdd.getSignature();
+
+        // Should use DateType signature when cast is to DateType and enable_date_conversion is false
+        Assertions.assertEquals(DateType.INSTANCE, signature.returnType);
+        Assertions.assertEquals(DateType.INSTANCE, signature.argumentsTypes.get(0));
+        Assertions.assertEquals(IntegerType.INSTANCE, signature.argumentsTypes.get(1));
+    }
+
+    @Test
+    public void testNonExplicitCastToDateV2TypeUsesDateV2SignatureForDaysSub() {
+        // Setup Presto dialect
+        ConnectContext context = new ConnectContext();
+        context.getSessionVariable().setSqlDialect("presto");
+        context.setThreadLocalInfo();
+
+        // Test non-explicit Cast from VARCHAR to DateV2Type (covers lines 106-108 in DaysSub)
+        SlotReference varcharColumn = new SlotReference("cal_dt", VarcharType.SYSTEM_DEFAULT);
+        Cast implicitCast = new Cast(varcharColumn, DateV2Type.INSTANCE, false); // isExplicitType = false
+        DaysSub daysSub = new DaysSub(implicitCast, new IntegerLiteral(1));
+
+        FunctionSignature signature = daysSub.getSignature();
+
+        // Should use DATEV2 signature when cast is to DateV2Type
+        Assertions.assertEquals(DateV2Type.INSTANCE, signature.returnType);
+        Assertions.assertEquals(DateV2Type.INSTANCE, signature.argumentsTypes.get(0));
+        Assertions.assertEquals(IntegerType.INSTANCE, signature.argumentsTypes.get(1));
+    }
+
+    @Test
+    public void testNonExplicitCastToDateTypeUsesDateSignatureForDaysSub() {
+        // Set config to false to test the else branch (covers lines 110-111 in DaysSub)
+        Config.enable_date_conversion = false;
+
+        // Setup Presto dialect
+        ConnectContext context = new ConnectContext();
+        context.getSessionVariable().setSqlDialect("presto");
+        context.setThreadLocalInfo();
+
+        // Test non-explicit Cast from VARCHAR to DateType
+        SlotReference varcharColumn = new SlotReference("cal_dt", VarcharType.SYSTEM_DEFAULT);
+        Cast implicitCast = new Cast(varcharColumn, DateType.INSTANCE, false); // isExplicitType = false
+        DaysSub daysSub = new DaysSub(implicitCast, new IntegerLiteral(1));
+
+        FunctionSignature signature = daysSub.getSignature();
+
+        // Should use DateType signature when cast is to DateType and enable_date_conversion is false
+        Assertions.assertEquals(DateType.INSTANCE, signature.returnType);
+        Assertions.assertEquals(DateType.INSTANCE, signature.argumentsTypes.get(0));
         Assertions.assertEquals(IntegerType.INSTANCE, signature.argumentsTypes.get(1));
     }
 }

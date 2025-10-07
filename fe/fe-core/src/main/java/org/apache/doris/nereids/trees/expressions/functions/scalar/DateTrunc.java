@@ -29,6 +29,7 @@ import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.trees.expressions.literal.VarcharLiteral;
 import org.apache.doris.nereids.trees.expressions.shape.BinaryExpression;
 import org.apache.doris.nereids.trees.expressions.visitor.ExpressionVisitor;
+import org.apache.doris.nereids.types.DataType;
 import org.apache.doris.nereids.types.DateTimeType;
 import org.apache.doris.nereids.types.DateTimeV2Type;
 import org.apache.doris.nereids.types.DateType;
@@ -116,12 +117,16 @@ public class DateTrunc extends ScalarFunction
                     && cast.child().getDataType().isStringLikeType()
                     && cast.child().getDataType().isVarcharType()) {
                 // Non-explicit cast from VARCHAR should use DATEV2 in Presto dialect
-                if (Config.enable_date_conversion) {
-                    return FunctionSignature.ret(DateV2Type.INSTANCE)
-                            .args(DateV2Type.INSTANCE, VarcharType.SYSTEM_DEFAULT);
-                } else {
-                    return FunctionSignature.ret(DateType.INSTANCE)
-                            .args(DateType.INSTANCE, VarcharType.SYSTEM_DEFAULT);
+                // But only if the cast output is a date-like type (not datetime)
+                DataType castOutputType = cast.getDataType();
+                if (castOutputType instanceof DateV2Type || castOutputType instanceof DateType) {
+                    if (Config.enable_date_conversion) {
+                        return FunctionSignature.ret(DateV2Type.INSTANCE)
+                                .args(DateV2Type.INSTANCE, VarcharType.SYSTEM_DEFAULT);
+                    } else {
+                        return FunctionSignature.ret(DateType.INSTANCE)
+                                .args(DateType.INSTANCE, VarcharType.SYSTEM_DEFAULT);
+                    }
                 }
             }
         }
