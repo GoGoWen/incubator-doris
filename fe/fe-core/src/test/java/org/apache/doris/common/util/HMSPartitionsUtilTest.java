@@ -38,6 +38,7 @@ import org.apache.doris.nereids.trees.expressions.Or;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.expressions.functions.agg.Sum;
 import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
+import org.apache.doris.nereids.trees.expressions.literal.NullLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
 import org.apache.doris.nereids.types.DataType;
 import org.apache.doris.nereids.types.IntegerType;
@@ -99,9 +100,14 @@ public class HMSPartitionsUtilTest {
                 Arrays.asList(new PartitionValue("2023"), new PartitionValue("02")),
                 partitionColumns);
 
+        PartitionKey pk3 = PartitionKey.createPartitionKey(
+                Arrays.asList(new PartitionValue("", true), new PartitionValue("02")),
+                partitionColumns);
+
         partitionItems = Arrays.asList(
                 new ListPartitionItem(Arrays.asList(pk1)),
-                new ListPartitionItem(Arrays.asList(pk2))
+                new ListPartitionItem(Arrays.asList(pk2)),
+                new ListPartitionItem(Arrays.asList(pk3))
         );
     }
 
@@ -352,6 +358,7 @@ public class HMSPartitionsUtilTest {
         // Test unsupported expression (Sum function)
         Sum sumExpr = new Sum(slotRef);
         Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(sumExpr));
+        Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(new NullLiteral()));
     }
 
     @Test
@@ -374,8 +381,8 @@ public class HMSPartitionsUtilTest {
         List<List<NamedExpression>> result = HMSPartitionsUtil.buildConstantExpressionsFromPartitions(
                 partitionItems, partitionColumns, nameToType, unionOutputs);
 
-        // Should have 2 partition items
-        Assertions.assertEquals(2, result.size());
+        // Should have 3 partition items
+        Assertions.assertEquals(3, result.size());
 
         // Each partition should have 2 columns
         Assertions.assertEquals(2, result.get(0).size());
@@ -401,8 +408,8 @@ public class HMSPartitionsUtilTest {
         List<List<NamedExpression>> result = HMSPartitionsUtil.buildConstantExpressionsFromPartitions(
                 partitionItems, partitionColumns, partialNameToType, unionOutputs);
 
-        // Should still have 2 partition items
-        Assertions.assertEquals(2, result.size());
+        // Should still have 3 partition items
+        Assertions.assertEquals(3, result.size());
 
         // Each partition should have only 1 expression (only year)
         Assertions.assertEquals(1, result.get(0).size());
@@ -456,7 +463,7 @@ public class HMSPartitionsUtilTest {
                 partitionItems, partitionColumns, differentNameToType, unionOutputs);
 
         // Should still work with type coercion
-        Assertions.assertEquals(2, result.size());
+        Assertions.assertEquals(3, result.size());
         Assertions.assertEquals(2, result.get(0).size());
 
         // Verify expressions are created

@@ -17,6 +17,7 @@
 
 package org.apache.doris.common.util;
 
+import org.apache.doris.analysis.NullLiteral;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.ListPartitionItem;
 import org.apache.doris.catalog.PartitionItem;
@@ -98,7 +99,8 @@ public class HMSPartitionsUtil {
         if (expression instanceof SlotReference) {
             return true;
         }
-        if (expression instanceof Literal) {
+        if (expression instanceof Literal
+                && !(expression instanceof org.apache.doris.nereids.trees.expressions.literal.NullLiteral)) {
             return true;
         }
         if (expression instanceof And || expression instanceof Or || expression instanceof EqualTo
@@ -129,7 +131,10 @@ public class HMSPartitionsUtil {
             for (int i = 0; i < partitionColumns.size(); i++) {
                 String name = partitionColumns.get(i).getName();
                 if (nameToType.containsKey(name)) {
-                    Literal literal = Literal.of(partitionKey.getKeys().get(i).getRealValue());
+                    Literal literal = partitionKey.getKeys().get(i) instanceof NullLiteral
+                            ? Literal.of(null)
+                            : Literal.of(partitionKey.getKeys().get(i).getRealValue());
+
                     Expression castedLiteral = literal.checkedCastTo(nameToType.get(name));
 
                     // Find the corresponding output to get target type for proper coercion
