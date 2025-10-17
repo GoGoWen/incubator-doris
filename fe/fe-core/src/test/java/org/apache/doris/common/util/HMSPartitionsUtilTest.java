@@ -41,6 +41,8 @@ import org.apache.doris.nereids.trees.expressions.literal.IntegerLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.NullLiteral;
 import org.apache.doris.nereids.trees.expressions.literal.StringLiteral;
 import org.apache.doris.nereids.types.DataType;
+import org.apache.doris.nereids.types.DateTimeV2Type;
+import org.apache.doris.nereids.types.DateV2Type;
 import org.apache.doris.nereids.types.IntegerType;
 import org.apache.doris.nereids.types.StringType;
 import org.apache.doris.nereids.types.VarcharType;
@@ -78,31 +80,37 @@ public class HMSPartitionsUtilTest {
         // Setup partition columns
         partitionColumns = Arrays.asList(
             new Column("year", PrimitiveType.INT),
-            new Column("month", PrimitiveType.VARCHAR)
+            new Column("month", PrimitiveType.VARCHAR),
+            new Column("date", PrimitiveType.DATEV2),
+            new Column("datetime", PrimitiveType.DATETIMEV2)
         );
 
         // Setup name to type mapping
         nameToType = Maps.newHashMap();
         nameToType.put("year", IntegerType.INSTANCE);
         nameToType.put("month", VarcharType.createVarcharType(10));
+        nameToType.put("date", DateV2Type.INSTANCE);
+        nameToType.put("datetime", DateTimeV2Type.SYSTEM_DEFAULT);
 
         // Setup union outputs
         unionOutputs = Arrays.asList(
             new SlotReference("year", IntegerType.INSTANCE),
-            new SlotReference("month", VarcharType.createVarcharType(10))
+            new SlotReference("month", VarcharType.createVarcharType(10)),
+            new SlotReference("date", DateV2Type.INSTANCE),
+            new SlotReference("datetime", DateTimeV2Type.SYSTEM_DEFAULT)
         );
 
         // Setup partition items
         PartitionKey pk1 = PartitionKey.createPartitionKey(
-                Arrays.asList(new PartitionValue("2023"), new PartitionValue("01")),
-                partitionColumns);
+                Arrays.asList(new PartitionValue("2023"), new PartitionValue("01"), new PartitionValue("2023-01-01"),
+                        new PartitionValue("2023-01-01 10:00:00")), partitionColumns);
         PartitionKey pk2 = PartitionKey.createPartitionKey(
-                Arrays.asList(new PartitionValue("2023"), new PartitionValue("02")),
-                partitionColumns);
+                Arrays.asList(new PartitionValue("2023"), new PartitionValue("02"), new PartitionValue("2023-02-01"),
+                        new PartitionValue("2023-02-01 10:00:00")), partitionColumns);
 
         PartitionKey pk3 = PartitionKey.createPartitionKey(
-                Arrays.asList(new PartitionValue("", true), new PartitionValue("02")),
-                partitionColumns);
+                Arrays.asList(new PartitionValue("", true), new PartitionValue("02"),
+                        new PartitionValue("2023-03-01"), new PartitionValue("2023-03-01 10:00:00")), partitionColumns);
 
         partitionItems = Arrays.asList(
                 new ListPartitionItem(Arrays.asList(pk1)),
@@ -385,8 +393,8 @@ public class HMSPartitionsUtilTest {
         Assertions.assertEquals(3, result.size());
 
         // Each partition should have 2 columns
-        Assertions.assertEquals(2, result.get(0).size());
-        Assertions.assertEquals(2, result.get(1).size());
+        Assertions.assertEquals(4, result.get(0).size());
+        Assertions.assertEquals(4, result.get(1).size());
 
         // Verify first partition expressions
         NamedExpression yearExpr = result.get(0).get(0);

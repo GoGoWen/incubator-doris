@@ -17,11 +17,14 @@
 
 package org.apache.doris.common.util;
 
+import org.apache.doris.analysis.DateLiteral;
+import org.apache.doris.analysis.LiteralExpr;
 import org.apache.doris.analysis.NullLiteral;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.ListPartitionItem;
 import org.apache.doris.catalog.PartitionItem;
 import org.apache.doris.catalog.PartitionKey;
+import org.apache.doris.catalog.Type;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
 import org.apache.doris.datasource.hive.HMSExternalTable;
@@ -37,6 +40,8 @@ import org.apache.doris.nereids.trees.expressions.LessThanEqual;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Or;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
+import org.apache.doris.nereids.trees.expressions.literal.DateTimeV2Literal;
+import org.apache.doris.nereids.trees.expressions.literal.DateV2Literal;
 import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.types.DataType;
 import org.apache.doris.nereids.util.TypeCoercionUtils;
@@ -131,10 +136,19 @@ public class HMSPartitionsUtil {
             for (int i = 0; i < partitionColumns.size(); i++) {
                 String name = partitionColumns.get(i).getName();
                 if (nameToType.containsKey(name)) {
-                    Literal literal = partitionKey.getKeys().get(i) instanceof NullLiteral
-                            ? Literal.of(null)
-                            : Literal.of(partitionKey.getKeys().get(i).getRealValue());
-
+                    Literal literal;
+                    LiteralExpr literalExpr = partitionKey.getKeys().get(i);
+                    if (literalExpr instanceof DateLiteral) {
+                        if (literalExpr.getType().equals(Type.DATE) || literalExpr.getType().equals(Type.DATEV2)) {
+                            literal = new DateV2Literal(literalExpr.getStringValue());
+                        } else {
+                            literal = new DateTimeV2Literal(literalExpr.getStringValue());
+                        }
+                    } else {
+                        literal = partitionKey.getKeys().get(i) instanceof NullLiteral
+                                ? Literal.of(null)
+                                : Literal.of(partitionKey.getKeys().get(i).getRealValue());
+                    }
                     Expression castedLiteral = literal.checkedCastTo(nameToType.get(name));
 
                     // Find the corresponding output to get target type for proper coercion
