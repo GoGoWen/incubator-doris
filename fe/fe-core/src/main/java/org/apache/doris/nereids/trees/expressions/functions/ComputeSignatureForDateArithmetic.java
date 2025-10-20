@@ -29,6 +29,7 @@ import org.apache.doris.nereids.types.IntegerType;
 /**
  * use for date arithmetic, such as date_sub('2024-05-28', INTERVAL 1 day).
  * if the first argument is string like literal and could cast to legal date literal,
+ * or if it's sysdate() which returns date-formatted strings,
  * then use date/dateV2 signature
  */
 @Developing
@@ -37,6 +38,17 @@ public interface ComputeSignatureForDateArithmetic extends ComputeSignature {
     @Override
     default FunctionSignature computeSignature(FunctionSignature signature) {
         FunctionSignature ret = ComputeSignature.super.computeSignature(signature);
+
+        if (child(0) instanceof BoundFunction
+                && "sysdate".equalsIgnoreCase(((BoundFunction) child(0)).getName())) {
+            if (Config.enable_date_conversion) {
+                return FunctionSignature.ret(DateV2Type.INSTANCE)
+                        .args(DateV2Type.INSTANCE, IntegerType.INSTANCE);
+            } else {
+                return FunctionSignature.ret(DateType.INSTANCE).args(DateType.INSTANCE, IntegerType.INSTANCE);
+            }
+        }
+
         if (child(0) instanceof StringLikeLiteral) {
             try {
                 String s = ((StringLikeLiteral) child(0)).getStringValue().trim();
