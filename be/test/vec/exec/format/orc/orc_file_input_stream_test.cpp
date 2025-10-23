@@ -23,7 +23,6 @@
 
 #include "common/config.h"
 #include "io/fs/file_reader.h"
-#include "util/runtime_profile.h"
 
 namespace doris::vectorized {
 
@@ -85,12 +84,11 @@ protected:
         _mock_reader = std::make_shared<MockFileReader>(_file_size);
         
         _statistics = std::make_unique<OrcReader::Statistics>();
-        _profile = std::make_unique<RuntimeProfile>("test_profile");
         _io_ctx = std::make_unique<io::IOContext>();
         
         _file_name = "test_orc_file";
         _input_stream = std::make_unique<ORCFileInputStream>(
-            _file_name, _mock_reader, _statistics.get(), _io_ctx.get(), _profile.get());
+            _file_name, _mock_reader, _statistics.get(), _io_ctx.get());
     }
 
     void TearDown() override {
@@ -99,7 +97,6 @@ protected:
 
     std::shared_ptr<MockFileReader> _mock_reader;
     std::unique_ptr<OrcReader::Statistics> _statistics;
-    std::unique_ptr<RuntimeProfile> _profile;
     std::unique_ptr<io::IOContext> _io_ctx;
     std::string _file_name;
     std::unique_ptr<ORCFileInputStream> _input_stream;

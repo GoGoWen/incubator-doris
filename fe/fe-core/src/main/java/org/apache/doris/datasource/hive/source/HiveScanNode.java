@@ -31,6 +31,8 @@ import org.apache.doris.common.Pair;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.common.util.HMSPartitionsUtil;
+import org.apache.doris.common.util.HiveBucketingUtil;
+import org.apache.doris.common.util.HiveBucketingUtil.HiveBucketProperty;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.datasource.FileQueryScanNode;
 import org.apache.doris.datasource.FileSplit;
@@ -76,6 +78,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -436,7 +439,15 @@ public class HiveScanNode extends FileQueryScanNode {
             if (Config.enable_log_empty_partition_when_list_file) {
                 logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
             }
+            if (Config.enable_hive_bucketing_optimize_rule && !conjuncts.isEmpty()) {
+                Optional<HiveBucketProperty> hiveBucketProperty = HiveBucketingUtil.getHiveBucketProperty(hmsTable);
+                if (hiveBucketProperty.isPresent()) {
+                    fileCaches = HiveBucketingUtil.filterByBucketConjuncts(hiveBucketProperty.get(),
+                            conjuncts, fileCaches);
+                }
+            }
         }
+
         if (tableSample != null) {
             List<HiveMetaStoreCache.HiveFileStatus> hiveFileStatuses = selectFiles(fileCaches);
             splitAllFiles(allFiles, hiveFileStatuses);

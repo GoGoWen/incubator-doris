@@ -268,7 +268,7 @@ Status OrcReader::_create_file_reader() {
                 _profile, _system_properties, _file_description, reader_options, &_file_system,
                 &inner_reader, io::DelegateReader::AccessMode::RANDOM, _io_ctx));
         _file_input_stream.reset(new ORCFileInputStream(_scan_range.path, inner_reader,
-                                                        &_statistics, _io_ctx, _profile));
+                                                        &_statistics, _io_ctx));
     }
     if (_file_input_stream->getLength() == 0) {
         return Status::EndOfFile("empty orc file: " + _scan_range.path);
@@ -933,8 +933,7 @@ Status OrcReader::set_fill_columns(
             orcInputStreamPtr->set_all_tiny_stripes();
             auto& orc_file_reader = orcInputStreamPtr->get_file_reader();
             orc_file_reader->collect_profile_before_close();
-            auto orc_inner_reader = orcInputStreamPtr->get_inner_reader();
-            orc_file_reader = std::make_shared<io::RangeCacheFileReader>(_profile, orc_inner_reader,
+            orc_file_reader = std::make_shared<io::RangeCacheFileReader>(_profile, orc_file_reader,
                                                                      range_finder);
         }
 
@@ -2502,31 +2501,6 @@ void ORCFileInputStream::beforeReadStripe(
     }
     if (_file_reader != nullptr) {
         _file_reader->collect_profile_before_close();
-    }
-    // Generate prefetch ranges, build stripe file reader.
-    uint64_t offset = current_strip_information->getOffset();
-    std::vector<io::PrefetchRange> prefetch_ranges;
-    size_t total_io_size = 0;
-    for (uint64_t stream_id = 0; stream_id < current_strip_information->getNumberOfStreams();
-         ++stream_id) {
-        std::unique_ptr<orc::StreamInformation> stream =
-                current_strip_information->getStreamInformation(stream_id);
-        uint32_t columnId = stream->getColumnId();
-        uint64_t length = stream->getLength();
-        if (selected_columns[columnId]) {
-            total_io_size += length;
-            doris::io::PrefetchRange prefetch_range = {offset, offset + length};
-            prefetch_ranges.emplace_back(std::move(prefetch_range));
-        }
-        offset += length;
-    }
-    size_t num_columns = std::count_if(selected_columns.begin(), selected_columns.end(),
-                                       [](bool selected) { return selected; });
-    if (total_io_size / num_columns < io::MergeRangeFileReader::SMALL_IO) {
-        // The underlying page reader will prefetch data in column.
-        _file_reader.reset(new io::MergeRangeFileReader(_profile, _inner_reader, prefetch_ranges));
-    } else {
-        _file_reader = _inner_reader;
     }
 }
 

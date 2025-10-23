@@ -633,15 +633,12 @@ private:
 
 class ORCFileInputStream : public orc::InputStream, public ProfileCollector {
 public:
-    ORCFileInputStream(const std::string& file_name, io::FileReaderSPtr inner_reader,
-                       OrcReader::Statistics* statistics, const io::IOContext* io_ctx,
-                       RuntimeProfile* profile)
+    ORCFileInputStream(const std::string& file_name, io::FileReaderSPtr file_reader,
+                       OrcReader::Statistics* statistics, const io::IOContext* io_ctx)
             : _file_name(file_name),
-              _inner_reader(inner_reader),
-              _file_reader(inner_reader),
+              _file_reader(file_reader),
               _statistics(statistics),
               _io_ctx(io_ctx),
-              _profile(profile),
               _cache_buffer(0),
               _cache_offset(0) {}
 
@@ -678,21 +675,17 @@ public:
 
     io::FileReaderSPtr& get_file_reader() { return _file_reader; }
 
-    io::FileReaderSPtr& get_inner_reader() { return _inner_reader; }
-
 protected:
     void _collect_profile_at_runtime() override {};
     void _collect_profile_before_close() override;
 
 private:
     const std::string& _file_name;
-    io::FileReaderSPtr _inner_reader;
     io::FileReaderSPtr _file_reader;
     bool _is_all_tiny_stripes = false;
     // Owned by OrcReader
     OrcReader::Statistics* _statistics = nullptr;
     const io::IOContext* _io_ctx = nullptr;
-    RuntimeProfile* _profile = nullptr;
     std::vector<char> _cache_buffer;
     uint64_t _cache_offset;
 };
