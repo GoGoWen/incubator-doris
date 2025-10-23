@@ -39,9 +39,9 @@
 #include "io/fs/file_system.h"
 #include "io/fs/file_writer.h"
 #include "io/fs/hdfs_file_reader.h"
-#include "io/fs/new_hdfs_file_reader.h"
 #include "io/fs/hdfs_file_writer.h"
 #include "io/fs/local_file_system.h"
+#include "io/fs/new_hdfs_file_reader.h"
 #include "io/hdfs_builder.h"
 #include "util/hdfs_util.h"
 #include "util/obj_lru_cache.h"
@@ -113,7 +113,8 @@ public:
     // try get hdfs file from cache, if not exists, will open a new file, insert it into cache
     // and return the file cache handle.
     Status get_file(const std::shared_ptr<HdfsFileSystem>& fs, const Path& file, int64_t mtime,
-                    int64_t file_size, FileHandleCache::Accessor* accessor);
+                    int64_t file_size, FileHandleCache::Accessor* accessor,
+                    const hdfsAuditContext* audit_context);
 
 private:
     FileHandleCache _cache;
@@ -125,13 +126,14 @@ private:
 
 Status HdfsFileHandleCache::get_file(const std::shared_ptr<HdfsFileSystem>& fs, const Path& file,
                                      int64_t mtime, int64_t file_size,
-                                     FileHandleCache::Accessor* accessor) {
+                                     FileHandleCache::Accessor* accessor,
+                                     const hdfsAuditContext* audit_context) {
     bool cache_hit;
     std::string fname = file.string();
     RETURN_IF_ERROR(HdfsFileHandleCache::instance()->cache().get_file_handle(
             fs->_fs_handle, fs->_hdfs_params.user, fname, mtime, file_size, false, accessor,
-            &cache_hit));
-    accessor->set_fs(fs);
+            &cache_hit, audit_context));
+    accessor->set_fs(std::static_pointer_cast<FileSystem>(fs));
 
     return Status::OK();
 }
@@ -161,6 +163,26 @@ HdfsFileSystem::HdfsFileSystem(const THdfsParams& hdfs_params, std::string id,
     } else {
         _fs_name = fs_name;
     }
+
+    for (const auto& conf : _hdfs_params.hdfs_conf) {
+        if (conf.key == "BEE_BUSINESSID") {
+            _audit_context_strings["businessId"] = conf.value;
+        } else if (conf.key == "BEE_USER") {
+            _audit_context_strings["erp"] = conf.value;
+        } else if (conf.key == "BEE_SOURCE") {
+            _audit_context_strings["source"] = conf.value;
+        }
+    }
+
+    if (_audit_context_strings.contains("businessId")) {
+        _audit_context.businessId = _audit_context_strings["businessId"].c_str();
+    }
+    if (_audit_context_strings.contains("erp")) {
+        _audit_context.erp = _audit_context_strings["erp"].c_str();
+    }
+    if (_audit_context_strings.contains("source")) {
+        _audit_context.source = _audit_context_strings["source"].c_str();
+    }
 }
 
 HdfsFileSystem::~HdfsFileSystem() = default;
@@ -189,16 +211,17 @@ Status HdfsFileSystem::open_file_internal(const Path& file, FileReaderSPtr* read
         FileHandleCache::Accessor accessor;
         RETURN_IF_ERROR(HdfsFileHandleCache::instance()->get_file(
                 std::static_pointer_cast<HdfsFileSystem>(shared_from_this()), real_path, opts.mtime,
-                opts.file_size, &accessor));
-
+                opts.file_size, &accessor, &_audit_context));
         *reader = std::make_shared<HdfsFileReader>(file, _fs_name, std::move(accessor), _profile);
     } else {
         std::unique_ptr<ExclusiveHdfsFileHandle> hdfs_file_handle =
-            std::make_unique<ExclusiveHdfsFileHandle>(std::static_pointer_cast<HdfsFileSystem>(shared_from_this())->_fs_handle,
-                real_path.string(), opts.mtime);
-        RETURN_IF_ERROR(hdfs_file_handle->init(opts.file_size));
-        *reader = std::make_shared<NewHdfsFileReader>(file, _fs_name, std::static_pointer_cast<HdfsFileSystem>(shared_from_this()),
-            std::move(hdfs_file_handle), _profile);
+                std::make_unique<ExclusiveHdfsFileHandle>(
+                        std::static_pointer_cast<HdfsFileSystem>(shared_from_this())->_fs_handle,
+                        real_path.string(), opts.mtime);
+        RETURN_IF_ERROR(hdfs_file_handle->init(opts.file_size, &_audit_context));
+        *reader = std::make_shared<NewHdfsFileReader>(
+                file, _fs_name, std::static_pointer_cast<HdfsFileSystem>(shared_from_this()),
+                std::move(hdfs_file_handle), _profile);
     }
 
     return Status::OK();
@@ -247,7 +270,9 @@ Status HdfsFileSystem::delete_internal(const Path& path, int is_recursive) {
 Status HdfsFileSystem::exists_impl(const Path& path, bool* res) const {
     CHECK_HDFS_HANDLE(_fs_handle);
     Path real_path = convert_path(path, _fs_name);
-    int is_exists = hdfsExists(_fs_handle->hdfs_fs, real_path.string().c_str());
+
+    int is_exists = hdfsExistsWithAuditContext(_fs_handle->hdfs_fs, real_path.string().c_str(),
+                                               &_audit_context);
 #ifdef USE_HADOOP_HDFS
     // when calling hdfsExists() and return non-zero code,
     // if errno is ENOENT, which means the file does not exist.
@@ -269,7 +294,9 @@ Status HdfsFileSystem::exists_impl(const Path& path, bool* res) const {
 Status HdfsFileSystem::file_size_impl(const Path& path, int64_t* file_size) const {
     CHECK_HDFS_HANDLE(_fs_handle);
     Path real_path = convert_path(path, _fs_name);
-    hdfsFileInfo* file_info = hdfsGetPathInfo(_fs_handle->hdfs_fs, real_path.string().c_str());
+
+    hdfsFileInfo* file_info = hdfsGetPathInfoWithAuditContext(
+            _fs_handle->hdfs_fs, real_path.string().c_str(), &_audit_context);
     if (file_info == nullptr) {
         return Status::IOError("failed to get file size of {}: {}", path.native(), hdfs_error());
     }
@@ -288,8 +315,8 @@ Status HdfsFileSystem::list_impl(const Path& path, bool only_file, std::vector<F
     CHECK_HDFS_HANDLE(_fs_handle);
     Path real_path = convert_path(path, _fs_name);
     int numEntries = 0;
-    hdfsFileInfo* hdfs_file_info =
-            hdfsListDirectory(_fs_handle->hdfs_fs, real_path.c_str(), &numEntries);
+    hdfsFileInfo* hdfs_file_info = hdfsListDirectoryWithAuditContext(
+            _fs_handle->hdfs_fs, real_path.c_str(), &numEntries, &_audit_context);
     if (hdfs_file_info == nullptr) {
         return Status::IOError("failed to list files/directors {}: {}", path.native(),
                                hdfs_error());
@@ -468,14 +495,6 @@ std::string HdfsFileSystemCache::_hdfs_cache_key(const THdfsParams& hdfs_params,
 
     if (hdfs_params.__isset.user) {
         fmt::format_to(std::back_inserter(buffer), "{}", hdfs_params.user);
-    }
-
-    if (hdfs_params.__isset.hdfs_conf) {
-        for (const auto& conf : hdfs_params.hdfs_conf) {
-            if (conf.key == "BEE_USER" || conf.key == "BEE_SOURCE") {
-                fmt::format_to(std::back_inserter(buffer), "{}", conf.value);
-            }
-        }
     }
 
     return fmt::to_string(buffer);

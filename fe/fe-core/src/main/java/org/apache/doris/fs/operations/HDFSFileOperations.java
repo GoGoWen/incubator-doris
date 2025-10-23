@@ -20,6 +20,7 @@ package org.apache.doris.fs.operations;
 import org.apache.doris.backup.Status;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.URI;
+import org.apache.doris.fs.HdfsAuditUtil;
 
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -29,6 +30,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.util.Map;
 
 public class HDFSFileOperations implements FileOperations {
     private static final Logger LOG = LogManager.getLogger(HDFSFileOperations.class);
@@ -54,7 +56,9 @@ public class HDFSFileOperations implements FileOperations {
         try {
             URI pathUri = URI.create(hdfsOpParams.remotePath());
             Path inputFilePath = new Path(pathUri.getPath());
-            FSDataInputStream fsDataInputStream = hdfsClient.open(inputFilePath, READ_BUFFER_SIZE);
+            Map<String, String> auditCtx = HdfsAuditUtil.buildAuditContextMap();
+            FSDataInputStream fsDataInputStream = hdfsClient
+                    .openWithAuditContext(inputFilePath, READ_BUFFER_SIZE, auditCtx);
             fsDataInputStream.seek(hdfsOpParams.startOffset());
             hdfsOpParams.withFsDataInputStream(fsDataInputStream);
             return Status.OK;

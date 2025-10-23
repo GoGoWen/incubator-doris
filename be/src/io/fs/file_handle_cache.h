@@ -79,7 +79,7 @@ public:
     ~HdfsFileHandle();
 
     /// Init opens the file handle
-    Status init(int64_t file_size);
+    Status init(int64_t file_size, const hdfsAuditContext* audit_context);
 
     hdfsFS fs() const;
     hdfsFile file() const { return _hdfs_file; }
@@ -212,7 +212,7 @@ public:
     /// This obtains exclusive control over the returned file handle.
     Status get_file_handle(std::shared_ptr<HdfsFileSystemHandle> fs_handle, const std::string& user, const std::string& fname, int64_t mtime,
                            int64_t file_size, bool require_new_handle, Accessor* accessor,
-                           bool* cache_hit) WARN_UNUSED_RESULT;
+                           bool* cache_hit, const hdfsAuditContext* audit_context) WARN_UNUSED_RESULT;
 
 private:
     /// Periodic check to evict unused file handles. Only executed by _eviction_thread.

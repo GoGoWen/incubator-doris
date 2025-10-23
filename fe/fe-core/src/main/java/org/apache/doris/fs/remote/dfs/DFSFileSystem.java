@@ -22,6 +22,7 @@ import org.apache.doris.backup.Status;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.URI;
+import org.apache.doris.fs.HdfsAuditUtil;
 import org.apache.doris.fs.operations.HDFSFileOperations;
 import org.apache.doris.fs.operations.HDFSOpParams;
 import org.apache.doris.fs.operations.OpParams;
@@ -93,6 +94,7 @@ public class DFSFileSystem extends RemoteFileSystem {
                     if (bdpAuthContext.getErp() != null) {
                         conf.set("BEE_USER", bdpAuthContext.getErp());
                     }
+                    conf.set("BEE_COMPUTE", "Doris");
                     try {
                         dfsFileSystem = ugi.doAs((PrivilegedAction<FileSystem>) () -> {
                             try {
@@ -115,13 +117,15 @@ public class DFSFileSystem extends RemoteFileSystem {
     public Status listFiles(String remotePath, boolean recursive, List<RemoteFile> result) {
         if (Config.enable_list_hdfs_files_without_block_locations) {
             try {
-                org.apache.hadoop.fs.FileSystem fileSystem = nativeFileSystem(remotePath);
+                FileSystem fileSystem = nativeFileSystem(remotePath);
                 Path locatedPath = new Path(remotePath);
                 ArrayDeque<Path> pathQueue = new ArrayDeque<>();
                 pathQueue.add(locatedPath);
                 while (!pathQueue.isEmpty()) {
                     Path currentPath = pathQueue.poll();
-                    FileStatus[] fileStatusList = fileSystem.listStatus(currentPath);
+                    Map<String, String> auditCtx = HdfsAuditUtil.buildAuditContextMap();
+                    FileStatus[] fileStatusList = fileSystem
+                            .listStatusWithAuditContext(currentPath, auditCtx);
                     for (FileStatus fileStatus : fileStatusList) {
                         if (fileStatus.isDirectory()) {
                             if (recursive) {
@@ -153,11 +157,15 @@ public class DFSFileSystem extends RemoteFileSystem {
 
     protected RemoteIterator<LocatedFileStatus> getLocatedFiles(boolean recursive,
                 FileSystem fileSystem, Path locatedPath) throws IOException {
-        return fileSystem.listFiles(locatedPath, recursive);
+        Map<String, String> auditCtx = HdfsAuditUtil.buildAuditContextMap();
+        return fileSystem.listFilesWithAuditContext(locatedPath, recursive, auditCtx);
     }
 
     protected FileStatus[] getFileStatuses(String remotePath, FileSystem fileSystem) throws IOException {
-        return fileSystem.listStatus(new Path(remotePath));
+        Path path = new Path(remotePath);
+        Map<String, String> auditCtx = HdfsAuditUtil.buildAuditContextMap();
+        FileStatus[] statuses = fileSystem.listStatusWithAuditContext(path, auditCtx);
+        return statuses;
     }
 
     public static Configuration getHdfsConf(boolean fallbackToSimpleAuth) {
@@ -331,7 +339,8 @@ public class DFSFileSystem extends RemoteFileSystem {
             URI pathUri = URI.create(remotePath);
             Path inputFilePath = new Path(pathUri.getPath());
             FileSystem fileSystem = nativeFileSystem(remotePath);
-            boolean isPathExist = fileSystem.exists(inputFilePath);
+            Map<String, String> auditCtx = HdfsAuditUtil.buildAuditContextMap();
+            boolean isPathExist = fileSystem.existsWithAuditContext(inputFilePath, auditCtx);
             if (!isPathExist) {
                 return new Status(Status.ErrCode.NOT_FOUND, "remote path does not exist: " + remotePath);
             }
@@ -493,7 +502,8 @@ public class DFSFileSystem extends RemoteFileSystem {
             URI pathUri = URI.create(remotePath);
             FileSystem fileSystem = nativeFileSystem(remotePath);
             Path pathPattern = new Path(pathUri.getPath());
-            FileStatus[] files = fileSystem.globStatus(pathPattern);
+            Map<String, String> auditCtx = HdfsAuditUtil.buildAuditContextMap();
+            FileStatus[] files = fileSystem.globStatusWithAuditContext(pathPattern, auditCtx);
             if (files == null) {
                 LOG.info("no files in path " + remotePath);
                 return Status.OK;

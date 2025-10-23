@@ -146,6 +146,12 @@ public class HdfsResource extends Resource {
                 hdfsConf.setValue(bdpAuthContext.getUserToken());
                 tHdfsParams.hdfs_conf.add(hdfsConf);
             }
+            if (bdpAuthContext.getQueryId() != null) {
+                THdfsConf hdfsConf = new THdfsConf();
+                hdfsConf.setKey("BEE_BUSINESSID");
+                hdfsConf.setValue(bdpAuthContext.getQueryIdStr());
+                tHdfsParams.hdfs_conf.add(hdfsConf);
+            }
         }
         return tHdfsParams;
     }

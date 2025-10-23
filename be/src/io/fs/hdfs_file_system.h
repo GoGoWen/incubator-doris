@@ -125,7 +125,6 @@ protected:
 private:
     Status delete_internal(const Path& path, int is_recursive);
 
-private:
     friend class HdfsFileWriter;
     HdfsFileSystem(const THdfsParams& hdfs_params, std::string id, const std::string& path,
                    RuntimeProfile* profile);
@@ -133,6 +132,9 @@ private:
     std::string _fs_name;
     std::shared_ptr<HdfsFileSystemHandle> _fs_handle = nullptr;
     RuntimeProfile* _profile = nullptr;
+
+    hdfsAuditContext _audit_context = {nullptr, nullptr, nullptr};
+    std::unordered_map<std::string, std::string> _audit_context_strings;
 };
 } // namespace io
 } // namespace doris

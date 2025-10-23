@@ -85,7 +85,6 @@ public class DFSFileSystemTest {
         Path file4Path = new Path("/test/subdir/file4.txt");
 
         // Create additional paths for proper testing
-        Path rootPath = new Path("/test");
         Path subdirPath = new Path("/test/subdir");
 
         // Mock FileStatus objects
@@ -103,15 +102,17 @@ public class DFSFileSystemTest {
             }
         };
 
-        // Mock FileSystem.listStatus calls
+        // Mock FileSystem.listStatusWithAuditContext calls
         new Expectations() {{
-                // Mock listStatus for root directory
-                mockFileSystem.listStatus(rootPath);
+                // Mock listStatusWithAuditContext for root directory (first call)
+                mockFileSystem.listStatusWithAuditContext(new Path("/test"), (Map<String, String>) any);
                 result = new FileStatus[]{file1Status, file2Status, subdirStatus};
+                times = 1;
 
-                // Mock listStatus for subdirectory (called during recursive traversal)
-                mockFileSystem.listStatus(subdirPath);
+                // Mock listStatusWithAuditContext for subdirectory (second call)
+                mockFileSystem.listStatusWithAuditContext(new Path("/test/subdir"), (Map<String, String>) any);
                 result = new FileStatus[]{file3Status, file4Status};
+                times = 1;
             }};
 
         List<RemoteFile> result = new ArrayList<>();
@@ -151,7 +152,6 @@ public class DFSFileSystemTest {
         // ├── file2.txt
         // └── subdir/ (directory, should not be traversed in non-recursive mode)
 
-        Path rootPath = new Path("/test");
         Path file1Path = new Path("/test/file1.txt");
         Path file2Path = new Path("/test/file2.txt");
         Path subdirPath = new Path("/test/subdir");
@@ -169,10 +169,10 @@ public class DFSFileSystemTest {
             }
         };
 
-        // Mock FileSystem.listStatus calls
+        // Mock FileSystem.listStatusWithAuditContext calls
         new Expectations() {{
-                // Mock listStatus for root directory only (non-recursive)
-                mockFileSystem.listStatus(rootPath);
+                // Mock listStatusWithAuditContext for root directory only (non-recursive)
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
                 result = new FileStatus[]{file1Status, file2Status, subdirStatus};
                 // Note: subdirectory should NOT be traversed in non-recursive mode
             }};
@@ -203,8 +203,6 @@ public class DFSFileSystemTest {
         // Enable new implementation
         Config.enable_list_hdfs_files_without_block_locations = true;
 
-        Path nonexistentPath = new Path("/nonexistent");
-
         // Use MockUp to partially mock DFSFileSystem - only override nativeFileSystem method
         new MockUp<DFSFileSystem>() {
             @Mock
@@ -213,10 +211,10 @@ public class DFSFileSystemTest {
             }
         };
 
-        // Mock FileSystem.listStatus to throw FileNotFoundException
+        // Mock FileSystem.listStatusWithAuditContext to throw FileNotFoundException
         new Expectations() {{
-                // Mock listStatus to throw FileNotFoundException
-                mockFileSystem.listStatus(nonexistentPath);
+                // Mock listStatusWithAuditContext to throw FileNotFoundException
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
                 result = new java.io.FileNotFoundException("Path not found: /nonexistent");
             }};
 
@@ -234,8 +232,6 @@ public class DFSFileSystemTest {
         // Enable new implementation
         Config.enable_list_hdfs_files_without_block_locations = true;
 
-        Path testPath = new Path("/test");
-
         // Use MockUp to partially mock DFSFileSystem - only override nativeFileSystem method
         new MockUp<DFSFileSystem>() {
             @Mock
@@ -244,10 +240,10 @@ public class DFSFileSystemTest {
             }
         };
 
-        // Mock FileSystem.listStatus to throw IOException
+        // Mock FileSystem.listStatusWithAuditContext to throw IOException
         new Expectations() {{
-                // Mock listStatus to throw IOException
-                mockFileSystem.listStatus(testPath);
+                // Mock listStatusWithAuditContext to throw IOException
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
                 result = new java.io.IOException("Network error");
             }};
 
@@ -287,8 +283,6 @@ public class DFSFileSystemTest {
         // Enable new implementation
         Config.enable_list_hdfs_files_without_block_locations = true;
 
-        Path emptyPath = new Path("/empty");
-
         // Use MockUp to partially mock DFSFileSystem - only override nativeFileSystem method
         new MockUp<DFSFileSystem>() {
             @Mock
@@ -297,10 +291,10 @@ public class DFSFileSystemTest {
             }
         };
 
-        // Mock FileSystem.listStatus to return empty array
+        // Mock FileSystem.listStatusWithAuditContext to return empty array
         new Expectations() {{
-                // Mock listStatus to return empty array (empty directory)
-                mockFileSystem.listStatus(emptyPath);
+                // Mock listStatusWithAuditContext to return empty array (empty directory)
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
                 result = new FileStatus[0];
             }};
 
@@ -339,7 +333,6 @@ public class DFSFileSystemTest {
         // Simple test to verify basic functionality
         Config.enable_list_hdfs_files_without_block_locations = true;
 
-        Path rootPath = new Path("/test");
         Path file1Path = new Path("/test/test1.txt");
         Path file2Path = new Path("/test/test2.txt");
 
@@ -355,10 +348,10 @@ public class DFSFileSystemTest {
             }
         };
 
-        // Mock FileSystem.listStatus calls
+        // Mock FileSystem.listStatusWithAuditContext calls
         new Expectations() {{
-                // Mock listStatus for root directory
-                mockFileSystem.listStatus(rootPath);
+                // Mock listStatusWithAuditContext for root directory
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
                 result = new FileStatus[]{file1Status, file2Status};
             }};
 
@@ -380,7 +373,6 @@ public class DFSFileSystemTest {
     public void testListFilesConfigurationToggle() throws Exception {
         // Test that the configuration flag properly controls behavior
 
-        Path rootPath = new Path("/test");
         Path filePath = new Path("/test/file.txt");
         FileStatus fileStatus = createMockFileStatus(filePath, false, 1024, 1000);
 
@@ -396,7 +388,7 @@ public class DFSFileSystemTest {
         };
 
         new Expectations() {{
-                mockFileSystem.listStatus(rootPath);
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
                 result = new FileStatus[]{fileStatus};
             }};
 
@@ -421,7 +413,6 @@ public class DFSFileSystemTest {
     public void testListFilesWithIgnoreHiddenDirectory() throws Exception {
         // Test that the configuration flag properly controls behavior
 
-        Path rootPath = new Path("/test");
         Path directoryPath = new Path("/test/.test");
         Path directoryPath2 = new Path("/test/_test");
         Path filePath = new Path("/test/.test/file.txt");
@@ -444,7 +435,7 @@ public class DFSFileSystemTest {
 
         new Expectations() {
             {
-                mockFileSystem.listStatus(rootPath);
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
                 result = new FileStatus[]{fileStatus1, fileStatus3};
                 minTimes = 1;
             }
@@ -461,12 +452,8 @@ public class DFSFileSystemTest {
 
         new Expectations() {
             {
-                mockFileSystem.listStatus(directoryPath);
-                result = new FileStatus[]{fileStatus2};
-                minTimes = 1;
-
-                mockFileSystem.listStatus(directoryPath2);
-                result = new FileStatus[]{fileStatus4};
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
+                result = new FileStatus[]{fileStatus2, fileStatus4};
                 minTimes = 1;
             }
         };
@@ -477,6 +464,133 @@ public class DFSFileSystemTest {
         Assertions.assertEquals(2, result2.size());
         Assertions.assertEquals("file.txt", result2.get(0).getName());
         Assertions.assertEquals("file2.txt", result2.get(1).getName());
+    }
+
+    @Test
+    public void testListFilesWithAuditContext() throws Exception {
+        // Enable new implementation
+        Config.enable_list_hdfs_files_without_block_locations = true;
+
+        Path file1Path = new Path("/test/file1.txt");
+        FileStatus file1Status = createMockFileStatus(file1Path, false, 1024, 1000);
+
+        new MockUp<DFSFileSystem>() {
+            @Mock
+            public FileSystem nativeFileSystem(String remotePath) {
+                return mockFileSystem;
+            }
+        };
+
+        new Expectations() {{
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
+                result = new FileStatus[]{file1Status};
+            }};
+
+        List<RemoteFile> result = new ArrayList<>();
+        Status status = dfsFileSystem.listFiles("/test", false, result);
+
+        Assertions.assertEquals(Status.OK, status);
+        Assertions.assertEquals(1, result.size());
+        Assertions.assertEquals("file1.txt", result.get(0).getName());
+    }
+
+    @Test
+    public void testExistsWithAuditContext() throws Exception {
+        new MockUp<DFSFileSystem>() {
+            @Mock
+            public FileSystem nativeFileSystem(String remotePath) {
+                return mockFileSystem;
+            }
+        };
+        new Expectations() {{
+                mockFileSystem.existsWithAuditContext((Path) any, (Map<String, String>) any);
+                result = true;
+            }};
+
+        Status status = dfsFileSystem.exists("/test/file.txt");
+
+        Assertions.assertEquals(Status.OK, status);
+    }
+
+    @Test
+    public void testGlobListWithAuditContext() throws Exception {
+        Path file1Path = new Path("/test/file1.txt");
+        FileStatus file1Status = createMockFileStatus(file1Path, false, 1024, 1000);
+
+        new MockUp<DFSFileSystem>() {
+            @Mock
+            public FileSystem nativeFileSystem(String remotePath) {
+                return mockFileSystem;
+            }
+        };
+
+        new Expectations() {{
+                mockFileSystem.globStatusWithAuditContext((Path) any, (Map<String, String>) any);
+                result = new FileStatus[]{file1Status};
+            }};
+
+        List<RemoteFile> result = new ArrayList<>();
+        Status status = dfsFileSystem.globList("/test/*", result);
+
+        Assertions.assertEquals(Status.OK, status);
+        Assertions.assertEquals(1, result.size());
+        Assertions.assertEquals("file1.txt", result.get(0).getName());
+    }
+
+    @Test
+    public void testGetLocatedFilesWithAuditContext() throws Exception {
+        Config.enable_list_hdfs_files_without_block_locations = false;
+        new MockUp<DFSFileSystem>() {
+            @Mock
+            public FileSystem nativeFileSystem(String remotePath) {
+                return mockFileSystem;
+            }
+        };
+
+        new Expectations() {{
+                mockFileSystem.listFilesWithAuditContext((Path) any, false, (Map<String, String>) any);
+                result = new org.apache.hadoop.fs.RemoteIterator<org.apache.hadoop.fs.LocatedFileStatus>() {
+                    @Override
+                    public boolean hasNext() {
+                        return false;
+                    }
+
+                    @Override
+                    public org.apache.hadoop.fs.LocatedFileStatus next() {
+                        return null;
+                    }
+                };
+            }};
+
+        List<RemoteFile> result = new ArrayList<>();
+        Status status = dfsFileSystem.listFiles("/test", false, result);
+
+        Assertions.assertEquals(Status.OK, status);
+    }
+
+    @Test
+    public void testGetFileStatusesWithAuditContext() throws Exception {
+        Config.enable_list_hdfs_files_without_block_locations = true;
+
+        FileStatus fileStatus = createMockFileStatus(new Path("/test/file.txt"), false, 1024, 1000);
+
+        new MockUp<DFSFileSystem>() {
+            @Mock
+            public FileSystem nativeFileSystem(String remotePath) {
+                return mockFileSystem;
+            }
+        };
+
+        new Expectations() {{
+                mockFileSystem.listStatusWithAuditContext((Path) any, (Map<String, String>) any);
+                result = new FileStatus[]{fileStatus};
+            }};
+
+        List<RemoteFile> result = new ArrayList<>();
+        Status status = dfsFileSystem.listFiles("/test", false, result);
+
+        Assertions.assertEquals(Status.OK, status);
+        Assertions.assertEquals(1, result.size());
     }
 
     /**

@@ -20,6 +20,7 @@ package org.apache.doris.fs.remote;
 import org.apache.doris.analysis.StorageBackend;
 import org.apache.doris.backup.Status;
 import org.apache.doris.common.UserException;
+import org.apache.doris.fs.HdfsAuditUtil;
 import org.apache.doris.fs.PersistentFileSystem;
 import org.apache.doris.fs.remote.dfs.DFSFileSystem;
 
@@ -34,6 +35,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public abstract class RemoteFileSystem extends PersistentFileSystem {
@@ -75,7 +77,8 @@ public abstract class RemoteFileSystem extends PersistentFileSystem {
 
     protected RemoteIterator<LocatedFileStatus> getLocatedFiles(boolean recursive,
                 FileSystem fileSystem, Path locatedPath) throws IOException {
-        return fileSystem.listFiles(locatedPath, recursive);
+        Map<String, String> auditCtx = HdfsAuditUtil.buildAuditContextMap();
+        return fileSystem.listFilesWithAuditContext(locatedPath, recursive, auditCtx);
     }
 
     @Override
@@ -95,7 +98,9 @@ public abstract class RemoteFileSystem extends PersistentFileSystem {
     }
 
     protected FileStatus[] getFileStatuses(String remotePath, FileSystem fileSystem) throws IOException {
-        return fileSystem.listStatus(new Path(remotePath));
+        Path path = new Path(remotePath);
+        Map<String, String> auditCtx = HdfsAuditUtil.buildAuditContextMap();
+        return fileSystem.listStatusWithAuditContext(path, auditCtx);
     }
 
     @Override

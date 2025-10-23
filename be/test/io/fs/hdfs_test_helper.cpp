@@ -60,7 +60,7 @@ Status HdfsTestHelper::get_file_handle(std::shared_ptr<HdfsFileSystemHandle> fs_
                                       FileHandleCache::Accessor* accessor,
                                       bool* cache_hit) {
     return HdfsFileHandleCache::instance()->cache().get_file_handle(
-        fs_handle, user, fname, mtime, file_size, require_new_handle, accessor, cache_hit);
+        fs_handle, user, fname, mtime, file_size, require_new_handle, accessor, cache_hit, nullptr);
 }
 
 void* HdfsTestHelper::get_file_handle_cache_instance() {

@@ -127,22 +127,20 @@ THdfsParams parse_properties(const std::map<std::string, std::string>& propertie
     std::vector<THdfsConf> hdfs_configs;
     THdfsParams hdfsParams;
     for (auto iter = prop.begin(); iter != prop.end();) {
-        if (iter->first.compare(FS_KEY) == 0) {
+        if (iter->first == FS_KEY) {
             hdfsParams.__set_fs_name(iter->second);
             iter = prop.erase(iter);
-        } else if (iter->first.compare(USER) == 0) {
+        } else if (iter->first == USER) {
             hdfsParams.__set_user(iter->second);
             iter = prop.erase(iter);
-        } else if (iter->first.compare(KERBEROS_PRINCIPAL) == 0) {
+        } else if (iter->first == KERBEROS_PRINCIPAL) {
             hdfsParams.__set_hdfs_kerberos_principal(iter->second);
             iter = prop.erase(iter);
-        } else if (iter->first.compare(KERBEROS_KEYTAB) == 0) {
+        } else if (iter->first == KERBEROS_KEYTAB) {
             hdfsParams.__set_hdfs_kerberos_keytab(iter->second);
             iter = prop.erase(iter);
-        } else if (iter->first.compare(HIVE_METASTORE_URIS) == 0
-            || iter->first.compare(CREATE_TIME) == 0
-            || iter->first.compare(TYPE) == 0
-            || iter->first.compare(USE_META_CACHE) == 0) {
+        } else if (iter->first == HIVE_METASTORE_URIS || iter->first == CREATE_TIME ||
+                   iter->first == TYPE || iter->first == USE_META_CACHE) {
             iter = prop.erase(iter);
         } else {
             THdfsConf item;
@@ -182,8 +180,6 @@ Status create_hdfs_builder(const THdfsParams& hdfsParams, const std::string& fs_
             if (strcmp(conf.key.c_str(), "HADOOP_USER_TOKEN") == 0) {
                 hdfsBuilderSetUserToken(builder->get(), conf.value.c_str());
                 getTokenByConf = true;
-            } else {
-                hdfsBuilderConfSetStr(builder->get(), conf.key.c_str(), conf.value.c_str());
             }
         }
     }
