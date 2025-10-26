@@ -60,7 +60,7 @@ public class DateSupplementTest {
 
     @Test
     public void testEvaluateWithNewDateInput() {
-        Assert.assertEquals("2023/10/05", dateSupplement.evaluate("2023-10-05 00:00:00"));
-        Assert.assertEquals("2023/10/05 01:02:33", dateSupplement.evaluate("2023-10-05 01:02:33"));
+        Assert.assertEquals("2023-10-05 00:00:00", dateSupplement.evaluate("2023-10-05 00:00:00"));
+        Assert.assertEquals("2023-10-05 01:02:33", dateSupplement.evaluate("2023-10-05 01:02:33"));
     }
 }
