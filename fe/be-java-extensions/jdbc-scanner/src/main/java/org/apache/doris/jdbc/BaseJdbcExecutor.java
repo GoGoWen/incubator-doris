@@ -207,8 +207,8 @@ public abstract class BaseJdbcExecutor implements JdbcExecutor {
 
             Map<String, Integer> columnIndexMap = new HashMap<>();
             for (int j = 0; j < outputColumnCount; j++) {
-                String outputColumnName = outputTable.getFields()[j].trim().toLowerCase();
-                Integer resultSetIndex = resultSetColumnMap.get(outputColumnName);
+                String outputColumnName = outputTable.getFields()[j];
+                Integer resultSetIndex = resultSetColumnMap.get(outputColumnName.trim().toLowerCase());
                 if (resultSetIndex == null) {
                     throw new RuntimeException("Column not found: " + outputColumnName);
                 }

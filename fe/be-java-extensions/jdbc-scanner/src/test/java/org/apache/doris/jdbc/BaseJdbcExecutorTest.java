@@ -288,17 +288,17 @@ public class BaseJdbcExecutorTest {
 
                 mockOutputTable.getFields();
                 result = new String[]{"  user_name  "}; // With whitespace - this will cause lookup failure
+
+                mockResultSet.next();
+                returns(true, false);
+
+                mockOutputTable.getMetaAddress();
+                result = 88888L;
             }
         };
 
-        // This should fail due to the whitespace bug in BaseJdbcExecutor
-        JdbcExecutorException exception = Assertions.assertThrows(JdbcExecutorException.class,
-                () -> executor.getBlockAddress(10, outputParams)
-        );
-
-        Assertions.assertNotNull(exception.getCause());
-        Assertions.assertTrue(exception.getCause() instanceof RuntimeException);
-        Assertions.assertTrue(exception.getCause().getMessage().contains("Column not found in result set"));
+        long result = executor.getBlockAddress(10, outputParams);
+        Assertions.assertEquals(88888L, result);
     }
 
     @Test
