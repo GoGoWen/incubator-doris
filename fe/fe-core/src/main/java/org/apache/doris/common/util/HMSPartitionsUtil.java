@@ -112,6 +112,9 @@ public class HMSPartitionsUtil {
                 || expression instanceof GreaterThan || expression instanceof GreaterThanEqual
                 || expression instanceof LessThan || expression instanceof LessThanEqual) {
             BinaryOperator binaryOperator = (BinaryOperator) expression;
+            if (binaryOperator.right() instanceof SlotReference) {
+                return false;
+            }
             return isFilterSupportedByListPartitions(binaryOperator.left())
                 && isFilterSupportedByListPartitions(binaryOperator.right());
         }

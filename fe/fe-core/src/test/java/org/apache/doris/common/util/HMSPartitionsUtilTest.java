@@ -382,6 +382,36 @@ public class HMSPartitionsUtilTest {
         Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(mixedAnd));
     }
 
+    @Test
+    public void testIsFilterSupportedByListPartitions_ColumnToColumnComparison() {
+        // Test column = column (not supported by HMS)
+        SlotReference col1 = new SlotReference("dp", StringType.INSTANCE);
+        SlotReference col2 = new SlotReference("dt", StringType.INSTANCE);
+
+        EqualTo columnEqualColumn = new EqualTo(col1, col2);
+        Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(columnEqualColumn));
+
+        GreaterThan columnGtColumn = new GreaterThan(col1, col2);
+        Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(columnGtColumn));
+
+        GreaterThanEqual columnGteColumn = new GreaterThanEqual(col1, col2);
+        Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(columnGteColumn));
+
+        LessThan columnLtColumn = new LessThan(col1, col2);
+        Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(columnLtColumn));
+
+        LessThanEqual columnLteColumn = new LessThanEqual(col1, col2);
+        Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(columnLteColumn));
+
+        GreaterThanEqual dtGteLiteral = new GreaterThanEqual(
+                new SlotReference("dt", StringType.INSTANCE),
+                new StringLiteral("2023-03-01")
+        );
+        And complexAnd = new And(dtGteLiteral, columnEqualColumn);
+        // Since one part is not supported, the whole expression is not supported
+        Assertions.assertFalse(HMSPartitionsUtil.isFilterSupportedByListPartitions(complexAnd));
+    }
+
     // ===== COMPREHENSIVE TESTS FOR buildConstantExpressionsFromPartitions =====
 
     @Test

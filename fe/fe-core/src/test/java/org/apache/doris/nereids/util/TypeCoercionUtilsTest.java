@@ -17,6 +17,7 @@
 
 package org.apache.doris.nereids.util;
 
+import org.apache.doris.common.Config;
 import org.apache.doris.nereids.trees.expressions.Add;
 import org.apache.doris.nereids.trees.expressions.Cast;
 import org.apache.doris.nereids.trees.expressions.Divide;
@@ -837,5 +838,23 @@ public class TypeCoercionUtilsTest {
         EqualTo expression = (EqualTo) TypeCoercionUtils.processComparisonPredicate(equalTo);
         Assertions.assertEquals(StringType.INSTANCE, expression.left().getDataType());
         Assertions.assertEquals(StringType.INSTANCE, expression.right().getDataType());
+    }
+
+    @Test
+    public void testProcessComparisonPredicateCastDateToStringConfig() {
+        // enable_cast_date_to_string: string slot vs date literal should use string type
+        boolean old = Config.enable_cast_date_to_string;
+        Config.enable_cast_date_to_string = true;
+        try {
+            EqualTo stringDate = new EqualTo(
+                    new SlotReference("c1", StringType.INSTANCE),
+                    new DateLiteral(2024, 4, 12)
+            );
+            stringDate = (EqualTo) TypeCoercionUtils.processComparisonPredicate(stringDate);
+            Assertions.assertEquals(StringType.INSTANCE, stringDate.left().getDataType());
+            Assertions.assertEquals(StringType.INSTANCE, stringDate.right().getDataType());
+        } finally {
+            Config.enable_cast_date_to_string = old;
+        }
     }
 }
