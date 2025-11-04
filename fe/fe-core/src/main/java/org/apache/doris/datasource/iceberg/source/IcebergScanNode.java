@@ -193,7 +193,6 @@ public class IcebergScanNode extends FileQueryScanNode {
 
     private List<Split> doGetSplits(int numBackends) throws UserException {
         TableScan scan = icebergTable.newScan();
-
         // set snapshot
         Long snapshotId = getSpecifiedSnapshot();
         if (snapshotId != null) {
