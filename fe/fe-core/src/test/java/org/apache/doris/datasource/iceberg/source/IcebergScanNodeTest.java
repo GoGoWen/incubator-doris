@@ -23,6 +23,7 @@ import org.apache.doris.analysis.TupleId;
 import org.apache.doris.catalog.DatabaseIf;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
+import org.apache.doris.common.ThreadPoolManager;
 import org.apache.doris.common.UserException;
 import org.apache.doris.datasource.CatalogProperty;
 import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
@@ -31,6 +32,7 @@ import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 
+import com.alibaba.ttl.threadpool.TtlExecutors;
 import mockit.Mock;
 import mockit.MockUp;
 import org.apache.hadoop.conf.Configuration;
@@ -60,6 +62,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 
 public class IcebergScanNodeTest {
@@ -123,6 +126,12 @@ public class IcebergScanNodeTest {
                 Mockito.when(icebergCache.getIcebergTable(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(mockTable);
 
                 Mockito.when(env.getExtMetaCacheMgr()).thenReturn(cacheMgr);
+                ExecutorService fileListingExecutor = TtlExecutors.getTtlExecutorService(
+                        ThreadPoolManager.newDaemonFixedThreadPool(
+                        Config.max_external_file_cache_loader_thread_pool_size,
+                        Config.max_external_cache_loader_thread_pool_size * 1000,
+                        "FileListingExecutor", 10, true));
+                Mockito.when(cacheMgr.getFileListingExecutor()).thenReturn(fileListingExecutor);
                 Mockito.when(cacheMgr.getIcebergMetadataCache()).thenReturn(icebergCache);
 
                 return env;
@@ -154,11 +163,9 @@ public class IcebergScanNodeTest {
             try {
                 scanNode.getSplits(3);
                 Assert.fail("Expected RuntimeException wrapping AnalysisException but no exception was thrown");
-            } catch (RuntimeException e) {
-                Assert.assertTrue("Exception should wrap an AnalysisException",
-                        e.getCause() instanceof AnalysisException);
+            } catch (AnalysisException e) {
                 Assert.assertTrue("Exception message should contain 'exceed max bytes'",
-                        e.getCause().getMessage().contains("exceed max bytes for single iceberg table"));
+                        e.getMessage().contains("exceed max bytes for single iceberg table"));
             }
         } finally {
             Config.max_selected_total_file_size_for_lakehouse_table = oldMaxFileSize;
@@ -190,11 +197,9 @@ public class IcebergScanNodeTest {
             try {
                 scanNode.getSplits(3);
                 Assert.fail("Expected RuntimeException wrapping AnalysisException but no exception was thrown");
-            } catch (RuntimeException e) {
-                Assert.assertTrue("Exception should wrap an AnalysisException",
-                        e.getCause() instanceof AnalysisException);
+            } catch (AnalysisException e) {
                 Assert.assertTrue("Exception message should contain 'exceed max selected partition num'",
-                        e.getCause().getMessage().contains("exceed max selected partition num"));
+                        e.getMessage().contains("exceed max selected partition num"));
             }
         } finally {
             Config.max_selected_partition_num_for_lakehouse_table = oldMaxPartitionCount;
@@ -217,6 +222,7 @@ public class IcebergScanNodeTest {
         Mockito.when(icebergTable.spec()).thenReturn(partitionSpec);
         Mockito.when(partitionSpec.isPartitioned()).thenReturn(false);
 
+        Mockito.when(tableScan.planWith(Mockito.any())).thenReturn(tableScan);
         // Mock planFiles to throw RuntimeException (since IOException is not allowed)
         Mockito.when(tableScan.planFiles()).thenThrow(new RuntimeException("Test IO exception"));
 
@@ -265,11 +271,9 @@ public class IcebergScanNodeTest {
         try {
             scanNode.getSplits(3);
             Assert.fail("Expected RuntimeException wrapping UserException but no exception was thrown");
-        } catch (RuntimeException e) {
-            Assert.assertTrue("Exception should wrap a UserException",
-                    e.getCause() instanceof UserException);
+        } catch (UserException e) {
             Assert.assertTrue("Exception message should contain 'TableScanUtil IO exception'",
-                    e.getCause().getMessage().contains("TableScanUtil IO exception"));
+                    e.getMessage().contains("TableScanUtil IO exception"));
         }
     }
 
@@ -383,6 +387,7 @@ public class IcebergScanNodeTest {
         Mockito.when(partitionSpec.isPartitioned()).thenReturn(isPartitioned);
         Mockito.when(partitionSpec.fields()).thenReturn(new ArrayList<>());
 
+        Mockito.when(tableScan.planWith(Mockito.any())).thenReturn(tableScan);
         CloseableIterable<FileScanTask> plannedFiles = createCloseableIterable(tasks);
         Mockito.when(tableScan.planFiles()).thenReturn(plannedFiles);
     }
@@ -592,6 +597,7 @@ public class IcebergScanNodeTest {
 
         Mockito.when(partitionSpec.fields()).thenReturn(partitionFields);
 
+        Mockito.when(tableScan.planWith(Mockito.any())).thenReturn(tableScan);
         CloseableIterable<FileScanTask> plannedFiles = createCloseableIterable(tasks);
         Mockito.when(tableScan.planFiles()).thenReturn(plannedFiles);
     }
@@ -846,6 +852,7 @@ public class IcebergScanNodeTest {
         Mockito.when(structType.fieldType("date_col")).thenReturn(dateType);
         Mockito.when(dateType.typeId()).thenReturn(dateTypeId);
 
+        Mockito.when(tableScan.planWith(Mockito.any())).thenReturn(tableScan);
         CloseableIterable<FileScanTask> plannedFiles = createCloseableIterable(tasks);
         Mockito.when(tableScan.planFiles()).thenReturn(plannedFiles);
     }

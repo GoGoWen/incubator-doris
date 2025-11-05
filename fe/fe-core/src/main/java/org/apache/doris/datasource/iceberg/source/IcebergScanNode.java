@@ -22,6 +22,7 @@ import org.apache.doris.analysis.FunctionCallExpr;
 import org.apache.doris.analysis.TableSnapshot;
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.catalog.Column;
+import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.TableIf;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
@@ -33,7 +34,6 @@ import org.apache.doris.datasource.ExternalTable;
 import org.apache.doris.datasource.FileQueryScanNode;
 import org.apache.doris.datasource.TableFormatType;
 import org.apache.doris.datasource.hive.HMSExternalTable;
-import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
 import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
 import org.apache.doris.datasource.iceberg.IcebergExternalTable;
 import org.apache.doris.datasource.iceberg.IcebergUtils;
@@ -81,6 +81,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 public class IcebergScanNode extends FileQueryScanNode {
@@ -187,8 +188,7 @@ public class IcebergScanNode extends FileQueryScanNode {
 
     @Override
     public List<Split> getSplits(int numBackends) throws UserException {
-        return HiveMetaStoreClientHelper.ugiDoAs(source.getCatalog().getConfiguration(),
-                () -> doGetSplits(numBackends));
+        return doGetSplits(numBackends);
     }
 
     private List<Split> doGetSplits(int numBackends) throws UserException {
@@ -223,7 +223,8 @@ public class IcebergScanNode extends FileQueryScanNode {
         try {
             long totalFileSize = 0;
             HashSet<String> partitionCheckSet = new HashSet<>();
-            CloseableIterable<FileScanTask> plannedFiles = scan.planFiles();
+            ExecutorService executor = Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor();
+            CloseableIterable<FileScanTask> plannedFiles = scan.planWith(executor).planFiles();
             for (FileScanTask task : plannedFiles) {
                 totalFileSize += task.file().fileSizeInBytes();
 
