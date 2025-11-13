@@ -133,8 +133,8 @@ private:
     std::shared_ptr<HdfsFileSystemHandle> _fs_handle = nullptr;
     RuntimeProfile* _profile = nullptr;
 
-    hdfsAuditContext _audit_context = {nullptr, nullptr, nullptr};
     std::unordered_map<std::string, std::string> _audit_context_strings;
+    hdfsAuditContext _audit_context = {nullptr, nullptr, nullptr};
 };
 } // namespace io
 } // namespace doris

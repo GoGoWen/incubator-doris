@@ -24,11 +24,13 @@
 #include <stddef.h>
 
 #include <algorithm>
+#include <condition_variable>
 #include <filesystem>
 #include <map>
 #include <mutex>
 #include <ostream>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "common/config.h"
@@ -69,7 +71,6 @@ public:
         return dis(_gen);
     }
 };
-
 // Cache for HdfsFileSystemHandle
 class HdfsFileSystemCache {
 public:
@@ -87,6 +88,8 @@ public:
 
 private:
     std::mutex _lock;
+    std::condition_variable _creation_cv;
+    std::unordered_set<std::string> _creating_fs;
 
     std::unordered_map<std::string, std::shared_ptr<HdfsFileSystemHandle>> _cache;
     std::vector<std::string> _cache_keys;
@@ -443,9 +446,9 @@ Status HdfsFileSystemCache::get_connection(const THdfsParams& hdfs_params,
                                            const std::string& fs_name,
                                            std::shared_ptr<HdfsFileSystemHandle>* fs_handle) {
     std::string cache_key = _hdfs_cache_key(hdfs_params, fs_name);
-    {
-        std::lock_guard<std::mutex> l(_lock);
+    std::unique_lock<std::mutex> lock(_lock);
 
+    while (true) {
         auto it = _cache.find(cache_key);
         if (it != _cache.end()) {
             std::shared_ptr<HdfsFileSystemHandle> handle = it->second;
@@ -460,16 +463,28 @@ Status HdfsFileSystemCache::get_connection(const THdfsParams& hdfs_params,
                 _cache_keys.erase(key_it);
             }
         }
+
+        if (_creating_fs.find(cache_key) != _creating_fs.end()) {
+            _creation_cv.wait(lock);
+            continue;
+        }
+
+        _creating_fs.insert(cache_key);
+        break;
     }
 
-    hdfsFS hdfs_fs = nullptr;
-    RETURN_IF_ERROR(_create_fs(hdfs_params, fs_name, &hdfs_fs));
+    lock.unlock();
 
-    {
-        std::lock_guard<std::mutex> l(_lock);
+    hdfsFS hdfs_fs = nullptr;
+    Status create_status = _create_fs(hdfs_params, fs_name, &hdfs_fs);
+
+    lock.lock();
+
+    if (create_status.ok()) {
         const uint32_t max_cache_size = config::max_hdfs_file_system_cache_num;
         auto handle = std::make_shared<HdfsFileSystemHandle>(hdfs_fs, true);
         *fs_handle = handle;
+
         if (_cache_keys.size() >= max_cache_size) {
             uint32_t idx = _rand.uniform(max_cache_size);
             _cache.erase(_cache_keys[idx]);
@@ -480,7 +495,11 @@ Status HdfsFileSystemCache::get_connection(const THdfsParams& hdfs_params,
             _cache_keys.push_back(std::move(cache_key));
         }
     }
-    return Status::OK();
+
+    _creating_fs.erase(cache_key);
+    _creation_cv.notify_all();
+
+    return create_status;
 }
 
 std::string HdfsFileSystemCache::_hdfs_cache_key(const THdfsParams& hdfs_params,

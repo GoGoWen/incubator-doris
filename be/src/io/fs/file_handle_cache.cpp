@@ -160,7 +160,7 @@ Status FileHandleCache::get_file_handle(std::shared_ptr<HdfsFileSystemHandle> fs
     // Hash the key and get appropriate partition
     int index = HashUtil::hash(fname.data(), fname.size(), 0) % _cache_partitions.size();
     FileHandleCachePartition& p = _cache_partitions[index];
-    FileHandleCacheKey cache_key(user, fname, mtime);
+    FileHandleCacheKey cache_key(user, fname, mtime, audit_context->erp, audit_context->source);
     // If this requires a new handle, skip to the creation codepath. Otherwise,
     // find an unused entry with the same mtime
     if (!require_new_handle) {
