@@ -333,7 +333,7 @@ under the License.
         <httpcore.version>4.4.15</httpcore.version>
         <aws-java-sdk.version>1.12.669</aws-java-sdk.version>
         <mariadb-java-client.version>3.0.9</mariadb-java-client.version>
-        <hadoop.version>2.100.86_doris_2025110617</hadoop.version>
+        <hadoop.version>2.100.87_2025111417-SNAPSHOT</hadoop.version>
         <hbase.version>2.4.9</hbase.version>
         <antlr4.version>4.9.3</antlr4.version>
         <joda.version>2.8.1</joda.version>
