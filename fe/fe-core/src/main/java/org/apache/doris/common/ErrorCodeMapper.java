@@ -330,6 +330,8 @@ public class ErrorCodeMapper {
                 ErrorCode.ERR_OOM_JAVA_HEAP_SPACE);
         errorMap.put(Pattern.compile("can only be used in conjunction with COUNT"),
                 ErrorCode.ERR_CAN_ONLY_USED_WITH_COUNT);
+        errorMap.put(Pattern.compile("Cross Region Read NonCR Blocks Failed"),
+                ErrorCode.ERR_CROSS_REGION_READ_NONCR_BLOCKS_FAILED);
     }
 
     public static ErrorCode getErrorCode(String errorMessage) {

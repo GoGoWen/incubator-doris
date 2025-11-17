@@ -1413,7 +1413,8 @@ public enum ErrorCode {
     ERR_INPUT_SLOTS_NOT_IN_CHILD_OUTPUT(9174, new byte[]{'4', '2', '0', '0', '0'}, "Input slot(s) not in child output"),
     ERR_WRONG_PARQUET_LEVEL_FORMAT(9175, new byte[]{'4', '2', '0', '0', '0'}, "Wrong parquet level format"),
     ERR_OOM_JAVA_HEAP_SPACE(9176, new byte[]{'4', '2', '0', '0', '0'}, "OutOfMemoryError: Java heap space"),
-    ERR_CAN_ONLY_USED_WITH_COUNT(9177, new byte[]{'4', '2', '0', '0', '0'}, "Can only be used in conjunction with COUNT");
+    ERR_CAN_ONLY_USED_WITH_COUNT(9177, new byte[]{'4', '2', '0', '0', '0'}, "Can only be used in conjunction with COUNT"),
+    ERR_CROSS_REGION_READ_NONCR_BLOCKS_FAILED(9178, new byte[]{'4', '2', '0', '0', '0'}, "Cross Region Read NonCR Blocks Failed");
 
     // This is error code
     private final int code;

@@ -26,6 +26,7 @@ public class ErrorCodeMapperTest {
     public void testMappingsInBatch() {
         Object[][] cases = new Object[][]{
                 {"Query timeout", ErrorCode.ERR_QUERY_TIMEOUT},
+                {"Cross Region Read NonCR Blocks Failed", ErrorCode.ERR_CROSS_REGION_READ_NONCR_BLOCKS_FAILED},
         };
 
         for (Object[] c : cases) {
