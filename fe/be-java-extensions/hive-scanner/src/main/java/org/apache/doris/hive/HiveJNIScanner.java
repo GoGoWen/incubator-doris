@@ -87,6 +87,20 @@ public class HiveJNIScanner extends JniScanner {
         this.requiredFields = requiredParams.get(HiveProperties.REQUIRED_FIELDS).split(HiveProperties.FIELDS_DELIMITER);
         this.requiredTypes = new ColumnType[requiredFields.length];
         this.requiredColumnIds = new int[requiredFields.length];
+
+        if (requiredParams.containsKey(HiveProperties.COLUMN_IDS)) {
+            String columnIdsStr = requiredParams.get(HiveProperties.COLUMN_IDS);
+            String[] columnIdStrs = columnIdsStr.split(HiveProperties.FIELDS_DELIMITER);
+            for (int i = 0; i < columnIdStrs.length && i < requiredColumnIds.length; i++) {
+                requiredColumnIds[i] = Integer.parseInt(columnIdStrs[i]);
+            }
+        } else {
+            // Fallback
+            for (int i = 0; i < requiredColumnIds.length; i++) {
+                requiredColumnIds[i] = i;
+            }
+        }
+
         this.uri = requiredParams.get(HiveProperties.URI);
         this.splitStartOffset = Long.parseLong(requiredParams.get(HiveProperties.SPLIT_START_OFFSET));
         this.splitSize = Long.parseLong(requiredParams.get(HiveProperties.SPLIT_SIZE));
@@ -185,11 +199,25 @@ public class HiveJNIScanner extends JniScanner {
 
     private Properties createProperties() {
         Properties properties = new Properties();
-        properties.setProperty(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR,
-                Arrays.stream(this.requiredColumnIds).mapToObj(String::valueOf).collect(Collectors.joining(",")));
+        String columnIdsStr = Arrays.stream(this.requiredColumnIds)
+                .mapToObj(String::valueOf).collect(Collectors.joining(","));
+
+        // Column projection: specify which columns to read
+        properties.setProperty(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, columnIdsStr);
         properties.setProperty(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR, String.join(",", requiredFields));
-        properties.setProperty(HiveProperties.COLUMNS, String.join(",", requiredFields));
-        properties.setProperty(HiveProperties.COLUMNS2TYPES, String.join(",", columnTypes));
+
+        // Full table schema: required for RCFile deserializer
+        // Use full schema from FE if available (for RCFile), otherwise use projected schema
+        String fullSchemaNames = requiredParams.get(HiveProperties.FULL_SCHEMA_NAMES);
+        String fullSchemaTypes = requiredParams.get(HiveProperties.FULL_SCHEMA_TYPES);
+        if (fullSchemaNames != null && fullSchemaTypes != null) {
+            properties.setProperty(HiveProperties.COLUMNS, fullSchemaNames);
+            properties.setProperty(HiveProperties.COLUMNS2TYPES, fullSchemaTypes);
+        } else {
+            properties.setProperty(HiveProperties.COLUMNS, String.join(",", requiredFields));
+            properties.setProperty(HiveProperties.COLUMNS2TYPES, String.join(",", columnTypes));
+        }
+
         properties.setProperty(serdeConstants.SERIALIZATION_LIB, hiveFileContext.getSerde());
         return properties;
     }
@@ -271,16 +299,14 @@ public class HiveJNIScanner extends JniScanner {
     }
 
     private void parseRequiredTypes() {
-        HashMap<String, Integer> hiveColumnNameToIndex = new HashMap<>();
         HashMap<String, String> hiveColumnNameToType = new HashMap<>();
         for (int i = 0; i < requiredFields.length; i++) {
-            hiveColumnNameToIndex.put(requiredFields[i], i);
             hiveColumnNameToType.put(requiredFields[i], columnTypes[i]);
         }
 
         for (int i = 0; i < requiredFields.length; i++) {
             String fieldName = requiredFields[i];
-            requiredColumnIds[i] = hiveColumnNameToIndex.get(fieldName);
+            // Column IDs are already set in constructor from BE's column_ids parameter
             String typeStr = hiveColumnNameToType.get(fieldName);
             requiredTypes[i] = ColumnType.parseType(fieldName, typeStr);
         }

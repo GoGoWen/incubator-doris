@@ -27,7 +27,9 @@ import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.FsBroker;
 import org.apache.doris.catalog.FunctionGenTable;
 import org.apache.doris.catalog.HdfsResource;
+import org.apache.doris.catalog.ScalarType;
 import org.apache.doris.catalog.TableIf;
+import org.apache.doris.catalog.Type;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.NotImplementedException;
@@ -267,7 +269,8 @@ public abstract class FileQueryScanNode extends FileScanNode {
             ConnectContext.get().getExecutor().getSummaryProfile().setGetSplitsStartTime();
         }
         TFileFormatType fileFormatType = getFileFormatType();
-        if (fileFormatType == TFileFormatType.FORMAT_ORC) {
+        if (fileFormatType == TFileFormatType.FORMAT_ORC || fileFormatType == TFileFormatType.FORMAT_RCBINARY
+                || fileFormatType == TFileFormatType.FORMAT_RCTEXT) {
             genSlotToSchemaIdMapForOrc();
         }
         params.setFormatType(fileFormatType);
@@ -538,6 +541,54 @@ public abstract class FileQueryScanNode extends FileScanNode {
         }
     }
 
+    // Convert Doris type to Hive type string (matching BE's get_jni_type_v2)
+    private String toHiveType(Type type) {
+        if (!type.isScalarType()) {
+            return "string";  // Complex types default to string
+        }
+
+        switch (type.getPrimitiveType()) {
+            case BOOLEAN:
+                return "boolean";
+            case TINYINT:
+                return "tinyint";
+            case SMALLINT:
+                return "smallint";
+            case INT:
+                return "int";
+            case BIGINT:
+                return "bigint";
+            case LARGEINT:
+                return "largeint";
+            case FLOAT:
+                return "float";
+            case DOUBLE:
+                return "double";
+            case CHAR:
+            case VARCHAR:
+            case STRING:
+                return "string";  // All string types -> string for RCFile
+            case DATE:
+            case DATEV2:
+                return "date";
+            case DATETIME:
+            case DATETIMEV2:
+            case TIME:
+            case TIMEV2:
+                return "timestamp";
+            case DECIMALV2:
+            case DECIMAL32:
+            case DECIMAL64:
+            case DECIMAL128:
+                ScalarType scalarType = (ScalarType) type;
+                return "decimal(" + scalarType.getPrecision() + "," + scalarType.getScalarScale() + ")";
+            case BINARY:
+                return "binary";
+            default:
+                return "string";  // Fallback
+        }
+    }
+
     // To Support Hive 1.x orc internal column name like (_col0, _col1, _col2...)
     // We need to save mapping from slot name to schema position
     protected void genSlotToSchemaIdMapForOrc() {
@@ -555,6 +606,31 @@ public abstract class FileQueryScanNode extends FileScanNode {
             }
         }
         params.setSlotNameToSchemaPos(columnNameToPosition);
+
+        // For RCFile, pass full table schema to Java scanner via properties
+        try {
+            TFileFormatType format = getFileFormatType();
+            if (format == TFileFormatType.FORMAT_RCBINARY || format == TFileFormatType.FORMAT_RCTEXT) {
+                StringBuilder fullSchemaNames = new StringBuilder();
+                StringBuilder fullSchemaTypes = new StringBuilder();
+                for (int i = 0; i < baseSchema.size(); i++) {
+                    Column col = baseSchema.get(i);
+                    if (i > 0) {
+                        fullSchemaNames.append(",");
+                        fullSchemaTypes.append(",");
+                    }
+                    fullSchemaNames.append(col.getName());
+                    fullSchemaTypes.append(toHiveType(col.getType()));
+                }
+                if (params.getProperties() == null) {
+                    params.setProperties(Maps.newHashMap());
+                }
+                params.getProperties().put("full_schema_names", fullSchemaNames.toString());
+                params.getProperties().put("full_schema_types", fullSchemaTypes.toString());
+            }
+        } catch (UserException e) {
+            // If getFileFormatType() fails, skip adding full schema
+        }
     }
 
     @Override

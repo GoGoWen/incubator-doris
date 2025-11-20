@@ -24,6 +24,9 @@ public class HiveProperties {
 
     protected static final String COLUMNS_TYPES = "columns_types";
     protected static final String REQUIRED_FIELDS = "required_fields";
+    protected static final String COLUMN_IDS = "column_ids";
+    protected static final String FULL_SCHEMA_NAMES = "full_schema_names";
+    protected static final String FULL_SCHEMA_TYPES = "full_schema_types";
     protected static final String FILE_TYPE = "file_type";
     protected static final String FILE_FORMAT = "file_format";
     protected static final String URI = "uri";

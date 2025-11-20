@@ -49,18 +49,31 @@ Status HiveJNIReader::init_fetch_table_reader(
     _colname_to_value_range = colname_to_value_range;
     std::ostringstream required_fields;
     std::ostringstream columns_types;
+    std::ostringstream column_ids;
     std::vector<std::string> column_names;
     int index = 0;
+
     for (auto& desc : _file_slot_descs) {
         std::string field = desc->col_name();
         column_names.emplace_back(field);
         std::string type = JniConnector::get_jni_type_v2(desc->type());
+
+        int column_id = index;
+        if (_params.__isset.slot_name_to_schema_pos) {
+            auto it = _params.slot_name_to_schema_pos.find(field);
+            if (it != _params.slot_name_to_schema_pos.end()) {
+                column_id = it->second;
+            }
+        }
+
         if (index == 0) {
             required_fields << field;
             columns_types << type;
+            column_ids << column_id;
         } else {
             required_fields << "," << field;
             columns_types << "#" << type;
+            column_ids << "," << column_id;
         }
         index++;
     }
@@ -72,6 +85,7 @@ Status HiveJNIReader::init_fetch_table_reader(
             {"file_format", std::to_string(_params.format_type)},
             {"required_fields", required_fields.str()},
             {"columns_types", columns_types.str()},
+            {"column_ids", column_ids.str()},
             {"split_start_offset", std::to_string(_range.start_offset)},
             {"split_size", std::to_string(_range.size)}};
     if (type == TFileType::FILE_S3 || type == TFileType::FILE_HDFS) {

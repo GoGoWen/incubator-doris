@@ -19,6 +19,8 @@ package org.apache.doris.datasource;
 
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.analysis.TupleId;
+import org.apache.doris.catalog.ScalarType;
+import org.apache.doris.catalog.Type;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.LocationPath;
@@ -44,6 +46,7 @@ import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -247,5 +250,427 @@ public class FileQueryScanNodeTest {
         Assertions.assertEquals(TFileType.FILE_HDFS, rangeDesc.getFileType());
         Assertions.assertEquals("hdfs://HDFSO1101", rangeDesc.getFsName());
         Assertions.assertEquals(0, rangeDesc.getModificationTime());
+    }
+
+    @Test
+    public void testToHiveTypeConversions(@Injectable SessionVariable sessionVariable,
+                                          @Injectable TupleDescriptor tupleDesc,
+                                          @Injectable HMSExternalTable table,
+                                          @Injectable ExternalCatalog catalog) throws Exception {
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+            }
+        };
+
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+        Method toHiveTypeMethod = findMethodRecursively(scanNode.getClass().getSuperclass(), "toHiveType", Type.class);
+        toHiveTypeMethod.setAccessible(true);
+
+        // Test primitive types
+        Assertions.assertEquals("boolean", toHiveTypeMethod.invoke(scanNode, Type.BOOLEAN));
+        Assertions.assertEquals("tinyint", toHiveTypeMethod.invoke(scanNode, Type.TINYINT));
+        Assertions.assertEquals("smallint", toHiveTypeMethod.invoke(scanNode, Type.SMALLINT));
+        Assertions.assertEquals("int", toHiveTypeMethod.invoke(scanNode, Type.INT));
+        Assertions.assertEquals("bigint", toHiveTypeMethod.invoke(scanNode, Type.BIGINT));
+        Assertions.assertEquals("largeint", toHiveTypeMethod.invoke(scanNode, Type.LARGEINT));
+        Assertions.assertEquals("float", toHiveTypeMethod.invoke(scanNode, Type.FLOAT));
+        Assertions.assertEquals("double", toHiveTypeMethod.invoke(scanNode, Type.DOUBLE));
+
+        // Test string types - all map to "string"
+        Assertions.assertEquals("string", toHiveTypeMethod.invoke(scanNode, ScalarType.createCharType(10)));
+        Assertions.assertEquals("string", toHiveTypeMethod.invoke(scanNode, ScalarType.createVarcharType(255)));
+        Assertions.assertEquals("string", toHiveTypeMethod.invoke(scanNode, Type.STRING));
+
+        // Test date/time types
+        Assertions.assertEquals("date", toHiveTypeMethod.invoke(scanNode, Type.DATE));
+        Assertions.assertEquals("date", toHiveTypeMethod.invoke(scanNode, Type.DATEV2));
+        Assertions.assertEquals("timestamp", toHiveTypeMethod.invoke(scanNode, Type.DATETIME));
+        Assertions.assertEquals("timestamp", toHiveTypeMethod.invoke(scanNode, Type.DATETIMEV2));
+
+        // Test decimal types with precision/scale
+        // ScalarType decimal1 = ScalarType.createDecimalV2Type(10, 2);
+        // String decimalResult1 = (String) toHiveTypeMethod.invoke(scanNode, decimal1);
+        // Assertions.assertTrue(decimalResult1.startsWith("decimal("));
+        // Assertions.assertTrue(decimalResult1.contains("10"));
+        // Assertions.assertTrue(decimalResult1.contains("2"));
+
+        ScalarType decimal2 = ScalarType.createDecimalV3Type(20, 5);
+        String decimalResult2 = (String) toHiveTypeMethod.invoke(scanNode, decimal2);
+        Assertions.assertTrue(decimalResult2.startsWith("decimal("));
+        Assertions.assertTrue(decimalResult2.contains("20"));
+        Assertions.assertTrue(decimalResult2.contains("5"));
+    }
+
+    private Method findMethodRecursively(Class<?> clazz, String methodName, Class<?>... parameterTypes)
+            throws NoSuchMethodException {
+        Class<?> currentClass = clazz;
+        while (currentClass != null) {
+            try {
+                return currentClass.getDeclaredMethod(methodName, parameterTypes);
+            } catch (NoSuchMethodException e) {
+                currentClass = currentClass.getSuperclass();
+            }
+        }
+        throw new NoSuchMethodException(
+                String.format("method '%s' not found in %s", methodName, clazz.getName())
+        );
+    }
+
+    @Test
+    public void testGenSlotToSchemaIdMapForRCBinary(@Injectable SessionVariable sessionVariable,
+                                                     @Injectable TupleDescriptor tupleDesc,
+                                                     @Injectable HMSExternalTable table,
+                                                     @Injectable ExternalCatalog catalog) throws Exception {
+        testGenSlotToSchemaIdMapForRCFile(sessionVariable, tupleDesc, table, catalog,
+                org.apache.doris.thrift.TFileFormatType.FORMAT_RCBINARY);
+    }
+
+    @Test
+    public void testGenSlotToSchemaIdMapForRCText(@Injectable SessionVariable sessionVariable,
+                                                   @Injectable TupleDescriptor tupleDesc,
+                                                   @Injectable HMSExternalTable table,
+                                                   @Injectable ExternalCatalog catalog) throws Exception {
+        testGenSlotToSchemaIdMapForRCFile(sessionVariable, tupleDesc, table, catalog,
+                org.apache.doris.thrift.TFileFormatType.FORMAT_RCTEXT);
+    }
+
+    private void testGenSlotToSchemaIdMapForRCFile(SessionVariable sessionVariable,
+                                                    TupleDescriptor tupleDesc,
+                                                    HMSExternalTable table,
+                                                    ExternalCatalog catalog,
+                                                    org.apache.doris.thrift.TFileFormatType formatType) throws Exception {
+        // Create base schema with multiple columns of different types
+        List<org.apache.doris.catalog.Column> baseSchema = new ArrayList<>();
+        baseSchema.add(new org.apache.doris.catalog.Column("id", Type.INT));
+        baseSchema.add(new org.apache.doris.catalog.Column("name", Type.STRING));
+        baseSchema.add(new org.apache.doris.catalog.Column("age", Type.TINYINT));
+        baseSchema.add(new org.apache.doris.catalog.Column("salary", ScalarType.createDecimalV3Type(10, 2)));
+        baseSchema.add(new org.apache.doris.catalog.Column("is_active", Type.BOOLEAN));
+
+        // Create slot descriptors
+        List<org.apache.doris.analysis.SlotDescriptor> slots = new ArrayList<>();
+        for (int i = 0; i < baseSchema.size(); i++) {
+            org.apache.doris.analysis.SlotDescriptor slot = new org.apache.doris.analysis.SlotDescriptor(
+                    new org.apache.doris.analysis.SlotId(i), tupleDesc);
+            slot.setColumn(baseSchema.get(i));
+            slot.setIsMaterialized(true);
+            slots.add(slot);
+        }
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getBaseSchema();
+                result = baseSchema;
+
+                tupleDesc.getSlots();
+                result = slots;
+            }
+        };
+
+        // Create HiveScanNode with mocked getFileFormatType
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable) {
+            @Override
+            public org.apache.doris.thrift.TFileFormatType getFileFormatType() throws UserException {
+                return formatType;
+            }
+        };
+
+        // Initialize params field
+        Field paramsField = findFieldRecursively(scanNode.getClass().getSuperclass(), "params");
+        paramsField.setAccessible(true);
+        paramsField.set(scanNode, new org.apache.doris.thrift.TFileScanRangeParams());
+
+        // Call genSlotToSchemaIdMapForOrc which handles RCFile format
+        Method genSlotMethod = findMethodRecursively(scanNode.getClass().getSuperclass(), "genSlotToSchemaIdMapForOrc");
+        genSlotMethod.setAccessible(true);
+        genSlotMethod.invoke(scanNode);
+
+        // Verify the properties were set correctly
+        org.apache.doris.thrift.TFileScanRangeParams params =
+                (org.apache.doris.thrift.TFileScanRangeParams) paramsField.get(scanNode);
+
+        Assertions.assertNotNull(params.getProperties());
+        Assertions.assertTrue(params.getProperties().containsKey("full_schema_names"));
+        Assertions.assertTrue(params.getProperties().containsKey("full_schema_types"));
+
+        // Verify full_schema_names
+        String fullSchemaNames = params.getProperties().get("full_schema_names");
+        Assertions.assertEquals("id,name,age,salary,is_active", fullSchemaNames);
+
+        // Verify full_schema_types
+        String fullSchemaTypes = params.getProperties().get("full_schema_types");
+        Assertions.assertEquals("int,string,tinyint,decimal(10,2),boolean", fullSchemaTypes);
+    }
+
+    @Test
+    public void testGenSlotToSchemaIdMapForRCFile_EmptySchema(@Injectable SessionVariable sessionVariable,
+                                                               @Injectable TupleDescriptor tupleDesc,
+                                                               @Injectable HMSExternalTable table,
+                                                               @Injectable ExternalCatalog catalog) throws Exception {
+        // Test with empty schema
+        List<org.apache.doris.catalog.Column> baseSchema = new ArrayList<>();
+        List<org.apache.doris.analysis.SlotDescriptor> slots = new ArrayList<>();
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getBaseSchema();
+                result = baseSchema;
+
+                tupleDesc.getSlots();
+                result = slots;
+            }
+        };
+
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable) {
+            @Override
+            public org.apache.doris.thrift.TFileFormatType getFileFormatType() throws UserException {
+                return org.apache.doris.thrift.TFileFormatType.FORMAT_RCBINARY;
+            }
+        };
+
+        Field paramsField = findFieldRecursively(scanNode.getClass().getSuperclass(), "params");
+        paramsField.setAccessible(true);
+        paramsField.set(scanNode, new org.apache.doris.thrift.TFileScanRangeParams());
+
+        Method genSlotMethod = findMethodRecursively(scanNode.getClass().getSuperclass(), "genSlotToSchemaIdMapForOrc");
+        genSlotMethod.setAccessible(true);
+        genSlotMethod.invoke(scanNode);
+
+        org.apache.doris.thrift.TFileScanRangeParams params =
+                (org.apache.doris.thrift.TFileScanRangeParams) paramsField.get(scanNode);
+
+        Assertions.assertNotNull(params.getProperties());
+        Assertions.assertEquals("", params.getProperties().get("full_schema_names"));
+        Assertions.assertEquals("", params.getProperties().get("full_schema_types"));
+    }
+
+    @Test
+    public void testGenSlotToSchemaIdMapForRCFile_SingleColumn(@Injectable SessionVariable sessionVariable,
+                                                                @Injectable TupleDescriptor tupleDesc,
+                                                                @Injectable HMSExternalTable table,
+                                                                @Injectable ExternalCatalog catalog) throws Exception {
+        // Test with single column
+        List<org.apache.doris.catalog.Column> baseSchema = new ArrayList<>();
+        baseSchema.add(new org.apache.doris.catalog.Column("single_col", Type.BIGINT));
+
+        List<org.apache.doris.analysis.SlotDescriptor> slots = new ArrayList<>();
+        org.apache.doris.analysis.SlotDescriptor slot = new org.apache.doris.analysis.SlotDescriptor(
+                new org.apache.doris.analysis.SlotId(0), tupleDesc);
+        slot.setColumn(baseSchema.get(0));
+        slot.setIsMaterialized(true);
+        slots.add(slot);
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getBaseSchema();
+                result = baseSchema;
+
+                tupleDesc.getSlots();
+                result = slots;
+            }
+        };
+
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable) {
+            @Override
+            public org.apache.doris.thrift.TFileFormatType getFileFormatType() throws UserException {
+                return org.apache.doris.thrift.TFileFormatType.FORMAT_RCTEXT;
+            }
+        };
+
+        Field paramsField = findFieldRecursively(scanNode.getClass().getSuperclass(), "params");
+        paramsField.setAccessible(true);
+        paramsField.set(scanNode, new org.apache.doris.thrift.TFileScanRangeParams());
+
+        Method genSlotMethod = findMethodRecursively(scanNode.getClass().getSuperclass(), "genSlotToSchemaIdMapForOrc");
+        genSlotMethod.setAccessible(true);
+        genSlotMethod.invoke(scanNode);
+
+        org.apache.doris.thrift.TFileScanRangeParams params =
+                (org.apache.doris.thrift.TFileScanRangeParams) paramsField.get(scanNode);
+
+        Assertions.assertNotNull(params.getProperties());
+        Assertions.assertEquals("single_col", params.getProperties().get("full_schema_names"));
+        Assertions.assertEquals("bigint", params.getProperties().get("full_schema_types"));
+    }
+
+    @Test
+    public void testGenSlotToSchemaIdMapForORC_NotRCFile(@Injectable SessionVariable sessionVariable,
+                                                          @Injectable TupleDescriptor tupleDesc,
+                                                          @Injectable HMSExternalTable table,
+                                                          @Injectable ExternalCatalog catalog) throws Exception {
+        // Test that ORC format doesn't add RCFile properties
+        List<org.apache.doris.catalog.Column> baseSchema = new ArrayList<>();
+        baseSchema.add(new org.apache.doris.catalog.Column("id", Type.INT));
+        List<org.apache.doris.analysis.SlotDescriptor> slots = new ArrayList<>();
+        org.apache.doris.analysis.SlotDescriptor slot = new org.apache.doris.analysis.SlotDescriptor(
+                new org.apache.doris.analysis.SlotId(0), tupleDesc);
+        slot.setColumn(baseSchema.get(0));
+        slot.setIsMaterialized(true);
+        slots.add(slot);
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getBaseSchema();
+                result = baseSchema;
+
+                tupleDesc.getSlots();
+                result = slots;
+            }
+        };
+
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable) {
+            @Override
+            public org.apache.doris.thrift.TFileFormatType getFileFormatType() throws UserException {
+                return org.apache.doris.thrift.TFileFormatType.FORMAT_ORC;
+            }
+        };
+
+        Field paramsField = findFieldRecursively(scanNode.getClass().getSuperclass(), "params");
+        paramsField.setAccessible(true);
+        paramsField.set(scanNode, new org.apache.doris.thrift.TFileScanRangeParams());
+
+        Method genSlotMethod = findMethodRecursively(scanNode.getClass().getSuperclass(), "genSlotToSchemaIdMapForOrc");
+        genSlotMethod.setAccessible(true);
+        genSlotMethod.invoke(scanNode);
+
+        org.apache.doris.thrift.TFileScanRangeParams params =
+                (org.apache.doris.thrift.TFileScanRangeParams) paramsField.get(scanNode);
+
+        // ORC format should not add full_schema_names/types properties
+        if (params.getProperties() != null) {
+            Assertions.assertFalse(params.getProperties().containsKey("full_schema_names"));
+            Assertions.assertFalse(params.getProperties().containsKey("full_schema_types"));
+        }
+    }
+
+    @Test
+    public void testGenSlotToSchemaIdMapForRCFile_WithExistingProperties(@Injectable SessionVariable sessionVariable,
+                                                                          @Injectable TupleDescriptor tupleDesc,
+                                                                          @Injectable HMSExternalTable table,
+                                                                          @Injectable ExternalCatalog catalog) throws Exception {
+        // Test that existing properties are preserved
+        List<org.apache.doris.catalog.Column> baseSchema = new ArrayList<>();
+        baseSchema.add(new org.apache.doris.catalog.Column("col1", Type.INT));
+        baseSchema.add(new org.apache.doris.catalog.Column("col2", Type.STRING));
+
+        List<org.apache.doris.analysis.SlotDescriptor> slots = new ArrayList<>();
+        for (int i = 0; i < baseSchema.size(); i++) {
+            org.apache.doris.analysis.SlotDescriptor slot = new org.apache.doris.analysis.SlotDescriptor(
+                    new org.apache.doris.analysis.SlotId(i), tupleDesc);
+            slot.setColumn(baseSchema.get(i));
+            slot.setIsMaterialized(true);
+            slots.add(slot);
+        }
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getBaseSchema();
+                result = baseSchema;
+
+                tupleDesc.getSlots();
+                result = slots;
+            }
+        };
+
+        FileQueryScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable) {
+            @Override
+            public org.apache.doris.thrift.TFileFormatType getFileFormatType() throws UserException {
+                return org.apache.doris.thrift.TFileFormatType.FORMAT_RCBINARY;
+            }
+        };
+
+        Field paramsField = findFieldRecursively(scanNode.getClass().getSuperclass(), "params");
+        paramsField.setAccessible(true);
+        org.apache.doris.thrift.TFileScanRangeParams params = new org.apache.doris.thrift.TFileScanRangeParams();
+
+        // Set existing properties
+        java.util.Map<String, String> existingProps = new java.util.HashMap<>();
+        existingProps.put("existing_key", "existing_value");
+        params.setProperties(existingProps);
+        paramsField.set(scanNode, params);
+
+        Method genSlotMethod = findMethodRecursively(scanNode.getClass().getSuperclass(), "genSlotToSchemaIdMapForOrc");
+        genSlotMethod.setAccessible(true);
+        genSlotMethod.invoke(scanNode);
+
+        params = (org.apache.doris.thrift.TFileScanRangeParams) paramsField.get(scanNode);
+
+        Assertions.assertNotNull(params.getProperties());
+        // Existing property should be preserved
+        Assertions.assertEquals("existing_value", params.getProperties().get("existing_key"));
+        // New properties should be added
+        Assertions.assertEquals("col1,col2", params.getProperties().get("full_schema_names"));
+        Assertions.assertEquals("int,string", params.getProperties().get("full_schema_types"));
     }
 }
