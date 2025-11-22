@@ -1654,9 +1654,12 @@ public class InternalCatalog implements CatalogIf<Database> {
         long bucketNum = distributionInfo.getBucketNum();
         long replicaNum = singlePartitionDesc.getReplicaAlloc().getTotalReplicaNum();
         long totalReplicaNum = indexNum * bucketNum * replicaNum;
-        if (totalReplicaNum >= db.getReplicaQuotaLeftWithLock()) {
-            throw new DdlException("Database " + db.getFullName() + " table " + tableName + " add partition increasing "
-                    + totalReplicaNum + " of replica exceeds quota[" + db.getReplicaQuota() + "]");
+        if (Config.enable_check_database_quota) {
+            if (totalReplicaNum >= db.getReplicaQuotaLeftWithLock()) {
+                throw new DdlException("Database " + db.getFullName() + " table " + tableName
+                        + " add partition increasing " + totalReplicaNum + " of replica exceeds quota["
+                        + db.getReplicaQuota() + "]");
+            }
         }
         Set<Long> tabletIdSet = new HashSet<>();
         long bufferSize = 1 + totalReplicaNum + indexNum * bucketNum;

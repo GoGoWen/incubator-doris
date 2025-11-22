@@ -304,26 +304,28 @@ public class Database extends MetaObject implements Writable, DatabaseIf<Table> 
     }
 
     public long getReplicaCountWithLock() {
+        List<Table> tables = new ArrayList<>();
         readLock();
         try {
-            long usedReplicaCount = 0;
-            for (Table table : this.idToTable.values()) {
-                if (!table.isManagedTable()) {
-                    continue;
-                }
-
-                OlapTable olapTable = (OlapTable) table;
-                olapTable.readLock();
-                try {
-                    usedReplicaCount = usedReplicaCount + olapTable.getReplicaCount();
-                } finally {
-                    olapTable.readUnlock();
-                }
-            }
-            return usedReplicaCount;
+            tables.addAll(this.idToTable.values());
         } finally {
             readUnlock();
         }
+        long usedReplicaCount = 0;
+        for (Table table : tables) {
+            if (!table.isManagedTable()) {
+                continue;
+            }
+
+            OlapTable olapTable = (OlapTable) table;
+            olapTable.readLock();
+            try {
+                usedReplicaCount = usedReplicaCount + olapTable.getReplicaCount();
+            } finally {
+                olapTable.readUnlock();
+            }
+        }
+        return usedReplicaCount;
     }
 
     public long getReplicaQuotaLeftWithLock() {
@@ -363,7 +365,7 @@ public class Database extends MetaObject implements Writable, DatabaseIf<Table> 
     }
 
     public void checkQuota() throws DdlException {
-        if (Config.enable_check_database_quota_for_alter) {
+        if (Config.enable_check_database_quota) {
             checkDataSizeQuota();
             checkReplicaQuota();
         }

@@ -262,7 +262,7 @@ public class DatabaseTest {
 
     @Test
     public void testEnableCheckDatabaseQuota() throws DdlException {
-        Config.enable_check_database_quota_for_alter = true;
+        Config.enable_check_database_quota = true;
         final AtomicInteger invokeTimes = new AtomicInteger(0);
         new MockUp<Database>() {
             @Mock

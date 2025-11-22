@@ -408,16 +408,17 @@ public class DatabaseTransactionMgr {
         return tid;
     }
 
-    private void checkDatabaseDataQuota() throws MetaNotFoundException, QuotaExceedException {
-        Database db = env.getInternalCatalog().getDbOrMetaException(dbId);
-
-        if (usedQuotaDataBytes == -1) {
-            usedQuotaDataBytes = db.getUsedDataQuotaWithLock();
-        }
-
-        long dataQuotaBytes = db.getDataQuota();
-        if (usedQuotaDataBytes >= dataQuotaBytes) {
-            throw new QuotaExceedException(db.getFullName(), dataQuotaBytes);
+    @VisibleForTesting
+    protected void checkDatabaseDataQuota() throws MetaNotFoundException, QuotaExceedException {
+        if (Config.enable_check_database_quota) {
+            Database db = env.getInternalCatalog().getDbOrMetaException(dbId);
+            if (usedQuotaDataBytes == -1) {
+                usedQuotaDataBytes = db.getUsedDataQuotaWithLock();
+            }
+            long dataQuotaBytes = db.getDataQuota();
+            if (usedQuotaDataBytes >= dataQuotaBytes) {
+                throw new QuotaExceedException(db.getFullName(), dataQuotaBytes);
+            }
         }
     }
 
