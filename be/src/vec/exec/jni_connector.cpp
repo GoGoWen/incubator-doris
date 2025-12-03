@@ -31,6 +31,7 @@
 #include "vec/columns/column_nullable.h"
 #include "vec/columns/column_string.h"
 #include "vec/columns/column_struct.h"
+#include "vec/columns/column_vector.h"
 #include "vec/core/block.h"
 #include "vec/core/types.h"
 #include "vec/data_types/data_type_array.h"
@@ -262,6 +263,21 @@ Status JniConnector::_fill_block(Block* block, size_t num_rows) {
     SCOPED_TIMER(_fill_block_time);
     JNIEnv* env = nullptr;
     RETURN_IF_ERROR(JniUtil::GetJNIEnv(&env));
+
+    // Special handling for queries with no file columns (count(*) or partition-only queries).
+    // Resize all existing columns in the block to match num_rows.
+    // Note: For partition columns, _fill_columns_from_path() will clear and refill them.
+    if (_column_names.empty()) {
+        for (size_t i = 0; i < block->columns(); ++i) {
+            auto& col = block->get_by_position(i);
+            if (col.column) {
+                auto mutable_col = col.column->assume_mutable();
+                mutable_col->resize(num_rows);
+            }
+        }
+        return Status::OK();
+    }
+
     for (int i = 0; i < _column_names.size(); ++i) {
         auto& column_with_type_and_name = block->get_by_name(_column_names[i]);
         auto& column_ptr = column_with_type_and_name.column;

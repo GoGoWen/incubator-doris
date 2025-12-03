@@ -85,9 +85,15 @@ Status HiveJNIReader::init_fetch_table_reader(
             {"file_format", std::to_string(_params.format_type)},
             {"required_fields", required_fields.str()},
             {"columns_types", columns_types.str()},
-            {"column_ids", column_ids.str()},
             {"split_start_offset", std::to_string(_range.start_offset)},
             {"split_size", std::to_string(_range.size)}};
+
+    // Only add column_ids if there are columns to select
+    // Empty string causes NumberFormatException in Java when split
+    if (!column_ids.str().empty()) {
+        required_params["column_ids"] = column_ids.str();
+    }
+
     if (type == TFileType::FILE_S3 || type == TFileType::FILE_HDFS) {
         required_params.insert(_params.properties.begin(), _params.properties.end());
     }

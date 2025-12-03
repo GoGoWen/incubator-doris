@@ -19,7 +19,10 @@ package org.apache.doris.hive;
 
 import org.apache.doris.common.jni.JniScanner;
 import org.apache.doris.common.jni.vec.ColumnType;
+import org.apache.doris.common.jni.vec.ColumnType.Type;
 import org.apache.doris.common.jni.vec.TableSchema;
+import org.apache.doris.common.jni.vec.VectorColumn;
+import org.apache.doris.common.jni.vec.VectorTable;
 import org.apache.doris.thrift.TFileFormatType;
 import org.apache.doris.thrift.TFileType;
 
@@ -75,6 +78,9 @@ public class HiveJNIScanner extends JniScanner {
     private Writable key;
     private Writable value;
     private HiveFileContext hiveFileContext;
+    // For count(*) queries with 0 columns - need to persist meta across calls
+    private VectorColumn countMeta;
+    private int countStarNumRows;
 
     public HiveJNIScanner(int fetchSize, Map<String, String> requiredParams) {
         this.classLoader = this.getClass().getClassLoader();
@@ -82,20 +88,40 @@ public class HiveJNIScanner extends JniScanner {
         this.requiredParams = requiredParams;
         this.fileType = TFileType.findByValue(Integer.parseInt(requiredParams.get(HiveProperties.FILE_TYPE)));
         this.fileFormat = TFileFormatType.findByValue(Integer.parseInt(requiredParams.get(HiveProperties.FILE_FORMAT)));
-        this.columnTypes = requiredParams.get(HiveProperties.COLUMNS_TYPES)
-                .split(HiveProperties.COLUMNS_TYPE_DELIMITER);
-        this.requiredFields = requiredParams.get(HiveProperties.REQUIRED_FIELDS).split(HiveProperties.FIELDS_DELIMITER);
+
+        // Handle empty strings for count(*) queries
+        // Java's "".split(",") returns [""] not [], so we need to check first
+        String columnTypesStr = requiredParams.get(HiveProperties.COLUMNS_TYPES);
+        String requiredFieldsStr = requiredParams.get(HiveProperties.REQUIRED_FIELDS);
+
+        if (columnTypesStr == null || columnTypesStr.isEmpty()) {
+            this.columnTypes = new String[0];
+        } else {
+            this.columnTypes = columnTypesStr.split(HiveProperties.COLUMNS_TYPE_DELIMITER);
+        }
+
+        if (requiredFieldsStr == null || requiredFieldsStr.isEmpty()) {
+            this.requiredFields = new String[0];
+        } else {
+            this.requiredFields = requiredFieldsStr.split(HiveProperties.FIELDS_DELIMITER);
+        }
+
         this.requiredTypes = new ColumnType[requiredFields.length];
         this.requiredColumnIds = new int[requiredFields.length];
 
         if (requiredParams.containsKey(HiveProperties.COLUMN_IDS)) {
             String columnIdsStr = requiredParams.get(HiveProperties.COLUMN_IDS);
             String[] columnIdStrs = columnIdsStr.split(HiveProperties.FIELDS_DELIMITER);
+
             for (int i = 0; i < columnIdStrs.length && i < requiredColumnIds.length; i++) {
-                requiredColumnIds[i] = Integer.parseInt(columnIdStrs[i]);
+                String colIdStr = columnIdStrs[i];
+                if (colIdStr.isEmpty()) {
+                    throw new IllegalArgumentException(String.format(
+                        "Empty column_id at index %d, columnIdsStr=[%s]", i, columnIdsStr));
+                }
+                requiredColumnIds[i] = Integer.parseInt(colIdStr);
             }
         } else {
-            // Fallback
             for (int i = 0; i < requiredColumnIds.length; i++) {
                 requiredColumnIds[i] = i;
             }
@@ -176,6 +202,9 @@ public class HiveJNIScanner extends JniScanner {
                                     throw new RuntimeException(e);
                                 }
                         });
+
+        key = reader.createKey();
+        value = reader.createValue();
         deserializer = getDeserializer(jobConf, properties, hiveFileContext.getSerde());
         rowInspector = getTableObjectInspector(deserializer);
         for (int i = 0; i < requiredFields.length; i++) {
@@ -199,12 +228,16 @@ public class HiveJNIScanner extends JniScanner {
 
     private Properties createProperties() {
         Properties properties = new Properties();
-        String columnIdsStr = Arrays.stream(this.requiredColumnIds)
-                .mapToObj(String::valueOf).collect(Collectors.joining(","));
 
-        // Column projection: specify which columns to read
-        properties.setProperty(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, columnIdsStr);
-        properties.setProperty(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR, String.join(",", requiredFields));
+        // For count(*) queries, requiredFields is empty - don't set column projection
+        if (requiredFields.length > 0) {
+            String columnIdsStr = Arrays.stream(this.requiredColumnIds)
+                    .mapToObj(String::valueOf).collect(Collectors.joining(","));
+            String columnNamesStr = String.join(",", requiredFields);
+
+            properties.setProperty(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, columnIdsStr);
+            properties.setProperty(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR, columnNamesStr);
+        }
 
         // Full table schema: required for RCFile deserializer
         // Use full schema from FE if available (for RCFile), otherwise use projected schema
@@ -240,6 +273,42 @@ public class HiveJNIScanner extends JniScanner {
     }
 
     @Override
+    public long getNextBatchMeta() throws IOException {
+        // Special handling for count(*) queries with no columns
+        if (types != null && types.length == 0) {
+
+            // For count(*), we need a minimal VectorTable with just row count
+            if (vectorTable == null) {
+                vectorTable = VectorTable.createWritableTable(types, fields, batchSize);
+                countMeta = VectorColumn.createWritableColumn(
+                    new ColumnType("#meta", Type.BIGINT), 1);
+            }
+
+            try {
+                countStarNumRows = getNext();
+            } catch (IOException e) {
+                releaseTable();
+                countMeta = null;
+                throw e;
+            }
+
+            if (countStarNumRows == 0) {
+                releaseTable();
+                countMeta = null;
+                return 0;
+            }
+
+            // Reset and populate the persistent meta column
+            countMeta.reset();
+            countMeta.appendLong(countStarNumRows);
+            long metaAddr = countMeta.dataAddress();
+            return metaAddr;
+        }
+
+        return super.getNextBatchMeta();
+    }
+
+    @Override
     public void open() throws IOException {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             parseRequiredTypes();
@@ -258,6 +327,11 @@ public class HiveJNIScanner extends JniScanner {
             if (reader != null) {
                 reader.close();
             }
+            // Clean up count(*) meta column if it exists
+            if (countMeta != null) {
+                countMeta.close();
+                countMeta = null;
+            }
         } catch (IOException e) {
             LOG.error("Failed to close the hive reader.", e);
             throw new IOException("Failed to close the hive reader.", e);
@@ -267,9 +341,18 @@ public class HiveJNIScanner extends JniScanner {
     @Override
     public int getNext() throws IOException {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            key = reader.createKey();
-            value = reader.createValue();
             int numRows = 0;
+
+            // For count(*) queries, just count rows without deserializing
+            if (requiredFields.length == 0) {
+                for (; numRows < getBatchSize(); numRows++) {
+                    if (!reader.next(key, value)) {
+                        break;
+                    }
+                }
+                return numRows;
+            }
+
             for (; numRows < getBatchSize(); numRows++) {
                 if (!reader.next(key, value)) {
                     break;

@@ -497,6 +497,14 @@ Status VFileScanner::_fill_columns_from_path(size_t rows) {
     for (auto& kv : _partition_col_descs) {
         auto doris_column = _src_block_ptr->get_by_name(kv.first).column;
         IColumn* col_ptr = const_cast<IColumn*>(doris_column.get());
+
+        // Clear the column before filling partition values.
+        // The column may have been pre-sized with default values by JniConnector in the RCFile format table query case
+        // (for partition-only queries like "SELECT dt"). Since deserialize_column_from_fixed_json
+        // APPENDS values rather than replacing, we must clear first to avoid
+        // mixing default values with actual partition values.
+        col_ptr->clear();
+
         auto& [value, slot_desc] = kv.second;
         auto _text_serde = slot_desc->get_data_type_ptr()->get_serde();
         Slice slice(value.data(), value.size());
@@ -1149,7 +1157,9 @@ Status VFileScanner::_init_expr_ctxes() {
                 _partition_slot_index_map.emplace(slot_id, iti->second - _num_of_columns_from_file);
             } else {
                 auto kit = partition_name_to_key_index_map.find(it->second->col_name());
-                _partition_slot_index_map.emplace(slot_id, kit->second);
+                if (kit != partition_name_to_key_index_map.end()) {
+                    _partition_slot_index_map.emplace(slot_id, kit->second);
+                }
             }
         }
     }
