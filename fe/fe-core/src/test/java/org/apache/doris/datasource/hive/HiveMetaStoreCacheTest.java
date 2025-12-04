@@ -109,4 +109,38 @@ public class HiveMetaStoreCacheTest {
             Assertions.fail(e);
         }
     }
+
+    @Test
+    public void testLzoIndexFileIsNotVisible() {
+        Path lzoIndexPath = new Path("hdfs://namenode:8020/warehouse/table/data.lzo.index");
+        Assertions.assertFalse(FileCacheValue.isFileVisible(lzoIndexPath),
+                ".lzo.index files should not be visible");
+
+        Path partitionLzoIndex = new Path("hdfs://namenode:8020/warehouse/table/dt=2025-01-01/file.lzo.index");
+        Assertions.assertFalse(FileCacheValue.isFileVisible(partitionLzoIndex),
+                ".lzo.index files in partition directories should not be visible");
+
+        Path lzoDataFile = new Path("hdfs://namenode:8020/warehouse/table/data.lzo");
+        Assertions.assertTrue(FileCacheValue.isFileVisible(lzoDataFile),
+                ".lzo data files should be visible");
+
+        Path otherIndexFile = new Path("hdfs://namenode:8020/warehouse/table/data.index");
+        Assertions.assertTrue(FileCacheValue.isFileVisible(otherIndexFile),
+                "Non .lzo.index files should be visible");
+
+        Path parquetFile = new Path("hdfs://namenode:8020/warehouse/table/data.parquet");
+        Assertions.assertTrue(FileCacheValue.isFileVisible(parquetFile),
+                "Parquet files should be visible");
+
+        Assertions.assertFalse(FileCacheValue.isFileVisible(null),
+                "Null path should not be visible");
+
+        Path hiddenFile = new Path("hdfs://namenode:8020/warehouse/table/.hidden");
+        Assertions.assertFalse(FileCacheValue.isFileVisible(hiddenFile),
+                "Hidden files starting with . should not be visible");
+
+        Path underscoreFile = new Path("hdfs://namenode:8020/warehouse/table/_temporary");
+        Assertions.assertFalse(FileCacheValue.isFileVisible(underscoreFile),
+                "Files starting with _ should not be visible");
+    }
 }

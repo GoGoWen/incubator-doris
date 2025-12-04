@@ -1500,6 +1500,10 @@ public class HiveMetaStoreCache {
             if (containsHiddenPath(pathStr) || path.getName().startsWith("_")) {
                 return false;
             }
+            String fileName = path.getName();
+            if (fileName.endsWith(".lzo.index")) {
+                return false;
+            }
             for (String name : pathStr.split("/")) {
                 if (isGeneratedPath(name)) {
                     return false;
