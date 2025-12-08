@@ -17,6 +17,7 @@
 
 package org.apache.doris.qe;
 
+import org.apache.doris.analysis.Analyzer;
 import org.apache.doris.analysis.ExplainOptions;
 import org.apache.doris.analysis.InsertStmt;
 import org.apache.doris.analysis.KillStmt;
@@ -49,6 +50,9 @@ import org.apache.doris.mysql.MysqlCommand;
 import org.apache.doris.mysql.MysqlPacket;
 import org.apache.doris.mysql.MysqlSerializer;
 import org.apache.doris.mysql.MysqlServerStatusFlag;
+import org.apache.doris.mysql.privilege.AccessControllerManager;
+import org.apache.doris.mysql.privilege.CatalogAccessController;
+import org.apache.doris.mysql.privilege.PrivPredicate;
 import org.apache.doris.nereids.SqlCacheContext;
 import org.apache.doris.nereids.SqlCacheContext.CacheKeyType;
 import org.apache.doris.nereids.StatementContext;
@@ -79,6 +83,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -92,6 +97,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -207,8 +213,29 @@ public abstract class ConnectProcessor {
     protected void handleQuery(MysqlCommand mysqlCommand, String originStmt) throws ConnectionException {
         String fallbackCatalog = Config.sql_fallback_catalog;
         String dialect = ctx.getSessionVariable().getSqlDialect();
+
+        String routedCatalog = getCatalogBySource(
+                ctx.getBdpAuthContext() == null ? null : ctx.getBdpAuthContext().getSource());
+        boolean needForward = routedCatalog != null && originStmt != null
+                && originStmt.trim().toUpperCase().contains("SELECT");
+
         try {
+            if (needForward) {
+                try {
+                    checkQueryPrivilege(originStmt);
+                    handleQueryFallback(mysqlCommand, forwardToFallbackCatalog(originStmt, routedCatalog));
+                    return;
+                } catch (Exception e) {
+                    LOG.warn("Failed to check privilege or parse SQL for forwarding: " + e.getMessage());
+                    // Privilege or parsing failure is a semantic error; just return the error on the current connection
+                    // without closing it
+                    ctx.getState().setError(e.getMessage());
+                    return;
+                }
+            }
+
             executeQuery(mysqlCommand, originStmt);
+
             // try to query by fallback catalog
             if (ctx.getState().getStateType() == MysqlStateType.ERR && dialect.equals(fallbackCatalog)) {
                 handleQueryFallback(mysqlCommand, forwardToFallbackCatalog(originStmt, fallbackCatalog));
@@ -230,6 +257,47 @@ public abstract class ConnectProcessor {
         }
     }
 
+    private void checkQueryPrivilege(String originStmt) throws Exception {
+        List<StatementBase> stmts = parse(originStmt);
+        if (stmts == null || stmts.isEmpty()) {
+            return;
+        }
+
+        AccessControllerManager accessManager = ctx.getEnv().getAccessManager();
+        if (accessManager == null) {
+            throw new AnalysisException("AccessControllerManager is not available");
+        }
+        CatalogAccessController catalogAccessController = accessManager.getAccessControllerOrDefault("hive");
+        UserIdentity currentUser = ctx.getCurrentUserIdentity();
+
+        for (StatementBase stmt : stmts) {
+            if (stmt instanceof QueryStmt) {
+                Analyzer analyzer = new Analyzer(ctx.getEnv(), ctx);
+                stmt.analyze(analyzer);
+
+                QueryStmt queryStmt = (QueryStmt) stmt;
+                Map<Long, TableIf> tableMap = Maps.newHashMap();
+                Set<String> parentViewNameSet = Sets.newHashSet();
+                queryStmt.getTables(analyzer, false, tableMap, parentViewNameSet);
+
+                for (TableIf table : tableMap.values()) {
+                    DatabaseIf<?> db = table.getDatabase();
+                    if (db == null) {
+                        continue;
+                    }
+                    String dbName = db.getFullName();
+                    String tableName = table.getName();
+
+                    if (!catalogAccessController.checkTblPriv(currentUser, "hive", dbName, tableName,
+                            PrivPredicate.SELECT)) {
+                        throw new AnalysisException("Access denied for user " + currentUser
+                                + " to table hive." + dbName + "." + tableName);
+                    }
+                }
+            }
+        }
+    }
+
     private void handleQueryFallback(MysqlCommand mysqlCommand,
                                  String originStmt) throws ConnectionException {
         try {
@@ -248,6 +316,27 @@ public abstract class ConnectProcessor {
         sqlBuilder.append("select * from query('catalog'='").append(fallbackCatalog).append("',");
         sqlBuilder.append("'query'=").append('"').append(escapeSql(originStmt)).append('"').append(");");
         return sqlBuilder.toString();
+    }
+
+    private static String getCatalogBySource(String source) {
+        if (source == null || source.isEmpty()) {
+            return null;
+        }
+        String mapping = Config.source_catalog_routing;
+        if (mapping.isEmpty()) {
+            return null;
+        }
+        String result = null;
+        String[] pairs = mapping.split(",");
+        result = java.util.Arrays.stream(pairs)
+                .map(String::trim)
+                .map(p -> p.split(":", 2))
+                .filter(kv -> kv.length == 2)
+                .filter(kv -> kv[0].trim().equalsIgnoreCase(source))
+                .map(kv -> kv[1].trim())
+                .findFirst()
+                .orElse(null);
+        return result;
     }
 
     public static String escapeSql(String input) {

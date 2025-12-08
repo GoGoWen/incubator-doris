@@ -2928,6 +2928,11 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true, description = {"降级到catalog", "fallback to catalog"})
     public static String sql_fallback_catalog = "";
 
+    @ConfField(mutable = true, description = {
+            "JD湖仓查询专用：按 source 路由到 catalog，格式: source:catalog，例如 sandbox:presto, xxx:xxx",
+            "JD lakehouse: route to catalog by source, format: source:catalog, e.g. sandbox:presto, xxx:xxx"})
+    public static String source_catalog_routing = "sandbox:presto";
+
     @ConfField(mutable = true, description = {"是否忽略hive表的transaction属性",
             "whether to ignore the transaction property of the hive table"})
     public static boolean ignore_hive_table_transaction = true;

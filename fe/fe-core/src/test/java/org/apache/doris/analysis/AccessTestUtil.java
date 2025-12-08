@@ -133,6 +133,10 @@ public class AccessTestUtil {
                     minTimes = 0;
                     result = db;
 
+                    catalog.getDbOrAnalysisException("testDb");
+                    minTimes = 0;
+                    result = db;
+
                     catalog.getDbNullable("emptyDb");
                     minTimes = 0;
                     result = null;
