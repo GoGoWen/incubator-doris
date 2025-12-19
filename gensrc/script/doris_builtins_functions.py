@@ -1797,6 +1797,8 @@ visible_functions = {
         [['json_extract_double'], 'DOUBLE', ['JSONB', 'STRING'], 'ALWAYS_NULLABLE'],
         [['json_extract_string'], 'STRING', ['JSONB', 'VARCHAR'], 'ALWAYS_NULLABLE'],
         [['json_extract_string'], 'STRING', ['JSONB', 'STRING'], 'ALWAYS_NULLABLE'],
+        [['json_extract_string'], 'STRING', ['VARCHAR', 'VARCHAR'], 'ALWAYS_NULLABLE'],
+        [['json_extract_string'], 'STRING', ['STRING', 'STRING'], 'ALWAYS_NULLABLE'],
         [['json_length'], 'INT', ['JSONB'], 'ALWAYS_NULLABLE'],
         [['json_length'], 'INT', ['JSONB', 'VARCHAR'], 'ALWAYS_NULLABLE'],
         [['json_length'], 'INT', ['JSONB', 'STRING'], 'ALWAYS_NULLABLE'],

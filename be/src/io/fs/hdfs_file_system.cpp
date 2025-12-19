@@ -124,7 +124,7 @@ private:
     HdfsFileHandleCache()
             : _cache(config::max_hdfs_file_handle_cache_num,
                      config::num_partitions_for_hdfs_file_handle_cache,
-                     config::max_hdfs_file_handle_cache_time_sec * 1000L) {};
+                     config::max_hdfs_file_handle_cache_time_sec) {};
 };
 
 Status HdfsFileHandleCache::get_file(const std::shared_ptr<HdfsFileSystem>& fs, const Path& file,
