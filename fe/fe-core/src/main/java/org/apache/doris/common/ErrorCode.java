@@ -1414,7 +1414,11 @@ public enum ErrorCode {
     ERR_WRONG_PARQUET_LEVEL_FORMAT(9175, new byte[]{'4', '2', '0', '0', '0'}, "Wrong parquet level format"),
     ERR_OOM_JAVA_HEAP_SPACE(9176, new byte[]{'4', '2', '0', '0', '0'}, "OutOfMemoryError: Java heap space"),
     ERR_CAN_ONLY_USED_WITH_COUNT(9177, new byte[]{'4', '2', '0', '0', '0'}, "Can only be used in conjunction with COUNT"),
-    ERR_CROSS_REGION_READ_NONCR_BLOCKS_FAILED(9178, new byte[]{'4', '2', '0', '0', '0'}, "Cross Region Read NonCR Blocks Failed");
+    ERR_CROSS_REGION_READ_NONCR_BLOCKS_FAILED(9178, new byte[]{'4', '2', '0', '0', '0'}, "Cross Region Read NonCR Blocks Failed"),
+    ERR_REMOTE_FILE_NOT_EXIST(9179, new byte[]{'4', '2', '0', '0', '0'}, "RemoteException: File does not exist"),
+    ERR_BLOCK_MISSING_COULD_NOT_OBTAIN(9180, new byte[]{'4', '2', '0', '0', '0'}, "BlockMissingException: Could not obtain block"),
+    ERR_IO_MISSING_BLOCKS(9181, new byte[]{'4', '2', '0', '0', '0'}, "IOException: .* missing blocks"),
+    ERR_BLOCKLIST_CHANGED(9182, new byte[]{'4', '2', '0', '0', '0'}, "IOException: Blocklist for .* has changed");
 
     // This is error code
     private final int code;

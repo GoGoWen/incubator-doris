@@ -27,6 +27,10 @@ public class ErrorCodeMapperTest {
         Object[][] cases = new Object[][]{
                 {"Query timeout", ErrorCode.ERR_QUERY_TIMEOUT},
                 {"Cross Region Read NonCR Blocks Failed", ErrorCode.ERR_CROSS_REGION_READ_NONCR_BLOCKS_FAILED},
+                {"RemoteException: File does not exist", ErrorCode.ERR_REMOTE_FILE_NOT_EXIST},
+                {"BlockMissingException: Could not obtain block", ErrorCode.ERR_BLOCK_MISSING_COULD_NOT_OBTAIN},
+                {"IOException: some missing blocks", ErrorCode.ERR_IO_MISSING_BLOCKS},
+                {"IOException: Blocklist for abc has changed", ErrorCode.ERR_BLOCKLIST_CHANGED},
         };
 
         for (Object[] c : cases) {
@@ -37,5 +41,4 @@ public class ErrorCodeMapperTest {
         }
     }
 }
-
 

@@ -332,6 +332,14 @@ public class ErrorCodeMapper {
                 ErrorCode.ERR_CAN_ONLY_USED_WITH_COUNT);
         errorMap.put(Pattern.compile("Cross Region Read NonCR Blocks Failed"),
                 ErrorCode.ERR_CROSS_REGION_READ_NONCR_BLOCKS_FAILED);
+        errorMap.put(Pattern.compile("RemoteException: File does not exist"),
+                ErrorCode.ERR_REMOTE_FILE_NOT_EXIST);
+        errorMap.put(Pattern.compile("BlockMissingException: Could not obtain block"),
+                ErrorCode.ERR_BLOCK_MISSING_COULD_NOT_OBTAIN);
+        errorMap.put(Pattern.compile("IOException: .* missing blocks"),
+                ErrorCode.ERR_IO_MISSING_BLOCKS);
+        errorMap.put(Pattern.compile("IOException: Blocklist for .* has changed"),
+                ErrorCode.ERR_BLOCKLIST_CHANGED);
     }
 
     public static ErrorCode getErrorCode(String errorMessage) {
@@ -343,7 +351,6 @@ public class ErrorCodeMapper {
         return ErrorCode.ERR_UNKNOWN_ERROR;
     }
 }
-
 
 
 
