@@ -245,6 +245,9 @@ public abstract class FileQueryScanNode extends FileScanNode {
             }
             SlotDescriptor slotDesc = desc.getSlot(slot.getSlotId());
             String colName = slotDesc.getColumn().getName();
+            if (colName.startsWith(Column.GLOBAL_ROWID_COL)) {
+                continue;
+            }
             int idx = tbl.getBaseColumnIdxByName(colName);
             if (idx == -1) {
                 throw new UserException("Column " + colName + " not found in table " + tbl.getName());

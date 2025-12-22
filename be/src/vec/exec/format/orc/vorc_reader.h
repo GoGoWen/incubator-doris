@@ -33,6 +33,7 @@
 #include "common/config.h"
 #include "common/status.h"
 #include "exec/olap_common.h"
+#include "olap/rowset/segment_v2/column_reader.h"
 #include "io/file_factory.h"
 #include "io/fs/buffered_reader.h"
 #include "io/fs/file_reader.h"
@@ -56,6 +57,9 @@ namespace doris {
 class RuntimeState;
 class TFileRangeDesc;
 class TFileScanRangeParams;
+namespace segment_v2 {
+class RowIdColumnIteratorV2;
+}
 
 namespace io {
 class FileSystem;
@@ -212,8 +216,32 @@ public:
     static TypeDescriptor convert_to_doris_type(const orc::Type* orc_type);
     static std::string get_field_name_lower_case(const orc::Type* orc_type, int pos);
 
+    void set_row_id_column_iterator(
+            const std::pair<std::shared_ptr<segment_v2::RowIdColumnIteratorV2>, int>&
+                    iterator_pair) {
+        _row_id_column_iterator_pair = iterator_pair;
+    }
+
 protected:
     void _collect_profile_before_close() override;
+
+    Status _fill_row_id_columns(Block* block);
+
+    bool _seek_to_read_one_line() {
+        if (_read_line_mode_mode) {
+            if (_read_lines.empty()) {
+                return false;
+            }
+            _row_reader->seekToRow(_read_lines.front());
+            _read_lines.pop_front();
+        }
+        return true;
+    }
+
+    Status _set_read_one_line_impl() override {
+        _batch_size = 1;
+        return Status::OK();
+    }
 
 private:
     struct OrcProfile {
@@ -629,6 +657,9 @@ private:
     std::unordered_map<std::string, std::string> _table_col_to_file_col;
     //support iceberg position delete .
     std::vector<int64_t>* _position_delete_ordered_rowids = nullptr;
+
+    std::pair<std::shared_ptr<segment_v2::RowIdColumnIteratorV2>, int>
+            _row_id_column_iterator_pair = {nullptr, -1};
 };
 
 class ORCFileInputStream : public orc::InputStream, public ProfileCollector {

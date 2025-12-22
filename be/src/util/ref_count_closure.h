@@ -78,8 +78,9 @@ class AutoReleaseClosure : public google::protobuf::Closure {
     ENABLE_FACTORY_CREATOR(AutoReleaseClosure);
 
 public:
-    AutoReleaseClosure(std::shared_ptr<Request> req, std::shared_ptr<Callback> callback)
-            : request_(req), callback_(callback) {
+    AutoReleaseClosure(std::shared_ptr<Request> req, std::shared_ptr<Callback> callback,
+                       std::weak_ptr<QueryContext> context = {}, std::string_view error_msg = {})
+            : request_(req), callback_(callback), context_(std::move(context)) {
         this->cntl_ = callback->cntl_;
         this->response_ = callback->response_;
     }
@@ -132,6 +133,7 @@ private:
     // Use a weak ptr to keep the callback, so that the callback can be deleted if the main
     // thread is freed.
     Weak callback_;
+    std::weak_ptr<QueryContext> context_;
 };
 
 } // namespace doris

@@ -57,6 +57,7 @@ class PipelineXTask;
 class DescriptorTbl;
 class ObjectPool;
 class ExecEnv;
+class IdFileMap;
 class RuntimeFilterMgr;
 class MemTrackerLimiter;
 class QueryContext;
@@ -487,6 +488,8 @@ public:
         _pipeline_x_runtime_filter_mgr = pipeline_x_runtime_filter_mgr;
     }
 
+    std::weak_ptr<QueryContext> get_query_ctx_weak();
+
     QueryContext* get_query_ctx() { return _query_ctx; }
 
     void set_query_mem_tracker(const std::shared_ptr<MemTrackerLimiter>& tracker) {
@@ -658,6 +661,10 @@ public:
         return _partial_update_auto_inc_column;
     };
 
+    std::shared_ptr<IdFileMap>& get_id_file_map() { return _id_file_map; }
+
+    void set_id_file_map();
+
 private:
     Status create_error_log_file();
 
@@ -789,6 +796,9 @@ private:
     RuntimeState(const RuntimeState&);
 
     vectorized::ColumnInt64* _partial_update_auto_inc_column;
+
+    // used for encoding the global lazy materialize
+    std::shared_ptr<IdFileMap> _id_file_map = nullptr;
 };
 
 #define RETURN_IF_CANCELLED(state)                                                    \

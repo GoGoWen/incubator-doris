@@ -28,6 +28,8 @@ import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.Utils;
 import org.apache.doris.statistics.Statistics;
 
+import com.google.common.collect.ImmutableList;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -38,14 +40,15 @@ public class PhysicalSchemaScan extends PhysicalCatalogRelation {
 
     public PhysicalSchemaScan(RelationId id, TableIf table, List<String> qualifier,
             Optional<GroupExpression> groupExpression, LogicalProperties logicalProperties) {
-        super(id, PlanType.PHYSICAL_SCHEMA_SCAN, table, qualifier, groupExpression, logicalProperties);
+        super(id, PlanType.PHYSICAL_SCHEMA_SCAN, table, qualifier, groupExpression, logicalProperties,
+                ImmutableList.of());
     }
 
     public PhysicalSchemaScan(RelationId id, TableIf table, List<String> qualifier,
             Optional<GroupExpression> groupExpression, LogicalProperties logicalProperties,
             PhysicalProperties physicalProperties, Statistics statistics) {
         super(id, PlanType.PHYSICAL_SCHEMA_SCAN, table, qualifier, groupExpression,
-                logicalProperties, physicalProperties, statistics);
+                logicalProperties, physicalProperties, statistics, ImmutableList.of());
     }
 
     @Override

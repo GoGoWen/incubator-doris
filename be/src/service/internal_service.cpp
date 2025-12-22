@@ -59,6 +59,7 @@
 #include "common/logging.h"
 #include "common/signal_handler.h"
 #include "common/status.h"
+#include "exec/rowid_fetcher.h"
 #include "gen_cpp/BackendService.h"
 #include "gen_cpp/PaloInternalService_types.h"
 #include "gen_cpp/internal_service.pb.h"
@@ -102,6 +103,8 @@
 #include "runtime/stream_load/stream_load_context.h"
 #include "runtime/thread_context.h"
 #include "runtime/types.h"
+#include "runtime/workload_group/workload_group.h"
+#include "runtime/workload_group/workload_group_manager.h"
 #include "service/backend_options.h"
 #include "service/point_query_executor.h"
 #include "util/arrow/row_batch.h"
@@ -1991,14 +1994,14 @@ void PInternalServiceImpl::response_slave_tablet_pull_rowset(
     }
 }
 
-template <typename Func>
-auto scope_timer_run(Func fn, int64_t* cost) -> decltype(fn()) {
-    MonotonicStopWatch watch;
-    watch.start();
-    auto res = fn();
-    *cost += watch.elapsed_time() / 1000 / 1000;
-    return res;
-}
+//template <typename Func>
+//auto scope_timer_run(Func fn, int64_t* cost) -> decltype(fn()) {
+//    MonotonicStopWatch watch;
+//    watch.start();
+//    auto res = fn();
+//    *cost += watch.elapsed_time() / 1000 / 1000;
+//    return res;
+//}
 
 struct IteratorKey {
     int64_t tablet_id;
@@ -2179,7 +2182,7 @@ void PInternalServiceImpl::multiget_data(google::protobuf::RpcController* contro
                                          const PMultiGetRequest* request,
                                          PMultiGetResponse* response,
                                          google::protobuf::Closure* done) {
-    bool ret = _light_work_pool.try_offer([request, response, done, this]() {
+    bool ret = _heavy_work_pool.try_offer([request, response, done, this]() {
         signal::set_signal_task_id(request->query_id());
         // multi get data by rowid
         MonotonicStopWatch watch;
@@ -2191,6 +2194,30 @@ void PInternalServiceImpl::multiget_data(google::protobuf::RpcController* contro
         st.to_protobuf(response->mutable_status());
         LOG(INFO) << "multiget_data finished, cost(us):" << watch.elapsed_time() / 1000;
     });
+    if (!ret) {
+        offer_failed(response, done, _heavy_work_pool);
+        return;
+    }
+}
+
+void PInternalServiceImpl::multiget_data_v2(google::protobuf::RpcController* controller,
+                                        const PMultiGetRequestV2* request,
+                                        PMultiGetResponseV2* response,
+                                        google::protobuf::Closure* done) {
+
+    bool ret = _heavy_work_pool.try_offer([request, response, done]() {
+        signal::set_signal_task_id(request->query_id());
+        // multi get data by rowid
+        MonotonicStopWatch watch;
+        watch.start();
+        brpc::ClosureGuard closure_guard(done);
+        response->mutable_status()->set_status_code(0);
+        SCOPED_ATTACH_TASK(ExecEnv::GetInstance()->rowid_storage_reader_tracker());
+        Status st = RowIdStorageReader::read_by_rowids(*request, response);
+        st.to_protobuf(response->mutable_status());
+        LOG(INFO) << "multiget_data finished, cost(us):" << watch.elapsed_time() / 1000;
+    });
+
     if (!ret) {
         offer_failed(response, done, _heavy_work_pool);
         return;

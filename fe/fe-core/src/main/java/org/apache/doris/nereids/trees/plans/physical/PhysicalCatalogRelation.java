@@ -37,6 +37,7 @@ import org.apache.doris.statistics.Statistics;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -48,6 +49,7 @@ public abstract class PhysicalCatalogRelation extends PhysicalRelation implement
 
     protected final TableIf table;
     protected final ImmutableList<String> qualifier;
+    protected final ImmutableList<Slot> operativeSlots;
 
     /**
      * Constructor for PhysicalCatalogRelation.
@@ -56,10 +58,13 @@ public abstract class PhysicalCatalogRelation extends PhysicalRelation implement
      * @param qualifier qualified relation name
      */
     public PhysicalCatalogRelation(RelationId relationId, PlanType type, TableIf table, List<String> qualifier,
-            Optional<GroupExpression> groupExpression, LogicalProperties logicalProperties) {
+            Optional<GroupExpression> groupExpression, LogicalProperties logicalProperties,
+            Collection<Slot> operativeSlots) {
         super(relationId, type, groupExpression, logicalProperties);
         this.table = Objects.requireNonNull(table, "table can not be null");
         this.qualifier = ImmutableList.copyOf(Objects.requireNonNull(qualifier, "qualifier can not be null"));
+        this.operativeSlots = ImmutableList.copyOf(Objects.requireNonNull(operativeSlots,
+                "operativeSlots can not be null"));
     }
 
     /**
@@ -71,10 +76,13 @@ public abstract class PhysicalCatalogRelation extends PhysicalRelation implement
     public PhysicalCatalogRelation(RelationId relationId, PlanType type, TableIf table, List<String> qualifier,
             Optional<GroupExpression> groupExpression, LogicalProperties logicalProperties,
             PhysicalProperties physicalProperties,
-            Statistics statistics) {
+            Statistics statistics,
+            Collection<Slot> operativeSlots) {
         super(relationId, type, groupExpression, logicalProperties, physicalProperties, statistics);
         this.table = Objects.requireNonNull(table, "table can not be null");
         this.qualifier = ImmutableList.copyOf(Objects.requireNonNull(qualifier, "qualifier can not be null"));
+        this.operativeSlots = ImmutableList.copyOf(Objects.requireNonNull(operativeSlots,
+                "operativeSlots can not be null"));
     }
 
     @Override

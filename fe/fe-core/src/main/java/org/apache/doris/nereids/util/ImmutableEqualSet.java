@@ -20,7 +20,9 @@ package org.apache.doris.nereids.util;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +74,27 @@ public class ImmutableEqualSet<T> {
         }
 
         /**
+         * Remove all not contain in containSet
+         * @param containSet the set to contain
+         */
+        public void removeNotContain(Set<T> containSet) {
+            List<Set<T>> equalSetList = calEqualSetList();
+            this.parent.clear();
+            for (Set<T> equalSet : equalSetList) {
+                Set<T> intersect = Sets.intersection(containSet, equalSet);
+                if (intersect.size() <= 1) {
+                    continue;
+                }
+                Iterator<T> iterator = intersect.iterator();
+                T first = intersect.iterator().next();
+                while (iterator.hasNext()) {
+                    T next = iterator.next();
+                    this.addEqualPair(first, next);
+                }
+            }
+        }
+
+        /**
          * Add a equal pair
          */
         public void addEqualPair(T a, T b) {
@@ -86,6 +109,30 @@ public class ImmutableEqualSet<T> {
             if (root1 != root2) {
                 parent.put(root1, root2);
             }
+        }
+
+        /**
+         * Calculate all equal set
+         */
+        public List<Set<T>> calEqualSetList() {
+            parent.replaceAll((s, v) -> findRoot(s));
+
+            ImmutableList.Builder<Set<T>> setList = ImmutableList.builderWithExpectedSize(parent.size());
+            Set<T> distinct = Sets.newHashSet();
+            for (T value : parent.values()) {
+                if (!distinct.add(value)) {
+                    continue;
+                }
+                T ra = parent.get(value);
+                ImmutableSet.Builder<T> set = ImmutableSet.builderWithExpectedSize(parent.size());
+                for (Entry<T, T> kv : parent.entrySet()) {
+                    if (kv.getValue().equals(ra)) {
+                        set.add(kv.getKey());
+                    }
+                }
+                setList.add(set.build());
+            }
+            return setList.build();
         }
 
         public void addEqualSet(ImmutableEqualSet<T> equalSet) {
@@ -113,24 +160,39 @@ public class ImmutableEqualSet<T> {
      */
     public Set<T> calEqualSet(T a) {
         T ra = root.get(a);
-        return root.keySet().stream()
-                .filter(t -> root.get(t).equals(ra) && !t.equals(a))
-                .collect(ImmutableSet.toImmutableSet());
+        ImmutableSet.Builder<T> set = ImmutableSet.builderWithExpectedSize(root.size());
+        for (Entry<T, T> kv : root.entrySet()) {
+            if (kv.getValue().equals(ra) && !kv.getKey().equals(a)) {
+                set.add(kv.getKey());
+            }
+        }
+        return set.build();
+    }
+
+    public boolean isEmpty() {
+        return root.isEmpty();
     }
 
     /**
      * Calculate all equal set
      */
     public List<Set<T>> calEqualSetList() {
-        return root.values()
-                .stream()
-                .distinct()
-                .map(a -> {
-                    T ra = root.get(a);
-                    return root.keySet().stream()
-                            .filter(t -> root.get(t).equals(ra))
-                            .collect(ImmutableSet.toImmutableSet());
-                }).collect(ImmutableList.toImmutableList());
+        ImmutableList.Builder<Set<T>> setList = ImmutableList.builderWithExpectedSize(root.size());
+        Set<T> distinct = Sets.newHashSet();
+        for (T value : root.values()) {
+            if (!distinct.add(value)) {
+                continue;
+            }
+            T ra = root.get(value);
+            ImmutableSet.Builder<T> set = ImmutableSet.builderWithExpectedSize(root.size());
+            for (Entry<T, T> kv : root.entrySet()) {
+                if (kv.getValue().equals(ra)) {
+                    set.add(kv.getKey());
+                }
+            }
+            setList.add(set.build());
+        }
+        return setList.build();
     }
 
     public Set<T> getAllItemSet() {

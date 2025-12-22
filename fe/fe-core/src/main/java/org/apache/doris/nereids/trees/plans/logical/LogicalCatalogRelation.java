@@ -45,6 +45,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -58,18 +59,22 @@ public abstract class LogicalCatalogRelation extends LogicalRelation implements 
     protected final TableIf table;
     // [catalogName, databaseName]
     protected final ImmutableList<String> qualifier;
+    protected final ImmutableList<Slot> operativeSlots;
 
     public LogicalCatalogRelation(RelationId relationId, PlanType type, TableIf table, List<String> qualifier) {
         super(relationId, type);
         this.table = Objects.requireNonNull(table, "table can not be null");
         this.qualifier = ImmutableList.copyOf(Objects.requireNonNull(qualifier, "qualifier can not be null"));
+        this.operativeSlots = ImmutableList.of();
     }
 
     public LogicalCatalogRelation(RelationId relationId, PlanType type, TableIf table, List<String> qualifier,
-            Optional<GroupExpression> groupExpression, Optional<LogicalProperties> logicalProperties) {
+            Optional<GroupExpression> groupExpression, Optional<LogicalProperties> logicalProperties,
+            Collection<Slot> operativeSlots) {
         super(relationId, type, groupExpression, logicalProperties);
         this.table = Objects.requireNonNull(table, "table can not be null");
         this.qualifier = ImmutableList.copyOf(Objects.requireNonNull(qualifier, "qualifier can not be null"));
+        this.operativeSlots = Utils.fastToImmutableList(operativeSlots);
     }
 
     @Override
@@ -124,6 +129,11 @@ public abstract class LogicalCatalogRelation extends LogicalRelation implements 
      */
     public String qualifiedName() {
         return Utils.qualifiedName(qualifier, table.getName());
+    }
+
+    @Override
+    public List<Slot> getOperativeSlots() {
+        return operativeSlots;
     }
 
     @Override

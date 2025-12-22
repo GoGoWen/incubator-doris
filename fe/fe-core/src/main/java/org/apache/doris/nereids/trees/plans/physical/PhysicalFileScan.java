@@ -25,6 +25,7 @@ import org.apache.doris.nereids.properties.LogicalProperties;
 import org.apache.doris.nereids.properties.PhysicalProperties;
 import org.apache.doris.nereids.trees.TableSample;
 import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.PlanType;
 import org.apache.doris.nereids.trees.plans.RelationId;
@@ -33,6 +34,7 @@ import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.Utils;
 import org.apache.doris.statistics.Statistics;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -55,9 +57,9 @@ public class PhysicalFileScan extends PhysicalCatalogRelation {
             DistributionSpec distributionSpec, Optional<GroupExpression> groupExpression,
             LogicalProperties logicalProperties, Set<Expression> conjuncts,
             SelectedPartitions selectedPartitions, Optional<TableSample> tableSample,
-            Optional<TableSnapshot> tableSnapshot) {
+            Optional<TableSnapshot> tableSnapshot, Collection<Slot> operativeSlots) {
         this(id, PlanType.PHYSICAL_FILE_SCAN, table, qualifier, distributionSpec, groupExpression,
-                logicalProperties, conjuncts, selectedPartitions, tableSample, tableSnapshot);
+                logicalProperties, conjuncts, selectedPartitions, tableSample, tableSnapshot, operativeSlots);
     }
 
     /**
@@ -67,10 +69,11 @@ public class PhysicalFileScan extends PhysicalCatalogRelation {
             DistributionSpec distributionSpec, Optional<GroupExpression> groupExpression,
             LogicalProperties logicalProperties, PhysicalProperties physicalProperties,
             Statistics statistics, Set<Expression> conjuncts, SelectedPartitions selectedPartitions,
-            Optional<TableSample> tableSample, Optional<TableSnapshot> tableSnapshot) {
+            Optional<TableSample> tableSample, Optional<TableSnapshot> tableSnapshot,
+            Collection<Slot> operativeSlots) {
         this(id, PlanType.PHYSICAL_FILE_SCAN, table, qualifier, distributionSpec, groupExpression,
                 logicalProperties, physicalProperties, statistics, conjuncts, selectedPartitions, tableSample,
-                tableSnapshot);
+                tableSnapshot, operativeSlots);
     }
 
     /**
@@ -80,8 +83,8 @@ public class PhysicalFileScan extends PhysicalCatalogRelation {
             DistributionSpec distributionSpec, Optional<GroupExpression> groupExpression,
             LogicalProperties logicalProperties, Set<Expression> conjuncts,
             SelectedPartitions selectedPartitions, Optional<TableSample> tableSample,
-            Optional<TableSnapshot> tableSnapshot) {
-        super(id, type, table, qualifier, groupExpression, logicalProperties);
+            Optional<TableSnapshot> tableSnapshot, Collection<Slot> operativeSlots) {
+        super(id, type, table, qualifier, groupExpression, logicalProperties, operativeSlots);
         this.distributionSpec = distributionSpec;
         this.conjuncts = conjuncts;
         this.selectedPartitions = selectedPartitions;
@@ -93,9 +96,9 @@ public class PhysicalFileScan extends PhysicalCatalogRelation {
             DistributionSpec distributionSpec, Optional<GroupExpression> groupExpression,
             LogicalProperties logicalProperties, PhysicalProperties physicalProperties,
             Statistics statistics, Set<Expression> conjuncts, SelectedPartitions selectedPartitions,
-            Optional<TableSample> tableSample, Optional<TableSnapshot> tableSnapshot) {
+            Optional<TableSample> tableSample, Optional<TableSnapshot> tableSnapshot, Collection<Slot> operativeSlots) {
         super(id, type, table, qualifier, groupExpression, logicalProperties,
-                physicalProperties, statistics);
+                physicalProperties, statistics, operativeSlots);
         this.distributionSpec = distributionSpec;
         this.conjuncts = conjuncts;
         this.selectedPartitions = selectedPartitions;
@@ -131,7 +134,8 @@ public class PhysicalFileScan extends PhysicalCatalogRelation {
                 "stats", statistics,
                 "conjuncts", conjuncts,
                 "selected partitions num",
-                selectedPartitions.isPruned ? selectedPartitions.selectedPartitions.size() : "unknown"
+                selectedPartitions.isPruned ? selectedPartitions.selectedPartitions.size() : "unknown",
+                "operativeCols", getOperativeSlots()
         );
     }
 
@@ -143,14 +147,16 @@ public class PhysicalFileScan extends PhysicalCatalogRelation {
     @Override
     public PhysicalFileScan withGroupExpression(Optional<GroupExpression> groupExpression) {
         return new PhysicalFileScan(relationId, getTable(), qualifier, distributionSpec,
-                groupExpression, getLogicalProperties(), conjuncts, selectedPartitions, tableSample, tableSnapshot);
+                groupExpression, getLogicalProperties(), conjuncts, selectedPartitions, tableSample, tableSnapshot,
+                operativeSlots);
     }
 
     @Override
     public Plan withGroupExprLogicalPropChildren(Optional<GroupExpression> groupExpression,
             Optional<LogicalProperties> logicalProperties, List<Plan> children) {
         return new PhysicalFileScan(relationId, getTable(), qualifier, distributionSpec,
-                groupExpression, logicalProperties.get(), conjuncts, selectedPartitions, tableSample, tableSnapshot);
+                groupExpression, logicalProperties.get(), conjuncts, selectedPartitions, tableSample, tableSnapshot,
+                operativeSlots);
     }
 
     @Override
@@ -163,6 +169,11 @@ public class PhysicalFileScan extends PhysicalCatalogRelation {
                                                        Statistics statistics) {
         return new PhysicalFileScan(relationId, getTable(), qualifier, distributionSpec,
                 groupExpression, getLogicalProperties(), physicalProperties, statistics, conjuncts,
-                selectedPartitions, tableSample, tableSnapshot);
+                selectedPartitions, tableSample, tableSnapshot, operativeSlots);
+    }
+
+    @Override
+    public List<Slot> getOperativeSlots() {
+        return operativeSlots;
     }
 }

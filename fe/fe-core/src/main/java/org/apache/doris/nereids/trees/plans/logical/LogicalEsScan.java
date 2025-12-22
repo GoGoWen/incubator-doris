@@ -28,6 +28,7 @@ import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.Utils;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import java.util.List;
@@ -45,7 +46,8 @@ public class LogicalEsScan extends LogicalExternalRelation {
     public LogicalEsScan(RelationId id, ExternalTable table, List<String> qualifier,
                            Optional<GroupExpression> groupExpression,
                            Optional<LogicalProperties> logicalProperties, Set<Expression> conjuncts) {
-        super(id, PlanType.LOGICAL_ES_SCAN, table, qualifier, conjuncts, groupExpression, logicalProperties);
+        super(id, PlanType.LOGICAL_ES_SCAN, table, qualifier, conjuncts, groupExpression, logicalProperties,
+                ImmutableList.of());
     }
 
     public LogicalEsScan(RelationId id, ExternalTable table, List<String> qualifier) {
