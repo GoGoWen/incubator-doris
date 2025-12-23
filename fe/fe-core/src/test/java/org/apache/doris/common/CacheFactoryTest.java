@@ -36,10 +36,37 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 public class CacheFactoryTest {
 
     private ExecutorService executor;
+
+    // Default timeout for waiting conditions (30 seconds)
+    private static final long DEFAULT_TIMEOUT_MS = 30000;
+    // Polling interval (500 ms)
+    private static final long POLL_INTERVAL_MS = 500;
+
+    /**
+     * Wait for a condition to become true, with timeout.
+     * This is more robust than Thread.sleep() under high CPU contention.
+     */
+    private void waitForCondition(Supplier<Boolean> condition, long timeoutMs) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (!condition.get() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(POLL_INTERVAL_MS);
+        }
+    }
+
+    /**
+     * Wait for counter to reach expected value, with default timeout.
+     * Adds a small buffer after condition is met to ensure cache state is fully updated.
+     */
+    private void waitForCounter(AtomicLong counter, long expectedValue) throws InterruptedException {
+        waitForCondition(() -> counter.get() >= expectedValue, DEFAULT_TIMEOUT_MS);
+        // Small buffer to ensure cache entry is fully updated after counter increment
+        Thread.sleep(100);
+    }
 
     public static class CacheValue {
         private final String value;
@@ -137,8 +164,8 @@ public class CacheFactoryTest {
         value = loadingCache.get(1);
         // refresh in background, so still get value1
         Assertions.assertEquals("value1", value.getValue());
-        // sleep longer to wait for refresh
-        Thread.sleep(2500);
+        // wait for refresh to complete (use polling instead of fixed sleep for robustness under high parallelism)
+        waitForCounter(counter, 2);
         value = loadingCache.get(1);
         Assertions.assertEquals("value1", value.getValue());
         Assertions.assertEquals(2, counter.get());
@@ -168,8 +195,8 @@ public class CacheFactoryTest {
         value = loadingCache.get(1);
         // refresh in background, so still get value1
         Assertions.assertEquals("value1", value.getValue());
-        // sleep longer to wait for refresh
-        Thread.sleep(2500);
+        // wait for refresh to complete (use polling instead of fixed sleep for robustness under high parallelism)
+        waitForCounter(counter, 2);
         value = loadingCache.get(1);
         Assertions.assertEquals("value1", value.getValue());
         // refreshed, so counter +1
@@ -237,8 +264,8 @@ public class CacheFactoryTest {
         // refresh in background, so still get value1
         Assertions.assertTrue(futureValue.isDone());
         Assertions.assertEquals("value1", futureValue.get().get().getValue());
-        // sleep longer to wait for refresh
-        Thread.sleep(6000);
+        // wait for refresh to complete (use polling instead of fixed sleep for robustness under high parallelism)
+        waitForCounter(counter, 2);
         futureValue = loadingCache.get(1);
         Assertions.assertEquals("value1", futureValue.get().get().getValue());
         // refreshed, so counter +1

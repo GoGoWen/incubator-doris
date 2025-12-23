@@ -75,6 +75,8 @@ import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 public class TabletRepairAndBalanceTest {
     private static final Logger LOG = LogManager.getLogger(TabletRepairAndBalanceTest.class);
@@ -287,7 +289,7 @@ public class TabletRepairAndBalanceTest {
         String alterStr2 = "alter table test.tbl1 modify partition p1"
                 + " set (\"replication_allocation\" = \"tag.location.zone1: 1, tag.location.zone2: 2\");";
         ExceptionChecker.expectThrowsNoException(() -> alterTable(alterStr2));
-        Thread.sleep(5000);
+        waitForCondition(() -> checkReplicaAllocation(), 5, TimeUnit.SECONDS);
         Partition p1 = tbl.getPartition("p1");
         ReplicaAllocation p1ReplicaAlloc = tbl.getPartitionInfo().getReplicaAllocation(p1.getId());
         Assert.assertEquals(3, p1ReplicaAlloc.getTotalReplicaNum());
@@ -326,7 +328,7 @@ public class TabletRepairAndBalanceTest {
         stmt = (AlterSystemStmt) UtFrameUtils.parseAndAnalyzeStmt(stmtStr, connectContext);
         DdlExecutor.execute(Env.getCurrentEnv(), stmt);
         Assert.assertEquals(tag2, be.getLocationTag());
-        Thread.sleep(5000);
+        waitForCondition(() -> checkReplicaAllocation(), 5, TimeUnit.SECONDS);
         checkTableReplicaAllocation(tbl);
         Assert.assertEquals(90, replicaMetaTable.cellSet().size());
 
@@ -388,7 +390,7 @@ public class TabletRepairAndBalanceTest {
         stmt = (AlterSystemStmt) UtFrameUtils.parseAndAnalyzeStmt(stmtStr, connectContext);
         DdlExecutor.execute(Env.getCurrentEnv(), stmt);
         Assert.assertEquals(tag1, be.getLocationTag());
-        Thread.sleep(5000);
+        waitForCondition(() -> checkReplicaAllocation(), 5, TimeUnit.SECONDS);
         tbl.checkReplicaAllocation();
 
         checkTableReplicaAllocation(colTbl1);
@@ -548,6 +550,46 @@ public class TabletRepairAndBalanceTest {
             return true;
         }
         return false;
+    }
+
+    private void waitForCondition(Supplier<Boolean> condition, long timeout, TimeUnit unit) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                if (condition.get()) {
+                    return;
+                }
+            } catch (Exception e) {
+                // ignore and retry
+            }
+            Thread.sleep(100);
+        }
+        // final attempt
+        if (!condition.get()) {
+            throw new AssertionError("Condition not satisfied within timeout: " + timeout + " " + unit);
+        }
+    }
+
+    private boolean checkReplicaAllocation() {
+        try {
+            Database db = Env.getCurrentInternalCatalog().getDbNullable("test");
+            if (db == null) {
+                return false;
+            }
+            for (org.apache.doris.catalog.Table table : db.getTables()) {
+                if (!(table instanceof OlapTable)) {
+                    continue;
+                }
+                try {
+                    ((OlapTable) table).checkReplicaAllocation();
+                } catch (UserException | NoSuchElementException e) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void testColocateTableIndexSerialization(ColocateTableIndex colocateTableIndex) throws IOException {
