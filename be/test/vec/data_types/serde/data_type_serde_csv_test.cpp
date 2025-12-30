@@ -477,4 +477,121 @@ TEST(CsvSerde, ComplexTypeSerdeCsvTest) {
         EXPECT_EQ(str, rand_s_d.to_string());
     }
 }
+
+// Test for struct deserialization when data has fewer fields than schema
+// This can happen due to Hive schema evolution (adding new columns to struct)
+TEST(CsvSerde, StructHiveTextDeserializeFewerFields) {
+    // Test case: struct<string, string, int> but data only has 2 fields
+    // This simulates Hive schema change where new fields were added to struct
+    {
+        DataTypeSerDe::FormatOptions formatOptions;
+        formatOptions.collection_delim = '\002';
+        formatOptions.map_key_delim = '\003';
+        // Initialize null_format for the fix to work properly
+        formatOptions.null_format = "\\N";
+        formatOptions.null_len = 2;
+
+        // Data only has 2 fields (field1, field2) but schema expects 3 fields
+        // The third field should be filled with null
+        string str = "hello\002world";
+
+        DataTypes struct_dataTypes;
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeString>()));
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeString>()));
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeInt32>()));
+
+        DataTypePtr data_type_ptr =
+                make_nullable(std::make_shared<DataTypeStruct>(struct_dataTypes));
+
+        auto col = data_type_ptr->create_column();
+        Slice slice(str.data(), str.size());
+        DataTypeSerDeSPtr serde = data_type_ptr->get_serde();
+
+        // This should not crash - previously it would cause SIGSEGV due to out-of-bounds access
+        Status st = serde->deserialize_one_cell_from_hive_text(*col, slice, formatOptions);
+        EXPECT_EQ(st, Status::OK());
+
+        // Verify the column has 1 row
+        EXPECT_EQ(col->size(), 1);
+
+        std::cout << "StructHiveTextDeserializeFewerFields: Successfully deserialized struct with "
+                     "fewer fields than schema"
+                  << std::endl;
+    }
+
+    // Test case: array<struct<string, string, int>> where struct data has fewer fields
+    {
+        DataTypeSerDe::FormatOptions formatOptions;
+        formatOptions.collection_delim = '\002';
+        formatOptions.map_key_delim = '\003';
+        // Initialize null_format for the fix to work properly
+        formatOptions.null_format = "\\N";
+        formatOptions.null_len = 2;
+
+        // Array with one struct element, struct has only 2 fields but schema expects 3
+        // For array<struct>, array uses \002 as delimiter (level 1), struct uses \003 (level 2)
+        string str = "hello\003world";
+
+        DataTypes struct_dataTypes;
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeString>()));
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeString>()));
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeInt32>()));
+
+        DataTypePtr struct_type =
+                make_nullable(std::make_shared<DataTypeStruct>(struct_dataTypes));
+        DataTypePtr data_type_ptr =
+                make_nullable(std::make_shared<DataTypeArray>(struct_type));
+
+        auto col = data_type_ptr->create_column();
+        Slice slice(str.data(), str.size());
+        DataTypeSerDeSPtr serde = data_type_ptr->get_serde();
+
+        // This should not crash
+        Status st = serde->deserialize_one_cell_from_hive_text(*col, slice, formatOptions);
+        EXPECT_EQ(st, Status::OK());
+
+        // Verify the column has 1 row (1 array element)
+        EXPECT_EQ(col->size(), 1);
+
+        std::cout << "StructHiveTextDeserializeFewerFields: Successfully deserialized "
+                     "array<struct> with fewer fields than schema"
+                  << std::endl;
+    }
+
+    // Test case: struct with only one field in data, schema expects 2
+    {
+        DataTypeSerDe::FormatOptions formatOptions;
+        formatOptions.collection_delim = '\002';
+        formatOptions.map_key_delim = '\003';
+        // Initialize null_format for the fix to work properly
+        formatOptions.null_format = "\\N";
+        formatOptions.null_len = 2;
+
+        // Data has only 1 field, schema expects 2 fields
+        // The second field should be filled with null
+        string str = "only_one_field";
+
+        DataTypes struct_dataTypes;
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeString>()));
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeInt32>()));
+
+        DataTypePtr data_type_ptr =
+                make_nullable(std::make_shared<DataTypeStruct>(struct_dataTypes));
+
+        auto col = data_type_ptr->create_column();
+        Slice slice(str.data(), str.size());
+        DataTypeSerDeSPtr serde = data_type_ptr->get_serde();
+
+        // This should succeed with the fix - missing field is padded with null
+        Status st = serde->deserialize_one_cell_from_hive_text(*col, slice, formatOptions);
+        EXPECT_EQ(st, Status::OK());
+
+        // Verify the column has 1 row
+        EXPECT_EQ(col->size(), 1);
+
+        std::cout << "StructHiveTextDeserializeFewerFields: Successfully deserialized struct with "
+                     "single field when schema expects two"
+                  << std::endl;
+    }
+}
 } // namespace doris::vectorized
