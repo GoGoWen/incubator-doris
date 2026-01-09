@@ -20,6 +20,7 @@ package org.apache.doris.mysql;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.ErrorCode;
+import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.mysql.ProxyProtocolHandler.ProxyProtocolResult;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.ConnectProcessor;
@@ -67,7 +68,6 @@ public class AcceptListener implements ChannelListener<AcceptingChannel<StreamCo
             }
             context.setEnv(Env.getCurrentEnv());
             connectScheduler.submit(context);
-
             try {
                 channel.getWorker().execute(() -> {
                     try {
@@ -112,10 +112,12 @@ public class AcceptListener implements ChannelListener<AcceptingChannel<StreamCo
                         ConnectProcessor processor = new MysqlConnectProcessor(context);
                         context.startAcceptQuery(processor);
                     } catch (AfterConnectedException e) {
+                        MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd(context.getQualifiedUser()).increase(1L);
                         // do not need to print log for this kind of exception.
                         // just clean up the context;
                         context.cleanup();
                     } catch (Throwable e) {
+                        MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd(context.getQualifiedUser()).increase(1L);
                         // should be unexpected exception, so print warn log
                         if (context.getCurrentUserIdentity() != null) {
                             LOG.warn("connect processor exception because ", e);

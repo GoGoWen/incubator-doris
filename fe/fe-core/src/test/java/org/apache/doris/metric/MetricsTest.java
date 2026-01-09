@@ -17,20 +17,37 @@
 
 package org.apache.doris.metric;
 
+import org.apache.doris.catalog.Env;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.util.JsonUtil;
 import org.apache.doris.monitor.jvm.JvmService;
 import org.apache.doris.monitor.jvm.JvmStats;
+import org.apache.doris.mysql.AcceptListener;
+import org.apache.doris.mysql.MysqlProto;
+import org.apache.doris.mysql.privilege.UserPropertyMgr;
+import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.service.ExecuteEnv;
 
 import com.codahale.metrics.Histogram;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
+import mockit.Delegate;
+import mockit.Expectations;
+import mockit.Injectable;
+import mockit.Mock;
+import mockit.MockUp;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.xnio.Option;
+import org.xnio.StreamConnection;
+import org.xnio.XnioWorker;
+import org.xnio.channels.AcceptingChannel;
 
+import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -162,5 +179,78 @@ public class MetricsTest {
         }));
         Assert.assertTrue(size.get() < JsonUtil.parseArray(finalMetricJson).size());
 
+    }
+
+    @Test
+    public void testConnectionMetrics(@Injectable AcceptingChannel<StreamConnection> channel,
+            @Injectable StreamConnection streamConnection,
+            @Injectable XnioWorker xnioWorker) throws InterruptedException, IOException {
+        Assert.assertEquals(0L,
+                MetricRepo.USER_GAUGE_CONNECTION_NUM.getOrAdd("user1").getValue().longValue());
+        ConnectContext connectContext = new ConnectContext();
+        connectContext.setQualifiedUser("user1");
+        connectContext.setEnv(Env.getCurrentEnv());
+        new MockUp<UserPropertyMgr>() {
+            @Mock
+            public long getMaxConn(String qualifiedUser) {
+                return 3L;
+            }
+        };
+        ExecuteEnv.getInstance().getScheduler().registerConnection(connectContext);
+        Assert.assertEquals(1L,
+                MetricRepo.USER_GAUGE_CONNECTION_NUM.getOrAdd("user1").getValue().longValue());
+        MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd("user1").increase(1L);
+        MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd("user1").increase(1L);
+        MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd("user2").increase(1L);
+        Assert.assertEquals(2L,
+                MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd("user1").getValue().longValue());
+        Assert.assertEquals(1L,
+                MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd("user2").getValue().longValue());
+        Assert.assertEquals(0L,
+                MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd("user3").getValue().longValue());
+
+        final Runnable[] capturedRunnable = new Runnable[1];
+        new Expectations() {
+            {
+                channel.accept();
+                result = streamConnection;
+
+                streamConnection.setOption((Option<Boolean>) any, (Boolean) any);
+                result = true;
+
+                streamConnection.getPeerAddress();
+                result = new InetSocketAddress("127.0.0.1", 8890);
+
+                channel.getWorker();
+                result = xnioWorker;
+
+                xnioWorker.execute((Runnable) any);
+                result = new Delegate<Void>() {
+                    void execute(Runnable command) {
+                        capturedRunnable[0] = command;
+                    }
+                };
+            }
+        };
+
+        new MockUp<MysqlProto>() {
+            @Mock
+            public boolean negotiate(ConnectContext context) {
+                context.setQualifiedUser("user3");
+                return false;
+            }
+
+            @Mock
+            public void sendResponsePacket(ConnectContext context) {
+            }
+        };
+
+        AcceptListener acceptListener = new AcceptListener(ExecuteEnv.getInstance().getScheduler());
+        acceptListener.handleEvent(channel);
+        if (capturedRunnable[0] != null) {
+            capturedRunnable[0].run();
+        }
+        Assert.assertEquals(1L,
+                MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd("user3").getValue().longValue());
     }
 }
