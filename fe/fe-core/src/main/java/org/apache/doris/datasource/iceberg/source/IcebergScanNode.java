@@ -37,6 +37,7 @@ import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
 import org.apache.doris.datasource.iceberg.IcebergExternalTable;
 import org.apache.doris.datasource.iceberg.IcebergUtils;
+import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
@@ -221,7 +222,7 @@ public class IcebergScanNode extends FileQueryScanNode {
         long realFileSplitSize = getRealFileSplitSize(DEFAULT_SPLIT_SIZE);
 
         try {
-            long totalFileSize = 0;
+            long totalFileSize = 0L;
             HashSet<String> partitionCheckSet = new HashSet<>();
             ExecutorService executor = Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor();
             CloseableIterable<FileScanTask> plannedFiles = scan.planWith(executor).planFiles();
@@ -245,6 +246,7 @@ public class IcebergScanNode extends FileQueryScanNode {
             if (ConnectContext.get() != null) {
                 ConnectContext.get().addToTotalScanBytes(totalFileSize);
             }
+            MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.increase(totalFileSize);
             if (partitionCheckSet.size() > Config.max_selected_partition_num_for_lakehouse_table) {
                 TableIf table = getTargetTable();
                 plannedFiles.close();

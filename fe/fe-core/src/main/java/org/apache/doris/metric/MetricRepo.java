@@ -100,8 +100,12 @@ public final class MetricRepo {
     public static LongCounterMetric COUNTER_ANALYSIS_ERR;
     public static LongCounterMetric COUNTER_QUERY_TABLE;
     public static LongCounterMetric COUNTER_QUERY_OLAP_TABLE;
-    public static LongCounterMetric COUNTER_QUERY_HIVE_TABLE;
-    public static LongCounterMetric COUNTER_LARGE_QUERY_FOR_HIVE_TABLE;
+    public static LongCounterMetric COUNTER_QUERY_HMS_TABLE;
+    public static LongCounterMetric COUNTER_LARGE_QUERY_HMS_TABLE;
+    public static AutoMappedMetric<LongCounterMetric> COUNTER_HMS_TABLE;
+    public static LongCounterMetric COUNTER_HMS_SPLIT;
+    public static LongCounterMetric COUNTER_HMS_PARTITION;
+    public static LongCounterMetric COUNTER_HMS_SCAN_SIZE_BYTES;
     public static AutoMappedMetric<LongCounterMetric> USER_COUNTER_QUERY_ALL;
     public static AutoMappedMetric<LongCounterMetric> USER_COUNTER_QUERY_ERR;
     public static AutoMappedMetric<GaugeMetricImpl<Integer>> USER_GAUGE_CONNECTION_NUM;
@@ -335,12 +339,28 @@ public final class MetricRepo {
         COUNTER_QUERY_OLAP_TABLE = new LongCounterMetric("query_olap_table", MetricUnit.REQUESTS,
                 "total query from olap table");
         DORIS_METRIC_REGISTER.addMetrics(COUNTER_QUERY_OLAP_TABLE);
-        COUNTER_QUERY_HIVE_TABLE = new LongCounterMetric("query_hive_table", MetricUnit.REQUESTS,
-                "total query from hive table");
-        DORIS_METRIC_REGISTER.addMetrics(COUNTER_QUERY_HIVE_TABLE);
-        COUNTER_LARGE_QUERY_FOR_HIVE_TABLE = new LongCounterMetric("large_query_for_hive_table", MetricUnit.REQUESTS,
+        COUNTER_QUERY_HMS_TABLE = new LongCounterMetric("query_hms_table", MetricUnit.REQUESTS,
+                "total query from hms table");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_QUERY_HMS_TABLE);
+        COUNTER_LARGE_QUERY_HMS_TABLE = new LongCounterMetric("large_query_hms_table", MetricUnit.REQUESTS,
                 "total large query from hive table");
-        DORIS_METRIC_REGISTER.addMetrics(COUNTER_LARGE_QUERY_FOR_HIVE_TABLE);
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_LARGE_QUERY_HMS_TABLE);
+        COUNTER_HMS_TABLE = new AutoMappedMetric<>(typeName -> {
+            LongCounterMetric hmsTableCounter  = new LongCounterMetric("counter_hms_table", MetricUnit.REQUESTS,
+                    "total hms table counter");
+            hmsTableCounter.addLabel(new MetricLabel("type", typeName));
+            DORIS_METRIC_REGISTER.addMetrics(hmsTableCounter);
+            return hmsTableCounter;
+        });
+        COUNTER_HMS_PARTITION = new LongCounterMetric("counter_hms_partition", MetricUnit.REQUESTS,
+                "total hms partition counter");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_HMS_PARTITION);
+        COUNTER_HMS_SPLIT = new LongCounterMetric("counter_hms_split", MetricUnit.REQUESTS,
+                "total hms split counter");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_HMS_SPLIT);
+        COUNTER_HMS_SCAN_SIZE_BYTES = new LongCounterMetric("counter_hms_scan_size_bytes", MetricUnit.BYTES,
+                "total hms scan size bytes");
+        DORIS_METRIC_REGISTER.addMetrics(COUNTER_HMS_SCAN_SIZE_BYTES);
         USER_COUNTER_QUERY_ALL = new AutoMappedMetric<>(name -> {
             LongCounterMetric userCountQueryAll  = new LongCounterMetric("query_total", MetricUnit.REQUESTS,
                     "total query for single user");

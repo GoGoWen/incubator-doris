@@ -47,6 +47,7 @@ import org.apache.doris.datasource.hive.HivePartition;
 import org.apache.doris.datasource.hive.HiveProperties;
 import org.apache.doris.datasource.hive.HiveTransaction;
 import org.apache.doris.datasource.hive.source.HiveSplit.HiveSplitCreator;
+import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.nereids.trees.plans.logical.LogicalFileScan.SelectedPartitions;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
@@ -526,6 +527,7 @@ public class HiveScanNode extends FileQueryScanNode {
         if (ConnectContext.get() != null) {
             ConnectContext.get().addToTotalScanBytes(selectedFileSize);
         }
+        MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.increase(selectedFileSize);
         return selectedFileSize;
     }
 

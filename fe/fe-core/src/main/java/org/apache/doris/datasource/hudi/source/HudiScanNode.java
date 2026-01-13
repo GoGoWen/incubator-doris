@@ -36,6 +36,7 @@ import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
 import org.apache.doris.datasource.hive.HivePartition;
 import org.apache.doris.datasource.hive.source.HiveScanNode;
 import org.apache.doris.datasource.hudi.HudiUtils;
+import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.ConnectContext;
@@ -457,20 +458,21 @@ public class HudiScanNode extends HiveScanNode {
             throw new AnalysisException("Failed to process partitions: " + t.getMessage(), t);
         }
 
-        long totalSize = 0;
+        long totalFileSize = 0L;
         for (PartitionMetadata metadata : metadataList) {
-            totalSize += metadata.totalSize;
+            totalFileSize += metadata.totalSize;
         }
 
-        if (totalSize > Config.max_selected_total_file_size_for_lakehouse_table) {
-            throw new AnalysisException("the total scan bytes: " + totalSize
+        if (totalFileSize > Config.max_selected_total_file_size_for_lakehouse_table) {
+            throw new AnalysisException("the total scan bytes: " + totalFileSize
                 + " for " + hmsTable.getDbName() + "." + hmsTable.getName()
                 + " has exceed max bytes for single hudi table: "
                 + Config.max_selected_total_file_size_for_lakehouse_table);
         }
         if (ConnectContext.get() != null) {
-            ConnectContext.get().addToTotalScanBytes(totalSize);
+            ConnectContext.get().addToTotalScanBytes(totalFileSize);
         }
+        MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.increase(totalFileSize);
     }
 
     @Override

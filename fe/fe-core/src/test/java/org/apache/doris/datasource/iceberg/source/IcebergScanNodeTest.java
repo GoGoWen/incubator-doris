@@ -23,14 +23,17 @@ import org.apache.doris.analysis.TupleId;
 import org.apache.doris.catalog.DatabaseIf;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
+import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.ThreadPoolManager;
 import org.apache.doris.common.UserException;
 import org.apache.doris.datasource.CatalogProperty;
 import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
 import org.apache.doris.datasource.iceberg.IcebergExternalTable;
+import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
+import org.apache.doris.system.SystemInfoService;
 
 import com.alibaba.ttl.threadpool.TtlExecutors;
 import mockit.Mock;
@@ -69,11 +72,12 @@ public class IcebergScanNodeTest {
 
     @BeforeClass
     public static void setUpClass() {
-        // Initialize Config values that might be used
+        FeConstants.runningUnitTest = true;
+        MetricRepo.init();
+
         Config.max_selected_total_file_size_for_lakehouse_table = 10737418240L; // 10GB default
         Config.max_selected_partition_num_for_lakehouse_table = 1024; // Default value
 
-        // Mock ConnectContext to provide necessary global state
         new MockUp<org.apache.doris.qe.ConnectContext>() {
             @Mock
             public org.apache.doris.qe.ConnectContext get() {
@@ -126,6 +130,7 @@ public class IcebergScanNodeTest {
                 Mockito.when(icebergCache.getIcebergTable(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(mockTable);
 
                 Mockito.when(env.getExtMetaCacheMgr()).thenReturn(cacheMgr);
+                Mockito.when(env.getClusterInfo()).thenReturn(new SystemInfoService());
                 ExecutorService fileListingExecutor = TtlExecutors.getTtlExecutorService(
                         ThreadPoolManager.newDaemonFixedThreadPool(
                         Config.max_external_file_cache_loader_thread_pool_size,

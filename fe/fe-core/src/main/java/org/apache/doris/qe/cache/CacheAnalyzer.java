@@ -44,6 +44,8 @@ import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.datasource.CatalogIf;
 import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.source.HiveScanNode;
+import org.apache.doris.datasource.hudi.source.HudiScanNode;
+import org.apache.doris.datasource.iceberg.source.IcebergScanNode;
 import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.nereids.NereidsPlanner;
 import org.apache.doris.nereids.SqlCacheContext;
@@ -60,6 +62,7 @@ import org.apache.doris.qe.RowBatch;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.thrift.TUniqueId;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.commons.collections.CollectionUtils;
@@ -470,26 +473,40 @@ public class CacheAnalyzer {
         return CacheMode.None;
     }
 
-    private List<CacheTable> buildCacheTableList() {
+    @VisibleForTesting
+    public List<CacheTable> buildCacheTableList() {
         //Check the last version time of the table
         MetricRepo.COUNTER_QUERY_TABLE.increase(1L);
-        long olapScanNodeSize = 0;
-        long hiveScanNodeSize = 0;
+        int olapScanNodeSize = 0;
+        int hiveScanNodeSize = 0;
+        int hudiScanNodeSize = 0;
+        int icebergScanNodeSize = 0;
         for (ScanNode scanNode : scanNodes) {
             if (scanNode instanceof OlapScanNode) {
                 olapScanNodeSize++;
+            } else if (scanNode instanceof HudiScanNode) {
+                hudiScanNodeSize++;
             } else if (scanNode instanceof HiveScanNode) {
                 hiveScanNodeSize++;
+            } else if (scanNode instanceof IcebergScanNode) {
+                icebergScanNodeSize++;
             }
         }
         if (olapScanNodeSize > 0) {
             MetricRepo.COUNTER_QUERY_OLAP_TABLE.increase(1L);
         }
         if (hiveScanNodeSize > 0) {
-            MetricRepo.COUNTER_QUERY_HIVE_TABLE.increase(1L);
+            MetricRepo.COUNTER_HMS_TABLE.getOrAdd("hive").increase((long) hiveScanNodeSize);
+        }
+        if (hudiScanNodeSize > 0) {
+            MetricRepo.COUNTER_HMS_TABLE.getOrAdd("hudi").increase((long) hudiScanNodeSize);
+        }
+        if (icebergScanNodeSize > 0) {
+            MetricRepo.COUNTER_HMS_TABLE.getOrAdd("iceberg").increase((long) icebergScanNodeSize);
         }
 
-        if (!(olapScanNodeSize == scanNodes.size() || hiveScanNodeSize == scanNodes.size())) {
+        if (!(olapScanNodeSize == scanNodes.size()
+                || hiveScanNodeSize + hudiScanNodeSize + icebergScanNodeSize == scanNodes.size())) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("only support olap/hive table with non-federated query, other types are not supported now, "
                         + "queryId {}", DebugUtil.printId(queryId));

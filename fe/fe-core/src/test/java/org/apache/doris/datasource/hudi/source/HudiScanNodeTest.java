@@ -25,6 +25,7 @@ import org.apache.doris.catalog.PartitionItem;
 import org.apache.doris.catalog.Type;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
+import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.datasource.ExternalCatalog;
@@ -34,6 +35,7 @@ import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.HiveMetaStoreClientHelper;
 import org.apache.doris.datasource.hive.HivePartition;
 import org.apache.doris.datasource.hive.source.HiveScanNode;
+import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.planner.ListPartitionPrunerV2;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.ConnectContext;
@@ -65,6 +67,7 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.org.apache.avro.Schema;
 import org.apache.hudi.org.apache.avro.Schema.Field;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.MockedStatic;
@@ -87,8 +90,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class HudiScanNodeTest {
 
-    // Note: Static mocking is handled at the test method level using Mockito MockedStatic
-    // This provides better control and avoids checkstyle issues with JMockit $init pattern
+    @BeforeClass
+    public static void setUp() {
+        FeConstants.runningUnitTest = true;
+        MetricRepo.init();
+    }
 
     @Test
     public void testDoInitialize(@Injectable SessionVariable sessionVariable,

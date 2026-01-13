@@ -2063,7 +2063,7 @@ public class Config extends ConfigBase {
      * Max thread pool size for loading external file meta cache
      */
     @ConfField(mutable = false, masterOnly = false)
-    public static int max_external_file_cache_loader_thread_pool_for_many_partitions_size = 2048;
+    public static int max_external_file_cache_loader_thread_pool_for_many_partitions_size = 4096;
 
 
     @ConfField(mutable = true, masterOnly = false,  description = {"提示许多分区的阈值",

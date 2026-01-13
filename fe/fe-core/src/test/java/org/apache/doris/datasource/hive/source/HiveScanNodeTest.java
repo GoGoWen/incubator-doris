@@ -22,6 +22,7 @@ import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.analysis.TupleId;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
+import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.datasource.ExternalCatalog;
 import org.apache.doris.datasource.FileScanNode;
@@ -29,6 +30,7 @@ import org.apache.doris.datasource.hive.HMSExternalTable;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache.FileCacheValue;
 import org.apache.doris.datasource.hive.HivePartition;
 import org.apache.doris.fs.remote.RemoteFile;
+import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.qe.BDPAuthContext;
 import org.apache.doris.qe.ConnectContext;
@@ -49,6 +51,7 @@ import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
@@ -58,6 +61,12 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class HiveScanNodeTest {
+
+    @BeforeClass
+    public static void setUp() {
+        FeConstants.runningUnitTest = true;
+        MetricRepo.init();
+    }
 
     @Test
     public void testGetFileSplitSize(@Injectable SessionVariable sessionVariable,
@@ -98,68 +107,87 @@ public class HiveScanNodeTest {
         context.setThreadLocalInfo();
         try {
             context.resetTotalScanBytes();
+            MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.reset();
             long fileSplitSize = scanNode.getFileSplitSize(fileCaches, false);
             Assertions.assertEquals(FileScanNode.DEFAULT_SPLIT_SIZE, fileSplitSize);
             Assertions.assertEquals(1024, context.getTotalScanBytes());
+            Assertions.assertEquals(1024, MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.getValue().longValue());
         } catch (Exception e) {
             Assertions.fail(e);
         }
 
         try {
             context.resetTotalScanBytes();
+            MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.reset();
             long fileSplitSize = scanNode.getFileSplitSize(fileCaches, true);
             Assertions.assertEquals(FileScanNode.TINY_SPLIT_FILE_SIZE, fileSplitSize);
             Assertions.assertEquals(1024, context.getTotalScanBytes());
+            Assertions.assertEquals(1024, MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.getValue().longValue());
         } catch (Exception e) {
             Assertions.fail(e);
         }
 
         try {
             context.resetTotalScanBytes();
+            MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.reset();
             fileCaches.get(0).getFiles().get(0).setLength(Config.file_size_range_to_decide_split_size[0] + 1);
             long fileSplitSize = scanNode.getFileSplitSize(fileCaches, true);
             Assertions.assertEquals(FileScanNode.SMALL_SPLIT_FILE_SIZE, fileSplitSize);
             Assertions.assertEquals(Config.file_size_range_to_decide_split_size[0] + 1, context.getTotalScanBytes());
+            Assertions.assertEquals(Config.file_size_range_to_decide_split_size[0] + 1,
+                    MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.getValue().longValue());
         } catch (Exception e) {
             Assertions.fail(e);
         }
 
         try {
             context.resetTotalScanBytes();
+            MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.reset();
             fileCaches.get(0).getFiles().get(0).setLength(Config.file_size_range_to_decide_split_size[1] + 1);
             long fileSplitSize = scanNode.getFileSplitSize(fileCaches, true);
             Assertions.assertEquals(FileScanNode.MEDIUM_SPLIT_FILE_SIZE, fileSplitSize);
             Assertions.assertEquals(Config.file_size_range_to_decide_split_size[1] + 1, context.getTotalScanBytes());
+            Assertions.assertEquals(Config.file_size_range_to_decide_split_size[1] + 1,
+                    MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.getValue().longValue());
         } catch (Exception e) {
             Assertions.fail(e);
         }
 
         try {
             context.resetTotalScanBytes();
+            MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.reset();
             fileCaches.get(0).getFiles().get(0).setLength(Config.file_size_range_to_decide_split_size[2] + 1);
             long fileSplitSize = scanNode.getFileSplitSize(fileCaches, true);
             Assertions.assertEquals(FileScanNode.LARGE_SPLIT_FILE_SIZE, fileSplitSize);
             Assertions.assertEquals(Config.file_size_range_to_decide_split_size[2] + 1, context.getTotalScanBytes());
+            Assertions.assertEquals(Config.file_size_range_to_decide_split_size[2] + 1,
+                    MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.getValue().longValue());
         } catch (Exception e) {
             Assertions.fail(e);
         }
 
         try {
             context.resetTotalScanBytes();
+            MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.reset();
             fileCaches.get(0).getFiles().get(0).setLength(Config.file_size_range_to_decide_split_size[3] + 1);
             long fileSplitSize = scanNode.getFileSplitSize(fileCaches, true);
             Assertions.assertEquals(FileScanNode.HUGE_SPLIT_FILE_SIZE, fileSplitSize);
             Assertions.assertEquals(Config.file_size_range_to_decide_split_size[3] + 1, context.getTotalScanBytes());
+            Assertions.assertEquals(Config.file_size_range_to_decide_split_size[3] + 1,
+                    MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.getValue().longValue());
         } catch (Exception e) {
             Assertions.fail(e);
         }
 
         try {
             context.resetTotalScanBytes();
+            MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.reset();
             fileCaches.get(0).getFiles().get(0).setLength(Config.file_size_range_to_decide_split_size[4] + 1);
             long fileSplitSize = scanNode.getFileSplitSize(fileCaches, true);
             Assertions.assertEquals(FileScanNode.DEFAULT_SPLIT_SIZE, fileSplitSize);
             Assertions.assertEquals(Config.file_size_range_to_decide_split_size[4] + 1, context.getTotalScanBytes());
+            Assertions.assertEquals(Config.file_size_range_to_decide_split_size[4] + 1,
+                    MetricRepo.COUNTER_HMS_SCAN_SIZE_BYTES.getValue().longValue());
         } catch (Exception e) {
             Assertions.fail(e);
         }

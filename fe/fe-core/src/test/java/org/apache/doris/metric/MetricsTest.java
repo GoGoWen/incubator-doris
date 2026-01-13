@@ -17,15 +17,23 @@
 
 package org.apache.doris.metric;
 
+import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.util.JsonUtil;
+import org.apache.doris.datasource.hive.source.HiveScanNode;
+import org.apache.doris.datasource.hudi.source.HudiScanNode;
+import org.apache.doris.datasource.iceberg.source.IcebergScanNode;
+import org.apache.doris.datasource.jdbc.source.JdbcScanNode;
 import org.apache.doris.monitor.jvm.JvmService;
 import org.apache.doris.monitor.jvm.JvmStats;
 import org.apache.doris.mysql.AcceptListener;
 import org.apache.doris.mysql.MysqlProto;
 import org.apache.doris.mysql.privilege.UserPropertyMgr;
+import org.apache.doris.planner.ScanNode;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.cache.CacheAnalyzer;
+import org.apache.doris.qe.cache.CacheAnalyzer.CacheTable;
 import org.apache.doris.service.ExecuteEnv;
 
 import com.codahale.metrics.Histogram;
@@ -48,6 +56,7 @@ import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -252,5 +261,25 @@ public class MetricsTest {
         }
         Assert.assertEquals(1L,
                 MetricRepo.USER_COUNTER_CONNECTION_ERR.getOrAdd("user3").getValue().longValue());
+    }
+
+    @Test
+    public void testQueryTable(@Injectable ConnectContext connectContext,
+            @Injectable StatementBase statementBase,
+            @Injectable HiveScanNode hiveScanNode,
+            @Injectable HudiScanNode hudiScanNode,
+            @Injectable IcebergScanNode icebergScanNode,
+            @Injectable JdbcScanNode jdbcScanNode) {
+        List<ScanNode> scanNodeList = new ArrayList<>();
+        scanNodeList.add(hiveScanNode);
+        scanNodeList.add(hudiScanNode);
+        scanNodeList.add(icebergScanNode);
+        scanNodeList.add(jdbcScanNode);
+        CacheAnalyzer cacheAnalyzer = new CacheAnalyzer(connectContext, statementBase, scanNodeList);
+        List<CacheTable> cacheTables = cacheAnalyzer.buildCacheTableList();
+        Assert.assertTrue(cacheTables.isEmpty());
+        Assert.assertEquals(1L, MetricRepo.COUNTER_HMS_TABLE.getOrAdd("hive").getValue().longValue());
+        Assert.assertEquals(1L, MetricRepo.COUNTER_HMS_TABLE.getOrAdd("hudi").getValue().longValue());
+        Assert.assertEquals(1L, MetricRepo.COUNTER_HMS_TABLE.getOrAdd("iceberg").getValue().longValue());
     }
 }

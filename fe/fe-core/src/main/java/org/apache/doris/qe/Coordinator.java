@@ -679,7 +679,7 @@ public class Coordinator implements CoordInterface {
             if (Config.enable_workload_group) {
                 this.setTWorkloadGroups(context.getEnv().getWorkloadGroupMgr().getWorkloadGroup(context));
                 if (context.getWorkloadGroupName().equalsIgnoreCase(WorkloadGroupMgr.LARGE_QUERY_GROUP_NAME)) {
-                    MetricRepo.COUNTER_LARGE_QUERY_FOR_HIVE_TABLE.increase(1L);
+                    MetricRepo.COUNTER_LARGE_QUERY_HMS_TABLE.increase(1L);
                 }
                 boolean shouldQueue = this.shouldQueue();
                 if (shouldQueue) {
