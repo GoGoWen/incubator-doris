@@ -24,6 +24,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/runtime_state.h"
 #include "runtime/types.h"
+#include "util/runtime_profile.h"
 #include "vec/core/types.h"
 
 namespace doris {
@@ -66,7 +67,18 @@ HudiJniReader::HudiJniReader(const TFileScanRangeParams& scan_params,
             {"input_format", _hudi_params.input_format}};
 
     params["HADOOP_USER_NAME"] = scan_params.hdfs_params.user;
-    params["hudi_init_reader_timeout_ms"] = std::to_string(config::hudi_init_reader_timeout_ms);
+    // Use session variable if set, otherwise fallback to BE config
+    int64_t timeout_ms = config::hudi_init_reader_timeout_ms;
+    if (_state->query_options().__isset.hudi_init_reader_timeout_ms) {
+        if (_state->query_options().hudi_init_reader_timeout_ms >= 0) {
+            // Use explicitly set value
+            timeout_ms = _state->query_options().hudi_init_reader_timeout_ms;
+        } else {
+            // -1 means use default: half of query_timeout in milliseconds
+            timeout_ms = _state->query_options().query_timeout * 500;
+        }
+    }
+    params["hudi_init_reader_timeout_ms"] = std::to_string(timeout_ms);
     params["hoodie_memory_spillable_map_path"] = config::hoodie_memory_spillable_map_path;
     for (const THdfsConf& conf : scan_params.hdfs_params.hdfs_conf) {
         if (conf.key == "HADOOP_USER_TOKEN") {
@@ -107,6 +119,13 @@ Status HudiJniReader::get_columns(std::unordered_map<std::string, TypeDescriptor
 Status HudiJniReader::init_reader(
         std::unordered_map<std::string, ColumnValueRangeType>* colname_to_value_range) {
     _colname_to_value_range = colname_to_value_range;
+
+    // Add metric for monitoring hudi init reader time
+    if (_profile != nullptr && _hudi_init_reader_timer == nullptr) {
+        _hudi_init_reader_timer = ADD_TIMER(_profile, "HudiInitReaderTime");
+    }
+
+    SCOPED_TIMER(_hudi_init_reader_timer);
     RETURN_IF_ERROR(_jni_connector->init(colname_to_value_range));
     return _jni_connector->open(_state, _profile);
 }

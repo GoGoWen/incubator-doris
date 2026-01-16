@@ -339,6 +339,7 @@ struct TQueryOptions {
   137: optional i64 orc_tiny_stripe_threshold = 8388608;
   138: optional i64 orc_once_max_read_size = 8388608;
   139: optional i64 orc_max_merge_distance = 1048576;
+  140: optional i64 hudi_init_reader_timeout_ms = -1;
 
   // For cloud, to control if the content would be written into file cache
   1000: optional bool disable_file_cache = false

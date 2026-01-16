@@ -66,6 +66,7 @@ private:
     const TFileScanRangeParams& _scan_params;
     const THudiFileDesc& _hudi_params;
     std::unordered_map<std::string, ColumnValueRangeType>* _colname_to_value_range;
+    RuntimeProfile::Counter* _hudi_init_reader_timer = nullptr;
 };
 
 } // namespace doris::vectorized

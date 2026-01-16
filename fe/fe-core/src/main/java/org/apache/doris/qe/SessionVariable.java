@@ -85,6 +85,7 @@ public class SessionVariable implements Serializable, Writable {
     public static final String SCANNER_SCALE_UP_RATIO = "scanner_scale_up_ratio";
     public static final String QUERY_TIMEOUT = "query_timeout";
     public static final String ANALYZE_TIMEOUT = "analyze_timeout";
+    public static final String HUDI_INIT_READER_TIMEOUT_MS = "hudi_init_reader_timeout_ms";
 
     public static final String MAX_EXECUTION_TIME = "max_execution_time";
     public static final String INSERT_TIMEOUT = "insert_timeout";
@@ -733,6 +734,10 @@ public class SessionVariable implements Serializable, Writable {
 
     @VariableMgr.VarAttr(name = INSERT_TIMEOUT)
     public int insertTimeoutS = 14400;
+
+    // Hudi init reader timeout in milliseconds. Default is half of query_timeout.
+    @VariableMgr.VarAttr(name = HUDI_INIT_READER_TIMEOUT_MS, needForward = true)
+    private int hudiInitReaderTimeoutMs = -1; // -1 means use default (query_timeout / 2)
 
     // if true, need report to coordinator when plan fragment execute successfully.
     @VariableMgr.VarAttr(name = ENABLE_PROFILE, needForward = true)
@@ -2426,6 +2431,30 @@ public class SessionVariable implements Serializable, Writable {
         this.insertTimeoutS = insertTimeoutS;
     }
 
+    public int getHudiInitReaderTimeoutMs() {
+        // If not set (default -1), return half of query_timeout in milliseconds
+        if (hudiInitReaderTimeoutMs == -1) {
+            return queryTimeoutS * 500; // queryTimeoutS is in seconds, convert to milliseconds and divide by 2
+        }
+        return hudiInitReaderTimeoutMs;
+    }
+
+    public void setHudiInitReaderTimeoutMs(int hudiInitReaderTimeoutMs) {
+        if (hudiInitReaderTimeoutMs < 0 && hudiInitReaderTimeoutMs != -1) {
+            LOG.warn("Setting invalid hudi_init_reader_timeout_ms: {}", hudiInitReaderTimeoutMs);
+        }
+        this.hudiInitReaderTimeoutMs = hudiInitReaderTimeoutMs;
+    }
+
+    public void setHudiInitReaderTimeoutMs(String hudiInitReaderTimeoutMs) {
+        try {
+            int value = Integer.parseInt(hudiInitReaderTimeoutMs);
+            setHudiInitReaderTimeoutMs(value);
+        } catch (NumberFormatException e) {
+            LOG.warn("Invalid hudi_init_reader_timeout_ms value: {}", hudiInitReaderTimeoutMs);
+        }
+    }
+
     public boolean enableProfile() {
         return enableProfile;
     }
@@ -3888,6 +3917,7 @@ public class SessionVariable implements Serializable, Writable {
         queryOptions.setQueryTimeout(queryTimeoutS);
         queryOptions.setInsertTimeout(insertTimeoutS);
         queryOptions.setAnalyzeTimeout(analyzeTimeoutS);
+        queryOptions.setHudiInitReaderTimeoutMs(getHudiInitReaderTimeoutMs());
         return queryOptions;
     }
 

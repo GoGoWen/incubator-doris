@@ -98,8 +98,8 @@ DEFINE_String(mem_limit, "90%");
 // Soft memory limit as a fraction of hard memory limit.
 DEFINE_Double(soft_mem_limit_frac, "0.9");
 
-// Hudi MOR init reader timeout (ms), default 30000
-DEFINE_mInt64(hudi_init_reader_timeout_ms, "30000");
+// Hudi MOR init reader timeout (ms), default 60000
+DEFINE_mInt64(hudi_init_reader_timeout_ms, "60000");
 
 // Many modern allocators (for example, tcmalloc) do not do a mremap for
 // realloc, even in case of large enough chunks of memory. Although this allows

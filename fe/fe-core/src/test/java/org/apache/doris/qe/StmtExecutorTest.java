@@ -49,6 +49,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java_cup.runtime.Symbol;
 import mockit.Expectations;
+import mockit.Mock;
+import mockit.MockUp;
 import mockit.Mocked;
 import org.junit.Assert;
 import org.junit.Before;
@@ -184,6 +186,17 @@ public class StmtExecutorTest {
                            @Mocked Profile profile) throws Exception {
         Env env = Env.getCurrentEnv();
         Deencapsulation.setField(env, "canRead", new AtomicBoolean(true));
+
+        // Create TQueryOptions outside Expectations block to avoid JMockit bytecode issues
+        TQueryOptions queryOptions = new TQueryOptions();
+
+        // Use MockUp to mock Coordinator.getQueryOptions() to avoid JMockit bytecode issues
+        new MockUp<Coordinator>() {
+            @Mock
+            public TQueryOptions getQueryOptions() {
+                return queryOptions;
+            }
+        };
 
         new Expectations() {
             {

@@ -57,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -112,9 +111,9 @@ public class HadoopHudiJniScanner extends JniScanner {
     public static int HUDI_READER_INIT_MAXIMUM_THREAD_NUM = 256;
     public static int HUDI_READER_INIT_QUEUE_CAPACITY = 102400;
 
-    private static final ExecutorService hudiReaderInitExecutorService = buildHudiReaderInitExecutor();
+    private static final ThreadPoolExecutor hudiReaderInitExecutorService = buildHudiReaderInitExecutor();
 
-    private static ExecutorService buildHudiReaderInitExecutor() {
+    private static ThreadPoolExecutor buildHudiReaderInitExecutor() {
         BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(HUDI_READER_INIT_QUEUE_CAPACITY);
         ThreadFactory threadFactory = new ThreadFactoryBuilder()
                 .setDaemon(true)
@@ -360,7 +359,9 @@ public class HadoopHudiJniScanner extends JniScanner {
             reader = buildReaderFuture.get(initReaderTimeoutMs, TimeUnit.MILLISECONDS);
         } catch (Exception ex) {
             buildReaderFuture.cancel(true);
-            LOG.warn("Failed to init Hudi RecordReader", ex);
+            LOG.warn("Failed to init Hudi RecordReader, size of query: {}, size of running threads: {}, hudiSplit: {}",
+                    hudiReaderInitExecutorService.getQueue().size(),
+                    hudiReaderInitExecutorService.getActiveCount(), hudiSplit, ex);
             throw ex;
         }
 
