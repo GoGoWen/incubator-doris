@@ -29,6 +29,7 @@
 #include "vec/data_types/serde/data_type_serde.h"
 #include "vec/data_types/serde_utils.h"
 #include "vec/io/reader_buffer.h"
+#include "vec/exec/format/file_reader/new_plain_text_line_reader.h"
 
 namespace doris::vectorized {
 // This test aim to make sense for csv serde of data types.
@@ -481,8 +482,6 @@ TEST(CsvSerde, ComplexTypeSerdeCsvTest) {
 // Test for struct deserialization when data has fewer fields than schema
 // This can happen due to Hive schema evolution (adding new columns to struct)
 TEST(CsvSerde, StructHiveTextDeserializeFewerFields) {
-    // Test case: struct<string, string, int> but data only has 2 fields
-    // This simulates Hive schema change where new fields were added to struct
     {
         DataTypeSerDe::FormatOptions formatOptions;
         formatOptions.collection_delim = '\002';
@@ -591,6 +590,256 @@ TEST(CsvSerde, StructHiveTextDeserializeFewerFields) {
 
         std::cout << "StructHiveTextDeserializeFewerFields: Successfully deserialized struct with "
                      "single field when schema expects two"
+                  << std::endl;
+    }
+}
+
+// Test for EncloseCsvLineReaderContext with zero/one column separators
+TEST(CsvSerde, EncloseCsvLineReaderContextZeroColSepTest) {
+    {
+        std::string line_delimiter = "\n";
+        std::string column_sep = ",";
+        size_t col_sep_num = 0;  // This simulates empty _file_slot_descs
+
+        auto ctx = std::make_shared<EncloseCsvLineReaderContext>(
+                line_delimiter, line_delimiter.size(), column_sep, column_sep.size(), col_sep_num,
+                '"', '\\', false);
+
+        // Verify the context is created successfully
+        EXPECT_NE(ctx, nullptr);
+
+        // Test refresh - should work without issues
+        ctx->refresh();
+
+        std::cout << "EncloseCsvLineReaderContextZeroColSepTest: col_sep_num=0 handled correctly"
+                  << std::endl;
+    }
+
+    {
+        std::string line_delimiter = "\n";
+        std::string column_sep = ",";
+        size_t col_sep_num = 1;
+
+        auto ctx = std::make_shared<EncloseCsvLineReaderContext>(
+                line_delimiter, line_delimiter.size(), column_sep, column_sep.size(), col_sep_num,
+                '"', '\\', false);
+
+        EXPECT_NE(ctx, nullptr);
+        ctx->refresh();
+
+        std::cout << "EncloseCsvLineReaderContextZeroColSepTest: col_sep_num=1 handled correctly"
+                  << std::endl;
+    }
+
+    {
+        std::string line_delimiter = "\n";
+        std::string column_sep = ",";
+        size_t col_sep_num = 5;  // 6 columns means 5 separators
+
+        auto ctx = std::make_shared<EncloseCsvLineReaderContext>(
+                line_delimiter, line_delimiter.size(), column_sep, column_sep.size(), col_sep_num,
+                '"', '\\', false);
+
+        EXPECT_NE(ctx, nullptr);
+        ctx->refresh();
+
+        // Test reading a simple line
+        std::string test_line = "a,b,c,d,e,f\n";
+        const uint8_t* result =
+                ctx->read_line(reinterpret_cast<const uint8_t*>(test_line.data()), test_line.size());
+
+        // Should find the newline delimiter
+        EXPECT_NE(result, nullptr);
+
+        std::cout << "EncloseCsvLineReaderContextZeroColSepTest: Normal case handled correctly"
+                  << std::endl;
+    }
+}
+
+// Test for FormatOptions default values
+TEST(CsvSerde, FormatOptionsDefaultValuesTest) {
+    // Test case 1: Verify default values are set correctly
+    {
+        DataTypeSerDe::FormatOptions options;
+
+        // Verify null_format default value
+        EXPECT_STREQ(options.null_format, "\\N");
+        EXPECT_EQ(options.null_len, 2);
+
+        // Verify nested_string_wrapper default value
+        EXPECT_STREQ(options.nested_string_wrapper, "");
+        EXPECT_EQ(options.wrapper_len, 0);
+
+        // Verify other default values
+        EXPECT_EQ(options.date_olap_format, false);
+        EXPECT_EQ(options.field_delim, ",");
+        EXPECT_EQ(options.collection_delim, ',');
+        EXPECT_EQ(options.map_key_delim, ':');
+        EXPECT_EQ(options.converted_from_string, false);
+        EXPECT_EQ(options.escape_char, 0);
+        EXPECT_EQ(options._output_object_data, true);
+
+        std::cout << "FormatOptionsDefaultValuesTest: Default values verified correctly"
+                  << std::endl;
+    }
+
+    // Test case 2: Use FormatOptions with default values for serialization/deserialization
+    {
+        DataTypeSerDe::FormatOptions options;  // Use default values, don't set null_format
+
+        // Create a nullable string type
+        DataTypePtr data_type_ptr = DataTypeFactory::instance().create_data_type(
+                FieldType::OLAP_FIELD_TYPE_STRING, 0, 0);
+        DataTypePtr nullable_ptr = std::make_shared<DataTypeNullable>(data_type_ptr);
+
+        auto col = nullable_ptr->create_column();
+        DataTypeSerDeSPtr serde = nullable_ptr->get_serde();
+
+        // Test deserializing a normal value
+        std::string test_str = "hello_world";
+        Slice slice(test_str.data(), test_str.size());
+        Status st = serde->deserialize_one_cell_from_json(*col, slice, options);
+        EXPECT_EQ(st.ok(), true);
+        EXPECT_EQ(col->size(), 1);
+
+        // Test serializing back
+        auto ser_col = ColumnString::create();
+        ser_col->reserve(1);
+        VectorBufferWriter buffer_writer(*ser_col.get());
+        st = serde->serialize_one_cell_to_json(*col, 0, buffer_writer, options);
+        EXPECT_EQ(st.ok(), true);
+        buffer_writer.commit();
+
+        StringRef result = ser_col->get_data_at(0);
+        EXPECT_EQ(result.to_string(), test_str);
+
+        std::cout << "FormatOptionsDefaultValuesTest: Serialization with defaults works correctly"
+                  << std::endl;
+    }
+
+    // Test case 3: Test struct deserialization with default FormatOptions
+    {
+        DataTypeSerDe::FormatOptions options;  // Use default values only
+        options.collection_delim = '\002';
+        options.map_key_delim = '\003';
+        // Note: null_format and null_len use default values
+
+        // struct<string, int> with only one field in data
+        std::string str = "test_value";
+
+        DataTypes struct_dataTypes;
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeString>()));
+        struct_dataTypes.push_back(make_nullable(std::make_shared<DataTypeInt32>()));
+
+        DataTypePtr data_type_ptr =
+                make_nullable(std::make_shared<DataTypeStruct>(struct_dataTypes));
+
+        auto col = data_type_ptr->create_column();
+        Slice slice(str.data(), str.size());
+        DataTypeSerDeSPtr serde = data_type_ptr->get_serde();
+
+        // This should work with default null_format values
+        Status st = serde->deserialize_one_cell_from_hive_text(*col, slice, options);
+        EXPECT_EQ(st, Status::OK());
+        EXPECT_EQ(col->size(), 1);
+
+        std::cout << "FormatOptionsDefaultValuesTest: Struct with default null_format works"
+                  << std::endl;
+    }
+}
+
+
+TEST(CsvSerde, EncloseCsvLineReaderContextEdgeCasesTest) {
+    // Test case 1: Empty input with col_sep_num = 0
+    {
+        std::string line_delimiter = "\n";
+        std::string column_sep = ",";
+        size_t col_sep_num = 0;
+
+        auto ctx = std::make_shared<EncloseCsvLineReaderContext>(
+                line_delimiter, line_delimiter.size(), column_sep, column_sep.size(), col_sep_num,
+                '"', '\\', false);
+
+        ctx->refresh();
+
+        // Test with empty input
+        std::string empty_line = "";
+        const uint8_t* result =
+                ctx->read_line(reinterpret_cast<const uint8_t*>(empty_line.data()), empty_line.size());
+
+        // Should return nullptr for empty input
+        EXPECT_EQ(result, nullptr);
+
+        std::cout << "EncloseCsvLineReaderContextEdgeCasesTest: Empty input handled correctly"
+                  << std::endl;
+    }
+
+    // Test case 2: Single column with enclose character
+    {
+        std::string line_delimiter = "\n";
+        std::string column_sep = ",";
+        size_t col_sep_num = 0;  // Single column means 0 separators
+
+        auto ctx = std::make_shared<EncloseCsvLineReaderContext>(
+                line_delimiter, line_delimiter.size(), column_sep, column_sep.size(), col_sep_num,
+                '"', '\\', false);
+
+        ctx->refresh();
+
+        // Test with enclosed single value
+        std::string test_line = "\"hello world\"\n";
+        const uint8_t* result =
+                ctx->read_line(reinterpret_cast<const uint8_t*>(test_line.data()), test_line.size());
+
+        EXPECT_NE(result, nullptr);
+
+        std::cout << "EncloseCsvLineReaderContextEdgeCasesTest: Single enclosed column works"
+                  << std::endl;
+    }
+
+    // Test case 3: Line with only delimiter (edge case)
+    {
+        std::string line_delimiter = "\n";
+        std::string column_sep = ",";
+        size_t col_sep_num = 0;
+
+        auto ctx = std::make_shared<EncloseCsvLineReaderContext>(
+                line_delimiter, line_delimiter.size(), column_sep, column_sep.size(), col_sep_num,
+                '"', '\\', false);
+
+        ctx->refresh();
+
+        std::string test_line = "\n";
+        const uint8_t* result =
+                ctx->read_line(reinterpret_cast<const uint8_t*>(test_line.data()), test_line.size());
+
+        // Should find the newline at position 0
+        EXPECT_NE(result, nullptr);
+        EXPECT_EQ(result, reinterpret_cast<const uint8_t*>(test_line.data()));
+
+        std::cout << "EncloseCsvLineReaderContextEdgeCasesTest: Empty line handled correctly"
+                  << std::endl;
+    }
+
+    // Test case 4: Multi-byte line delimiter with col_sep_num = 0
+    {
+        std::string line_delimiter = "\r\n";
+        std::string column_sep = ",";
+        size_t col_sep_num = 0;
+
+        auto ctx = std::make_shared<EncloseCsvLineReaderContext>(
+                line_delimiter, line_delimiter.size(), column_sep, column_sep.size(), col_sep_num,
+                '"', '\\', false);
+
+        ctx->refresh();
+
+        std::string test_line = "value\r\n";
+        const uint8_t* result =
+                ctx->read_line(reinterpret_cast<const uint8_t*>(test_line.data()), test_line.size());
+
+        EXPECT_NE(result, nullptr);
+
+        std::cout << "EncloseCsvLineReaderContextEdgeCasesTest: Multi-byte delimiter works"
                   << std::endl;
     }
 }

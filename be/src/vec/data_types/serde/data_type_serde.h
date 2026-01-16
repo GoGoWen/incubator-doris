@@ -152,8 +152,8 @@ public:
          *      NULL
          *      null
          */
-        const char* null_format;
-        int null_len;
+        const char* null_format = "\\N";
+        int null_len = 2;
 
         /**
          * The wrapper char for string type in nested type.
@@ -162,8 +162,8 @@ public:
          *      if set to '"', the array<string> will be:
          *       ["abc", "def", "", "hig"]
          */
-        const char* nested_string_wrapper;
-        int wrapper_len;
+        const char* nested_string_wrapper = "";
+        int wrapper_len = 0;
 
         [[nodiscard]] char get_collection_delimiter(
                 int hive_text_complex_type_delimiter_level) const {
