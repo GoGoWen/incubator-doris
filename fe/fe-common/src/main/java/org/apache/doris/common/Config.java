@@ -2050,6 +2050,14 @@ public class Config extends ConfigBase {
     @ConfField(mutable = false, masterOnly = false)
     public static int max_external_cache_loader_thread_pool_size = 128;
 
+    @ConfField(mutable = false, masterOnly = false, description = {"枚举文件列表的超时时间",
+            "max execution time for file listing in second"})
+    public static int file_listing_max_second = 60;
+
+
+    @ConfField(mutable = false, masterOnly = false, description = {"湖仓表获取分片的超时时间",
+            "max execution time for lakehouse get split in second"})
+    public static int lakehouse_get_split_max_second = 120;
 
     /**
      * Max file cache loader thread-pool size.
@@ -2064,6 +2072,12 @@ public class Config extends ConfigBase {
      */
     @ConfField(mutable = false, masterOnly = false)
     public static int max_external_file_cache_loader_thread_pool_for_many_partitions_size = 4096;
+
+    /**
+     * Max get partition split thread-pool size.
+     */
+    @ConfField(mutable = false, masterOnly = false)
+    public static int max_get_partition_split_thread_pool_size = 4096;
 
 
     @ConfField(mutable = true, masterOnly = false,  description = {"提示许多分区的阈值",

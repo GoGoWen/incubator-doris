@@ -27,6 +27,7 @@ import org.apache.doris.common.util.LocationPath;
 import org.apache.doris.datasource.ExternalCatalog;
 import org.apache.doris.datasource.FileScanNode;
 import org.apache.doris.datasource.hive.HMSExternalTable;
+import org.apache.doris.datasource.hive.HiveMetaStoreCache;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache.FileCacheValue;
 import org.apache.doris.datasource.hive.HivePartition;
 import org.apache.doris.fs.remote.RemoteFile;
@@ -41,6 +42,8 @@ import mockit.Expectations;
 import mockit.Injectable;
 import mockit.Mocked;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.SerDeInfo;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
@@ -58,6 +61,7 @@ import org.junit.jupiter.api.Assertions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class HiveScanNodeTest {
@@ -987,5 +991,256 @@ public class HiveScanNodeTest {
                 "Should contain table name");
         Assertions.assertTrue(logMessage.contains("HMS client information: N/A"),
                 "Should contain HMS client info (N/A in test)");
+    }
+
+    // ========== Tests for getFileSplitByPartitions (lines 288, 329, 437) ==========
+
+    @Test
+    public void testGetFileSplitByPartitionsWithCache(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Injectable HiveMetaStoreCache cache,
+            @Injectable org.apache.hadoop.hive.metastore.api.Table remoteTable,
+            @Injectable StorageDescriptor sd,
+            @Injectable SerDeInfo serDeInfo) throws Exception {
+        // Test line 437: cache.getFilesByPartitions call with cache enabled
+
+        Map<String, String> tableParams = new java.util.HashMap<>();
+        tableParams.put("doris_x.enable_external_file_cache", "true");
+
+        Map<String, String> serdeParams = new java.util.HashMap<>();
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getRemoteTable();
+                result = remoteTable;
+
+                remoteTable.getParameters();
+                result = tableParams;
+
+                // These are only called when key is NOT in table params
+                remoteTable.getSd();
+                result = sd;
+                minTimes = 0;
+
+                sd.getSerdeInfo();
+                result = serDeInfo;
+                minTimes = 0;
+
+                serDeInfo.getParameters();
+                result = serdeParams;
+                minTimes = 0;
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create file cache values
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue fileCache = new FileCacheValue();
+        fileCache.setSplittable(true);
+        RemoteFile file = new RemoteFile("file1", true, 1024, 1024);
+        file.setPath(new Path("file1.parquet"));
+        fileCache.addFile(file, new LocationPath("file1.parquet"));
+        fileCaches.add(fileCache);
+
+        // Create partition
+        HivePartition partition = new HivePartition("testDb", "testTable", false,
+                "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+                "hdfs://ns6666/user/hive/warehouse/test.db/test_table/a=dd",
+                java.util.Arrays.asList("dd"), null);
+
+        new Expectations() {
+            {
+                cache.getFilesByPartitions((List<HivePartition>) any, anyBoolean, anyString);
+                result = fileCaches;
+            }
+        };
+
+        List<Split> allFiles = new ArrayList<>();
+
+        // Call the method that triggers line 437
+        scanNode.getFileSplitByPartitions(cache, java.util.Arrays.asList(partition), allFiles, "test", true);
+
+        // Verify files were processed
+        Assertions.assertFalse(allFiles.isEmpty(), "Should have generated file splits");
+    }
+
+    @Test
+    public void testGetFileSplitByPartitionsWithoutCache(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Injectable HiveMetaStoreCache cache,
+            @Injectable org.apache.hadoop.hive.metastore.api.Table remoteTable,
+            @Injectable StorageDescriptor sd,
+            @Injectable SerDeInfo serDeInfo) throws Exception {
+        // Test line 437: cache.getFilesByPartitions call with cache disabled
+
+        Map<String, String> tableParams = new java.util.HashMap<>();
+        tableParams.put("doris_x.enable_external_file_cache", "false");
+
+        Map<String, String> serdeParams = new java.util.HashMap<>();
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getRemoteTable();
+                result = remoteTable;
+
+                remoteTable.getParameters();
+                result = tableParams;
+
+                // These are only called when key is NOT in table params
+                remoteTable.getSd();
+                result = sd;
+                minTimes = 0;
+
+                sd.getSerdeInfo();
+                result = serDeInfo;
+                minTimes = 0;
+
+                serDeInfo.getParameters();
+                result = serdeParams;
+                minTimes = 0;
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create file cache values
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue fileCache = new FileCacheValue();
+        fileCache.setSplittable(true);
+        RemoteFile file = new RemoteFile("file1", true, 1024, 1024);
+        file.setPath(new Path("file1.parquet"));
+        fileCache.addFile(file, new LocationPath("file1.parquet"));
+        fileCaches.add(fileCache);
+
+        // Create partition
+        HivePartition partition = new HivePartition("testDb", "testTable", false,
+                "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+                "hdfs://ns6666/user/hive/warehouse/test.db/test_table/a=dd",
+                java.util.Arrays.asList("dd"), null);
+
+        new Expectations() {
+            {
+                cache.getFilesByPartitions((List<HivePartition>) any, anyBoolean, anyString);
+                result = fileCaches;
+            }
+        };
+
+        List<Split> allFiles = new ArrayList<>();
+
+        // Call the method that triggers line 437 with cache disabled
+        scanNode.getFileSplitByPartitions(cache, java.util.Arrays.asList(partition), allFiles, "test", false);
+
+        // Verify files were processed
+        Assertions.assertFalse(allFiles.isEmpty(), "Should have generated file splits");
+    }
+
+    @Test
+    public void testGetFileSplitByPartitionsWithSerdeParams(@Injectable SessionVariable sessionVariable,
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog,
+            @Injectable HiveMetaStoreCache cache,
+            @Injectable org.apache.hadoop.hive.metastore.api.Table remoteTable,
+            @Injectable StorageDescriptor sd,
+            @Injectable SerDeInfo serDeInfo) throws Exception {
+        // Test line 437: cache.getFilesByPartitions when cache setting is in serde params
+
+        Map<String, String> tableParams = new java.util.HashMap<>();
+        // No doris_x.enable_external_file_cache in table params
+
+        Map<String, String> serdeParams = new java.util.HashMap<>();
+        serdeParams.put("doris_x.enable_external_file_cache", "true");
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+
+                tupleDesc.getId();
+                result = new TupleId(1);
+
+                table.getCatalog();
+                result = catalog;
+
+                catalog.bindBrokerName();
+                result = "test";
+
+                table.getRemoteTable();
+                result = remoteTable;
+
+                remoteTable.getParameters();
+                result = tableParams;
+
+                remoteTable.getSd();
+                result = sd;
+
+                sd.getSerdeInfo();
+                result = serDeInfo;
+
+                serDeInfo.getParameters();
+                result = serdeParams;
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        // Create file cache values
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue fileCache = new FileCacheValue();
+        fileCache.setSplittable(true);
+        RemoteFile file = new RemoteFile("file1", true, 1024, 1024);
+        file.setPath(new Path("file1.parquet"));
+        fileCache.addFile(file, new LocationPath("file1.parquet"));
+        fileCaches.add(fileCache);
+
+        // Create partition
+        HivePartition partition = new HivePartition("testDb", "testTable", false,
+                "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+                "hdfs://ns6666/user/hive/warehouse/test.db/test_table/a=dd",
+                java.util.Arrays.asList("dd"), null);
+
+        new Expectations() {
+            {
+                cache.getFilesByPartitions((List<HivePartition>) any, anyBoolean, anyString);
+                result = fileCaches;
+            }
+        };
+
+        List<Split> allFiles = new ArrayList<>();
+
+        // Call the method that triggers line 437 with serde params
+        scanNode.getFileSplitByPartitions(cache, java.util.Arrays.asList(partition), allFiles, "test", true);
+
+        // Verify files were processed
+        Assertions.assertFalse(allFiles.isEmpty(), "Should have generated file splits");
     }
 }

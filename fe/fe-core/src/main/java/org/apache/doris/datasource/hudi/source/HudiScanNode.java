@@ -85,8 +85,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -422,7 +424,7 @@ public class HudiScanNode extends HiveScanNode {
     }
 
     public void getPartitionsSplits(List<HivePartition> partitions, List<Split> splits) throws AnalysisException {
-        Executor executor = Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor(partitions.size());
+        ExecutorService executor = Env.getCurrentEnv().getExtMetaCacheMgr().getLakehouseGetPartitionSplitExecutor();
         List<PartitionMetadata> metadataList = Collections.synchronizedList(new ArrayList<>());
         Path basePath = hudiClient.getBasePathV2();
         for (HivePartition partition : partitions) {
@@ -433,19 +435,30 @@ public class HudiScanNode extends HiveScanNode {
         AtomicReference<Throwable> error = new AtomicReference<>();
         HoodieTableFileSystemView fileSystemView = new HoodieTableFileSystemView(hudiClient,
                 timeline, storageStrategy);
-        metadataList.forEach(metadata -> executor.execute(() -> {
-            try {
-                processPartitionWithMetadata(fileSystemView, metadata, splits);
-                HMSPartitionsUtil.checkSelectedSplitNumLimit(hmsTable, splits.size());
-            } catch (Throwable t) {
-                error.compareAndSet(null, t);
-            } finally {
-                countDownLatch.countDown();
-            }
-        }));
+        List<Future<?>> futures = Lists.newArrayList();
+        metadataList.forEach(metadata -> {
+            Future<?> f =
+                    executor.submit(() -> {
+                        try {
+                            processPartitionWithMetadata(fileSystemView, metadata, splits);
+                            HMSPartitionsUtil.checkSelectedSplitNumLimit(hmsTable, splits.size());
+                        } catch (Throwable t) {
+                            error.compareAndSet(null, t);
+                        } finally {
+                            countDownLatch.countDown();
+                        }
+                    });
+            futures.add(f);
+        });
 
         try {
-            countDownLatch.await();
+            if (!countDownLatch.await(Config.lakehouse_get_split_max_second, TimeUnit.SECONDS)) {
+                for (Future<?> f : futures) {
+                    f.cancel(true);
+                }
+                throw new AnalysisException("Timeout while processing partitions for hudi table: "
+                        + hmsTable.getDbName() + "." + hmsTable.getName());
+            }
         } catch (InterruptedException e) {
             throw new AnalysisException("Interrupted while processing partitions: " + e.getMessage(), e);
         }

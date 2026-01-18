@@ -106,6 +106,9 @@ public final class MetricRepo {
     public static LongCounterMetric COUNTER_HMS_SPLIT;
     public static LongCounterMetric COUNTER_HMS_PARTITION;
     public static LongCounterMetric COUNTER_HMS_SCAN_SIZE_BYTES;
+    public static Histogram HISTO_HIVE_FILE_NUM;
+    public static Histogram HISTO_HIVE_FILE_LISTING_LATENCY;
+
     public static AutoMappedMetric<LongCounterMetric> USER_COUNTER_QUERY_ALL;
     public static AutoMappedMetric<LongCounterMetric> USER_COUNTER_QUERY_ERR;
     public static AutoMappedMetric<GaugeMetricImpl<Integer>> USER_GAUGE_CONNECTION_NUM;
@@ -361,6 +364,9 @@ public final class MetricRepo {
         COUNTER_HMS_SCAN_SIZE_BYTES = new LongCounterMetric("counter_hms_scan_size_bytes", MetricUnit.BYTES,
                 "total hms scan size bytes");
         DORIS_METRIC_REGISTER.addMetrics(COUNTER_HMS_SCAN_SIZE_BYTES);
+        HISTO_HIVE_FILE_NUM = METRIC_REGISTER.histogram(MetricRegistry.name("hive_file_num"));
+        HISTO_HIVE_FILE_LISTING_LATENCY = METRIC_REGISTER.histogram(
+                MetricRegistry.name("hive_file_listing", "latency", "ms"));
         USER_COUNTER_QUERY_ALL = new AutoMappedMetric<>(name -> {
             LongCounterMetric userCountQueryAll  = new LongCounterMetric("query_total", MetricUnit.REQUESTS,
                     "total query for single user");

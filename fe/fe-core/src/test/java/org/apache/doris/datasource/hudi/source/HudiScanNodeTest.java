@@ -499,7 +499,7 @@ public class HudiScanNodeTest {
                     java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
+                    Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(executor);
                     return env;
                 }
             };
@@ -1411,7 +1411,7 @@ public class HudiScanNodeTest {
                     java.util.concurrent.ExecutorService faultyExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(faultyExecutor);
+                    Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(faultyExecutor);
                     return env;
                 }
             };
@@ -1509,7 +1509,7 @@ public class HudiScanNodeTest {
                     java.util.concurrent.ExecutorService slowExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(slowExecutor);
+                    Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(slowExecutor);
                     return env;
                 }
             };
@@ -1809,7 +1809,7 @@ public class HudiScanNodeTest {
                     java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
+                    Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(executor);
                     return env;
                 }
             };
@@ -1926,6 +1926,129 @@ public class HudiScanNodeTest {
             Assertions.assertEquals(2, splits.size());
         } catch (Exception e) {
             Assertions.fail(e);
+        }
+    }
+
+    @Test
+    public void testGetPartitionsSplitsTimeout(@Injectable SessionVariable sessionVariable,
+                                               @Injectable TupleDescriptor tupleDesc,
+                                               @Injectable HMSExternalTable table,
+                                               @Injectable ExternalCatalog catalog,
+                                               @Injectable HoodieTableMetaClient client) throws Exception {
+        // Test lines 456-460: Timeout handling during partition processing
+
+        new Expectations() {
+            {
+                client.getBasePathV2();
+                result = new Path("/test/base/path");
+                minTimes = 0;
+            }
+        };
+
+        HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
+
+        // Mock static methods that cause NullPointerException
+        MockedStatic<org.apache.hudi.common.util.ReflectionUtils> reflectionUtilsMock =
+                Mockito.mockStatic(org.apache.hudi.common.util.ReflectionUtils.class);
+        MockedStatic<org.apache.hudi.common.bootstrap.index.BootstrapIndex> bootstrapIndexMock =
+                Mockito.mockStatic(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class);
+
+        // Save original config value
+        int originalTimeout = Config.lakehouse_get_split_max_second;
+        Config.lakehouse_get_split_max_second = 1; // Set to 1 second for testing
+
+        try {
+            // Mock ReflectionUtils to handle null class names
+            reflectionUtilsMock.when(() -> org.apache.hudi.common.util.ReflectionUtils.getClass(Mockito.any()))
+                    .thenReturn(Object.class);
+            reflectionUtilsMock.when(() -> org.apache.hudi.common.util.ReflectionUtils.loadClass(Mockito.any()))
+                    .thenReturn(Object.class);
+
+            // Mock BootstrapIndex to return a mock instance
+            bootstrapIndexMock.when(() -> org.apache.hudi.common.bootstrap.index.BootstrapIndex.getBootstrapIndex(Mockito.any()))
+                    .thenReturn(Mockito.mock(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class));
+
+            // Mock Env to return a slow executor that will cause timeout
+            new MockUp<Env>() {
+                @Mock
+                public Env getCurrentEnv() {
+                    Env env = Mockito.mock(Env.class);
+                    org.apache.doris.datasource.ExternalMetaCacheMgr metaCacheMgr =
+                            Mockito.mock(org.apache.doris.datasource.ExternalMetaCacheMgr.class);
+
+                    // Create an executor that will delay processing
+                    java.util.concurrent.ExecutorService slowExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+
+                    Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
+                    Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(slowExecutor);
+                    return env;
+                }
+            };
+
+            // Create partitions
+            HivePartition partition = createMockHivePartition("/test/base/path/partition1", Arrays.asList("2024", "01"));
+            List<HivePartition> partitions = Arrays.asList(partition);
+
+            // Mock HoodieTableFileSystemView to delay processing and cause timeout
+            new MockUp<org.apache.hudi.common.table.view.HoodieTableFileSystemView>() {
+                @Mock
+                public void $init(org.apache.hudi.common.table.HoodieTableMetaClient metaClient, // CHECKSTYLE IGNORE THIS LINE
+                                  org.apache.hudi.common.table.timeline.HoodieTimeline timeline,
+                                  org.apache.hudi.common.storage.HoodieStorageStrategy storageStrategy) {
+                    // Constructor mock - no-op
+                }
+
+                @Mock
+                public java.util.stream.Stream<org.apache.hudi.common.model.HoodieBaseFile> getLatestBaseFilesBeforeOrOn(String partitionPath, String maxCommitTime) {
+                    // Delay to cause timeout (lines 456-460)
+                    try {
+                        Thread.sleep(5000); // Sleep longer than the 1 second timeout
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return java.util.stream.Stream.empty();
+                }
+            };
+
+            // Set storage strategy
+            HoodieStorageStrategy storageStrategy = Mockito.mock(HoodieStorageStrategy.class);
+            java.lang.reflect.Field storageStrategyField = HudiScanNode.class.getDeclaredField("storageStrategy");
+            storageStrategyField.setAccessible(true);
+            storageStrategyField.set(scanNode, storageStrategy);
+
+            // Mock table for error message
+            new Expectations() {
+                {
+                    table.getDbName();
+                    result = "testDb";
+
+                    table.getName();
+                    result = "testTable";
+                }
+            };
+
+            // Create test splits list
+            List<Split> splits = Collections.synchronizedList(new ArrayList<>());
+
+            // Call the method that should trigger timeout (lines 456-460)
+            try {
+                scanNode.getPartitionsSplits(partitions, splits);
+                Assert.fail("Expected AnalysisException due to timeout");
+            } catch (AnalysisException e) {
+                // Verify that the exception message indicates timeout (lines 459-460)
+                Assert.assertTrue("Exception message should mention timeout: " + e.getMessage(),
+                        e.getMessage().contains("Timeout while processing partitions")
+                        || e.getMessage().contains("timeout"));
+                Assert.assertTrue("Exception message should contain table name: " + e.getMessage(),
+                        e.getMessage().contains("testDb.testTable")
+                        || e.getMessage().contains("testTable"));
+            }
+
+        } finally {
+            Config.lakehouse_get_split_max_second = originalTimeout;
+            // Clean up static mocks
+            reflectionUtilsMock.close();
+            bootstrapIndexMock.close();
         }
     }
 }

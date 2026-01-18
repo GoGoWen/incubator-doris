@@ -81,11 +81,10 @@ public class ExternalMetaCacheMgr {
     private ExecutorService rowCountRefreshExecutor;
     private ExecutorService commonRefreshExecutor;
     private ExecutorService fileListingExecutor;
-
     private ExecutorService fileListingExecutorForManyPartitions;
+    private ExecutorService lakehouseGetPartitionSplitExecutor;
 
     private ExecutorService scheduleExecutor;
-    private ExecutorService expiredFileListClearExecutor;
 
     private ExecutorService forkJoinPoolExecutor;
 
@@ -118,25 +117,27 @@ public class ExternalMetaCacheMgr {
         fileListingExecutor = TtlExecutors.getTtlExecutorService(ThreadPoolManager.newDaemonFixedThreadPool(
                 Config.max_external_file_cache_loader_thread_pool_size,
                 Config.max_external_cache_loader_thread_pool_size * 1000,
-                "FileListingExecutor", 10, true));
+                "FileListingExecutor", Config.file_listing_max_second, true));
 
         // The queue size should be large enough,
         // because there may be thousands of partitions being queried at the same time.
         fileListingExecutorForManyPartitions = TtlExecutors.getTtlExecutorService(
                 ThreadPoolManager.newDaemonFixedThreadPool(
                 Config.max_external_file_cache_loader_thread_pool_for_many_partitions_size,
-                Config.max_external_file_cache_loader_thread_pool_for_many_partitions_size * 1000,
-                "FileListingExecutorForManyPartitions", 10, true));
+                        Config.max_external_cache_loader_thread_pool_size * 1000,
+                "FileListingExecutorForManyPartitions", Config.file_listing_max_second, true));
+
+
+        lakehouseGetPartitionSplitExecutor = TtlExecutors.getTtlExecutorService(
+                ThreadPoolManager.newDaemonFixedThreadPool(
+                Config.max_get_partition_split_thread_pool_size,
+                        Config.max_external_cache_loader_thread_pool_size * 1000,
+                "LakehouseGetPartitionSplitExecutor", Config.lakehouse_get_split_max_second, true));
 
         scheduleExecutor = TtlExecutors.getTtlExecutorService(ThreadPoolManager.newDaemonFixedThreadPool(
                 Config.max_external_cache_loader_thread_pool_size,
                 Config.max_external_cache_loader_thread_pool_size * 1000,
                 "ScheduleExecutor", 10, true));
-
-        expiredFileListClearExecutor = ThreadPoolManager.newDaemonFixedThreadPool(
-                Config.max_external_cache_loader_thread_pool_size,
-                Config.max_external_cache_loader_thread_pool_size * 1000,
-                "ExpiredFileListClearExecutor", 20, true);
 
         forkJoinPoolExecutor = TtlExecutors.getTtlExecutorService(new ForkJoinPool(Runtime.getRuntime()
                 .availableProcessors()));
@@ -158,6 +159,10 @@ public class ExternalMetaCacheMgr {
         return fileListingExecutor;
     }
 
+    public  ExecutorService getLakehouseGetPartitionSplitExecutor() {
+        return lakehouseGetPartitionSplitExecutor;
+    }
+
     public ExecutorService getScheduleExecutor() {
         return scheduleExecutor;
     }
@@ -172,8 +177,7 @@ public class ExternalMetaCacheMgr {
             synchronized (cacheMap) {
                 if (!cacheMap.containsKey(catalog.getId())) {
                     cacheMap.put(catalog.getId(),
-                            new HiveMetaStoreCache(catalog, commonRefreshExecutor, fileListingExecutor,
-                                    expiredFileListClearExecutor));
+                            new HiveMetaStoreCache(catalog, commonRefreshExecutor, fileListingExecutor));
                 }
                 cache = cacheMap.get(catalog.getId());
             }

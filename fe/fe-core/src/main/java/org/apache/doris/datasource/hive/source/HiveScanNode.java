@@ -114,7 +114,7 @@ public class HiveScanNode extends FileQueryScanNode {
     protected final HMSExternalTable hmsTable;
     private HiveTransaction hiveTransaction = null;
 
-    // will only be set in Nereids, for lagency planner, it should be null
+    // will only be set in Nereids, for legacy planner, it should be null
     @Setter
     protected SelectedPartitions selectedPartitions = null;
 
@@ -285,7 +285,7 @@ public class HiveScanNode extends FileQueryScanNode {
                 }
             }
             withCache = withCache & !isUpdateFileListRecently();
-            getFileSplitByPartitions(cache, prunedPartitions, allFiles, bindBrokerName, withCache, numBackends);
+            getFileSplitByPartitions(cache, prunedPartitions, allFiles, bindBrokerName, withCache);
             if (ConnectContext.get().getExecutor() != null) {
                 ConnectContext.get().getExecutor().getSummaryProfile().setGetPartitionFilesFinishTime();
             }
@@ -326,8 +326,7 @@ public class HiveScanNode extends FileQueryScanNode {
                         try {
                             List<Split> allFiles = Lists.newArrayList();
                             getFileSplitByPartitions(
-                                    cache, Collections.singletonList(partition), allFiles, bindBrokerName,
-                                    false, numBackends);
+                                    cache, Collections.singletonList(partition), allFiles, bindBrokerName, false);
                             if (allFiles.size() > numSplitsPerPartition.get()) {
                                 numSplitsPerPartition.set(allFiles.size());
                             }
@@ -353,7 +352,7 @@ public class HiveScanNode extends FileQueryScanNode {
                     try {
                         List<Split> allFiles = Lists.newArrayList();
                         getFileSplitByPartitions(cache, Collections.singletonList(partition), allFiles, bindBrokerName,
-                                false, numBackends);
+                                false);
                         if (allFiles.size() > numSplitsPerPartition.get()) {
                             numSplitsPerPartition.set(allFiles.size());
                         }
@@ -417,8 +416,7 @@ public class HiveScanNode extends FileQueryScanNode {
     }
 
     protected void getFileSplitByPartitions(HiveMetaStoreCache cache, List<HivePartition> partitions,
-            List<Split> allFiles, String bindBrokerName, boolean withCache,
-            int numBackends) throws IOException, UserException {
+            List<Split> allFiles, String bindBrokerName, boolean withCache) throws IOException, UserException {
         List<FileCacheValue> fileCaches;
         if (hiveTransaction != null) {
             fileCaches = getFileSplitByTransaction(cache, partitions, bindBrokerName);
@@ -436,7 +434,7 @@ public class HiveScanNode extends FileQueryScanNode {
             withCache = withCache && Config.max_external_file_cache_num > 0 && (ConnectContext.get() == null
                     || ConnectContext.get().getSessionVariable().getEnableExternalFileCache());
             withCache = withCache && partitions.size() <= Config.num_indicate_many_partitions;
-            fileCaches = cache.getFilesByPartitions(partitions, withCache, !withCache, bindBrokerName);
+            fileCaches = cache.getFilesByPartitions(partitions, withCache, bindBrokerName);
             if (Config.enable_log_empty_partition_when_list_file) {
                 logIfGetNoFileFromEmptyPartitions(fileCaches, partitions);
             }

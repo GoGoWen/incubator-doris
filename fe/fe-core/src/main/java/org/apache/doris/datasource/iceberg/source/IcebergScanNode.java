@@ -224,7 +224,7 @@ public class IcebergScanNode extends FileQueryScanNode {
         try {
             long totalFileSize = 0L;
             HashSet<String> partitionCheckSet = new HashSet<>();
-            ExecutorService executor = Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor();
+            ExecutorService executor = Env.getCurrentEnv().getExtMetaCacheMgr().getLakehouseGetPartitionSplitExecutor();
             CloseableIterable<FileScanTask> plannedFiles = scan.planWith(executor).planFiles();
             for (FileScanTask task : plannedFiles) {
                 totalFileSize += task.file().fileSizeInBytes();

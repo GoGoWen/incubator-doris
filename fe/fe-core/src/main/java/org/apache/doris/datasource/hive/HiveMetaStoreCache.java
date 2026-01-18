@@ -97,6 +97,8 @@ import java.util.OptionalLong;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -119,8 +121,6 @@ public class HiveMetaStoreCache {
     private final ExecutorService refreshExecutor;
     private final ExecutorService fileListingExecutor;
 
-    private final ExecutorService expiredFileListClearExecutor;
-
     // cache from <dbname-tblname> -> <num of partitions>
     private LoadingCache<PartitionNumCacheKey, Integer> partitionNumCache;
 
@@ -137,12 +137,10 @@ public class HiveMetaStoreCache {
             = new AtomicReference<>();
 
     public HiveMetaStoreCache(HMSExternalCatalog catalog,
-            ExecutorService refreshExecutor, ExecutorService fileListingExecutor,
-            ExecutorService expiredFileListClearExecutor) {
+            ExecutorService refreshExecutor, ExecutorService fileListingExecutor) {
         this.catalog = catalog;
         this.refreshExecutor = refreshExecutor;
         this.fileListingExecutor = fileListingExecutor;
-        this.expiredFileListClearExecutor = expiredFileListClearExecutor;
         init();
         initMetrics();
     }
@@ -529,7 +527,7 @@ public class HiveMetaStoreCache {
         return result;
     }
 
-    private FileCacheValue loadFiles(FileCacheKey key) {
+    public FileCacheValue loadFiles(FileCacheKey key) {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         // it means reload sync if bdp_auth_context is null
         Preconditions.checkNotNull(BDPAuthContext.get(), "bdp auth info cannot be null");
@@ -688,12 +686,11 @@ public class HiveMetaStoreCache {
 
     public List<FileCacheValue> getFilesByPartitionsWithoutCache(List<HivePartition> partitions,
                                                                  String bindBrokerName) {
-        return getFilesByPartitions(partitions, false, true, bindBrokerName);
+        return getFilesByPartitions(partitions, false, bindBrokerName);
     }
 
     public List<FileCacheValue> getFilesByPartitions(List<HivePartition> partitions,
                                                      boolean withCache,
-                                                     boolean concurrent,
                                                      String bindBrokerName) {
         long start = System.currentTimeMillis();
         List<FileCacheValue> fileLists;
@@ -710,31 +707,38 @@ public class HiveMetaStoreCache {
             if (withCache) {
                 fileLists = new ArrayList<>(fileCacheRef.get().getAll(keys).values());
             } else {
-                if (concurrent) {
-                    ExecutorService executor =
-                            Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor(partitions.size());
-                    List<Future<FileCacheValue>> pList = keys.stream().map(
-                            key -> executor.submit(() -> loadFiles(key))).collect(Collectors.toList());
-                    fileLists = Lists.newArrayListWithExpectedSize(keys.size());
-                    for (Future<FileCacheValue> p : pList) {
-                        fileLists.add(p.get());
+                ExecutorService executor =
+                        Env.getCurrentEnv().getExtMetaCacheMgr().getFileListingExecutor(partitions.size());
+                List<Future<FileCacheValue>> pList = keys.stream().map(
+                        key -> executor.submit(() -> loadFiles(key))).collect(Collectors.toList());
+                fileLists = Lists.newArrayListWithExpectedSize(keys.size());
+                for (Future<FileCacheValue> p : pList) {
+                    try {
+                        fileLists.add(p.get(Config.file_listing_max_second, TimeUnit.SECONDS));
+                    } catch (TimeoutException e) {
+                        for  (Future<FileCacheValue> pToCancel : pList) {
+                            pToCancel.cancel(true);
+                        }
+                        throw new CacheException("queryId %s failed to get files from partitions in catalog %s with"
+                                + " timeout exception", e, BDPAuthContext.get().getQueryIdStr(), catalog.getName());
                     }
-                } else {
-                    fileLists = keys.stream().map(this::loadFiles).collect(Collectors.toList());
                 }
             }
         } catch (ExecutionException e) {
-            throw new CacheException("failed to get files from partitions in catalog %s",
-                    e, catalog.getName());
+            throw new CacheException("queryId %s failed to get files from partitions in catalog %s",
+                    e, BDPAuthContext.get().getQueryIdStr(), catalog.getName());
         } catch (InterruptedException e) {
-            throw new CacheException("failed to get files from partitions in catalog %s with interrupted exception",
-                    e, catalog.getName());
+            throw new CacheException("queryId %s failed to get files from partitions in catalog %s with"
+                    + " interrupted exception", e, BDPAuthContext.get().getQueryIdStr(), catalog.getName());
         }
-
+        long fileListingNum =
+                fileLists.stream().mapToLong(l -> l.getFiles() == null ? 0 : l.getFiles().size()).sum();
+        long fileListingLatency = System.currentTimeMillis() - start;
+        MetricRepo.HISTO_HIVE_FILE_NUM.update(fileListingNum);
+        MetricRepo.HISTO_HIVE_FILE_LISTING_LATENCY.update(fileListingLatency);
         if (LOG.isDebugEnabled()) {
-            LOG.debug("get #{} files from #{} partitions in catalog {} cost: {} ms",
-                    fileLists.stream().mapToInt(l -> l.getFiles() == null ? 0 : l.getFiles().size()).sum(),
-                    partitions.size(), catalog.getName(), (System.currentTimeMillis() - start));
+            LOG.debug("get #{} files from #{} partitions in catalog {} cost: {} ms", fileListingNum,
+                    partitions.size(), catalog.getName(), fileListingLatency);
         }
         return fileLists;
     }
@@ -827,28 +831,6 @@ public class HiveMetaStoreCache {
             LOG.debug("invalid table cache for {}.{} in catalog {}, cost: {} ms",
                     dbName, tblName, catalog.getName(), (System.currentTimeMillis() - start));
         }
-    }
-
-    public void invalidateFileCacheAsync(String dbName, String tblName, List<HivePartition> partitions) {
-        expiredFileListClearExecutor.submit(() -> {
-            LoadingCache<FileCacheKey, FileCacheValue> fileCache = fileCacheRef.get();
-            if (partitions.isEmpty()) {
-                String dummyKey = dbName + "." + tblName;
-                List<FileCacheKey> dummyFileKeys = fileCache.asMap().keySet().stream()
-                        .filter(fileKey -> Objects.equals(fileKey.dummyKey, dummyKey))
-                        .collect(Collectors.toList());
-                fileCache.invalidateAll(dummyFileKeys);
-            } else {
-                List<FileCacheKey> fileKeysToInvalidate = Lists.newArrayList();
-                partitions.forEach(partition -> {
-                    String targetPath = partition.getPath();
-                    fileCache.asMap().keySet().stream()
-                            .filter(fileKey -> Objects.equals(fileKey.location, targetPath))
-                            .forEach(fileKeysToInvalidate::add);
-                });
-                fileCache.invalidateAll(fileKeysToInvalidate);
-            }
-        });
     }
 
     public void invalidatePartitionCache(String dbName, String tblName, List<String> partitionNames) {
