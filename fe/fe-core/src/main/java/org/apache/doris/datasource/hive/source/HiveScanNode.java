@@ -501,7 +501,7 @@ public class HiveScanNode extends FileQueryScanNode {
 
     @VisibleForTesting
     protected long getSelectedFileSize(List<FileCacheValue> fileCaches) throws AnalysisException {
-        long selectedFileSize = 0;
+        long selectedFileSize = 0L;
         for (HiveMetaStoreCache.FileCacheValue fileCacheValue : fileCaches) {
             if (fileCacheValue.getFiles() != null) {
                 for (HiveMetaStoreCache.HiveFileStatus status : fileCacheValue.getFiles()) {
@@ -509,18 +509,25 @@ public class HiveScanNode extends FileQueryScanNode {
                 }
             }
         }
-        if (!hmsTable.isOrcOrParquetFileFormat() && selectedFileSize
-                > Config.max_selected_file_size_for_unrecommended_hive_table) {
+        long maxFileSizeForUnrecommended = -1L;
+        long maxFileSizeForHive = -1L;
+        if (sessionVariable != null) {
+            maxFileSizeForUnrecommended = sessionVariable.maxSelectedFileSizeForUnrecommendedHiveTable;
+            maxFileSizeForHive = sessionVariable.maxSelectedTotalFileSizeForHiveTable;
+        }
+
+        if (!hmsTable.isOrcOrParquetFileFormat() && maxFileSizeForUnrecommended > -1
+                && selectedFileSize > maxFileSizeForUnrecommended) {
             throw new AnalysisException(
                     "the total scan bytes: " + selectedFileSize + " for " + hmsTable.getDbName() + "."
                             + hmsTable.getName() + " has " + "exceed max bytes for single hive table with unrecommended"
-                            + " file format: " + Config.max_selected_file_size_for_unrecommended_hive_table);
+                            + " file format: " + maxFileSizeForUnrecommended);
         }
-        if (selectedFileSize > Config.max_selected_total_file_size_for_hive_table) {
+        if (maxFileSizeForHive > -1 && selectedFileSize > maxFileSizeForHive) {
             throw new AnalysisException("the total scan bytes: " + selectedFileSize
                     + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
                     + "exceed max bytes for single hive table: "
-                    + Config.max_selected_total_file_size_for_hive_table);
+                    + maxFileSizeForHive);
         }
         if (ConnectContext.get() != null) {
             ConnectContext.get().addToTotalScanBytes(selectedFileSize);
@@ -775,4 +782,3 @@ public class HiveScanNode extends FileQueryScanNode {
         return compressType;
     }
 }
-

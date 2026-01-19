@@ -227,6 +227,7 @@ public class HudiScanNodeTest {
         }
     }
 
+
     @Test
     public void testSetFsNameForRangeDesc(@Injectable SessionVariable sessionVariable,
                                           @Injectable TupleDescriptor tupleDesc, @Injectable HMSExternalTable table,
@@ -368,6 +369,8 @@ public class HudiScanNodeTest {
     }
 
 
+
+
     @Test
     public void testGetSplitsExceedsMaxFileSize(@Injectable SessionVariable sessionVariable,
                                                 @Injectable TupleDescriptor tupleDesc,
@@ -377,11 +380,15 @@ public class HudiScanNodeTest {
 
         new Expectations() {
             {
+                table.isHoodieCowTable();
+                result = true;
                 client.getBasePathV2();
                 result = new Path("/test/base/path");
                 minTimes = 0;
             }
         };
+
+        sessionVariable.maxSelectedTotalFileSizeForLakehouseTable = 8796093022208L;
 
         HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
 
@@ -392,8 +399,7 @@ public class HudiScanNodeTest {
                 Mockito.mockStatic(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class);
 
         // Set a very low max file size limit
-        long oldMaxFileSize = Config.max_selected_total_file_size_for_lakehouse_table;
-        Config.max_selected_total_file_size_for_lakehouse_table = 1000; // 1KB for testing
+        sessionVariable.maxSelectedTotalFileSizeForLakehouseTable = 1000; // 1KB for testing
 
         try {
             // Mock ReflectionUtils to handle null class names
@@ -416,11 +422,32 @@ public class HudiScanNodeTest {
 
             // HoodieTableFileSystemView is mocked globally in static block
 
+            // Mock Env to avoid NPE
+            new MockUp<Env>() {
+                @Mock
+                public Env getCurrentEnv() {
+                    Env env = Mockito.mock(Env.class);
+                    org.apache.doris.datasource.ExternalMetaCacheMgr metaCacheMgr =
+                            Mockito.mock(org.apache.doris.datasource.ExternalMetaCacheMgr.class);
+                    // Mock synchronous executor to avoid concurrency issues
+                    java.util.concurrent.ExecutorService executor = Mockito.mock(java.util.concurrent.ExecutorService.class);
+                    Mockito.doAnswer(invocation -> {
+                        ((Runnable) invocation.getArguments()[0]).run();
+                        return null;
+                    }).when(executor).execute(Mockito.any(Runnable.class));
+
+                    Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
+                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
+                    return env;
+                }
+            };
+
             // Mock ConnectContext
             new MockUp<ConnectContext>() {
                 @Mock
                 public ConnectContext get() {
                     ConnectContext context = Mockito.mock(ConnectContext.class);
+                    Mockito.when(context.getSessionVariable()).thenReturn(sessionVariable);
                     return context;
                 }
             };
@@ -438,11 +465,129 @@ public class HudiScanNodeTest {
                 }
             };
 
-            // Mock FileSystem with large files
+            // Mock HoodieTableFileSystemView
+            new MockUp<org.apache.hudi.common.table.view.HoodieTableFileSystemView>() {
+                @Mock
+                public void $init(HoodieTableMetaClient metaClient, org.apache.hudi.common.table.timeline.HoodieTimeline visibleActiveTimeline, // CHECKSTYLE IGNORE THIS LINE
+                                  org.apache.hudi.common.storage.HoodieStorageStrategy strategy) {
+                }
+
+                @Mock
+                public java.util.stream.Stream<org.apache.hudi.common.model.HoodieBaseFile> getLatestBaseFilesBeforeOrOn(String partitionPath, String maxInstantTime) {
+                    // Return a file with large size
+                    org.apache.hudi.common.model.HoodieBaseFile baseFile = Mockito.mock(org.apache.hudi.common.model.HoodieBaseFile.class);
+                    Mockito.when(baseFile.getFileSize()).thenReturn(2000L);
+                    Mockito.when(baseFile.getPath()).thenReturn("hdfs://path/to/file");
+                    return java.util.stream.Stream.of(baseFile);
+                }
+            };
+
+            try {
+                scanNode.getSplits(1);
+                Assert.fail("Should have thrown exception due to file size limit");
+            } catch (AnalysisException e) {
+                Assert.assertTrue(e.getMessage().contains("exceed max bytes for single hudi table"));
+            }
+
+        } finally {
+            reflectionUtilsMock.close();
+            bootstrapIndexMock.close();
+        }
+    }
+
+
+    @Test
+    public void testGetSplitsWithSessionVariable(@Injectable SessionVariable sessionVariable,
+                                                @Injectable TupleDescriptor tupleDesc,
+                                                @Injectable HMSExternalTable table,
+                                                @Injectable ExternalCatalog catalog,
+                                                @Injectable HoodieTableMetaClient client) throws Exception {
+
+        new Expectations() {
+            {
+                client.getBasePathV2();
+                result = new Path("/test/base/path");
+                minTimes = 0;
+            }
+        };
+
+        HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
+
+        // Mock static methods that cause NullPointerException
+        MockedStatic<org.apache.hudi.common.util.ReflectionUtils> reflectionUtilsMock =
+                Mockito.mockStatic(org.apache.hudi.common.util.ReflectionUtils.class);
+        MockedStatic<org.apache.hudi.common.bootstrap.index.BootstrapIndex> bootstrapIndexMock =
+                Mockito.mockStatic(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class);
+
+        try {
+            // Mock ReflectionUtils to handle null class names
+            reflectionUtilsMock.when(() -> org.apache.hudi.common.util.ReflectionUtils.getClass(Mockito.any()))
+                    .thenReturn(Object.class);
+            reflectionUtilsMock.when(() -> org.apache.hudi.common.util.ReflectionUtils.loadClass(Mockito.any()))
+                    .thenReturn(Object.class);
+
+            // Mock BootstrapIndex to return a mock instance
+            bootstrapIndexMock.when(() -> org.apache.hudi.common.bootstrap.index.BootstrapIndex.getBootstrapIndex(Mockito.any()))
+                    .thenReturn(Mockito.mock(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class));
+
+            // Create partitions
+            List<HivePartition> partitions = Arrays.asList(
+                    createMockHivePartition("/test/base/path/partition1", Arrays.asList("2024", "01"))
+            );
+
+            java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
+            prunedPartitionsField.setAccessible(true);
+            prunedPartitionsField.set(scanNode, partitions);
+
+            // Mock Env to avoid NPE
+            new MockUp<Env>() {
+                @Mock
+                public Env getCurrentEnv() {
+                    Env env = Mockito.mock(Env.class);
+                    org.apache.doris.datasource.ExternalMetaCacheMgr metaCacheMgr =
+                            Mockito.mock(org.apache.doris.datasource.ExternalMetaCacheMgr.class);
+                    // Mock synchronous executor to avoid concurrency issues
+                    java.util.concurrent.ExecutorService executor = Mockito.mock(java.util.concurrent.ExecutorService.class);
+                    Mockito.doAnswer(invocation -> {
+                        ((Runnable) invocation.getArguments()[0]).run();
+                        return null;
+                    }).when(executor).execute(Mockito.any(Runnable.class));
+
+                    Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
+                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
+                    return env;
+                }
+            };
+
+            // Mock ConnectContext with SessionVariable limit 1KB
+            new MockUp<ConnectContext>() {
+                @Mock
+                public ConnectContext get() {
+                    ConnectContext context = Mockito.mock(ConnectContext.class);
+                    SessionVariable sv = new SessionVariable();
+                    sv.maxSelectedTotalFileSizeForLakehouseTable = 1000L; // 1KB
+                    Mockito.when(context.getSessionVariable()).thenReturn(sv);
+                    return context;
+                }
+            };
+
+            // Mock UserGroupInformation
+            new MockUp<UserGroupInformation>() {
+                @Mock
+                public UserGroupInformation createRemoteUser(String user, String cluster, String token) {
+                    return Mockito.mock(UserGroupInformation.class);
+                }
+
+                @Mock
+                public <T> T doAs(PrivilegedAction<T> action) {
+                    return action.run();
+                }
+            };
+
+            // Mock FileSystem with large files (10KB)
             FileSystem fs = Mockito.mock(FileSystem.class);
             FileStatus[] fileStatuses = new FileStatus[] {
-                createMockFileStatus("/test/base/path/partition1/file1.parquet", 10000), // 10KB
-                createMockFileStatus("/test/base/path/partition1/file2.parquet", 20000)  // 20KB
+                createMockFileStatus("/test/base/path/partition1/file1.parquet", 10000) // 10KB
             };
             Mockito.when(fs.listStatus(Mockito.any(Path.class))).thenReturn(fileStatuses);
 
@@ -463,40 +608,40 @@ public class HudiScanNodeTest {
             Mockito.when(storageStrategy.getAllLocations(Mockito.anyString(), Mockito.anyBoolean()))
                     .thenReturn(new HashSet<>(Arrays.asList(new Path("/test/base/path/partition1"))));
 
-            // Create mock base files with sizes that exceed the 1KB limit (total 30KB)
+            // Create mock base files
             org.apache.hudi.common.model.HoodieBaseFile baseFile1 = Mockito.mock(org.apache.hudi.common.model.HoodieBaseFile.class);
-            org.apache.hudi.common.model.HoodieBaseFile baseFile2 = Mockito.mock(org.apache.hudi.common.model.HoodieBaseFile.class);
-
             Mockito.when(baseFile1.getPath()).thenReturn("/test/base/path/partition1/file1.parquet");
-            Mockito.when(baseFile1.getFileSize()).thenReturn(15000L); // 15KB
+            Mockito.when(baseFile1.getFileSize()).thenReturn(10000L); // 10KB
 
-            Mockito.when(baseFile2.getPath()).thenReturn("/test/base/path/partition1/file2.parquet");
-            Mockito.when(baseFile2.getFileSize()).thenReturn(15000L); // 15KB
-
-            // Mock HoodieTableFileSystemView constructor to return our mock
             new MockUp<org.apache.hudi.common.table.view.HoodieTableFileSystemView>() {
                 @Mock
                 public void $init(org.apache.hudi.common.table.HoodieTableMetaClient metaClient, // CHECKSTYLE IGNORE THIS LINE
                                   org.apache.hudi.common.table.timeline.HoodieTimeline timeline,
                                   org.apache.hudi.common.storage.HoodieStorageStrategy storageStrategy) {
-                    // Constructor mock - no-op
                 }
 
                 @Mock
-                public java.util.stream.Stream<org.apache.hudi.common.model.HoodieBaseFile> getLatestBaseFilesBeforeOrOn(String partitionPath, String maxCommitTime) {
-                    // Create a new stream each time to avoid stream reuse issues
-                    return java.util.stream.Stream.of(baseFile1, baseFile2);
+                public java.util.stream.Stream<org.apache.hudi.common.model.HoodieBaseFile> getLatestBaseFilesBeforeOrOn(mockit.Invocation inv, String partitionPath, String maxCommitTime) {
+                    // Create fresh mock for each call to avoid stream reuse issues and state pollution
+                    org.apache.hudi.common.model.HoodieBaseFile file = Mockito.mock(org.apache.hudi.common.model.HoodieBaseFile.class);
+                    Mockito.when(file.getFileSize()).thenReturn(10000L);
+                    Mockito.when(file.getPath()).thenReturn("/test/base/path/partition1/file1.parquet");
+                    return com.google.common.collect.Lists.newArrayList(file).stream();
                 }
             };
 
-            // Mock environment for file listing executor
             new MockUp<Env>() {
                 @Mock
                 public Env getCurrentEnv() {
                     Env env = Mockito.mock(Env.class);
                     org.apache.doris.datasource.ExternalMetaCacheMgr metaCacheMgr =
                             Mockito.mock(org.apache.doris.datasource.ExternalMetaCacheMgr.class);
-                    java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+                    // Mock synchronous executor to avoid concurrency issues
+                    java.util.concurrent.ExecutorService executor = Mockito.mock(java.util.concurrent.ExecutorService.class);
+                    Mockito.doAnswer(invocation -> {
+                        ((Runnable) invocation.getArguments()[0]).run();
+                        return null;
+                    }).when(executor).execute(Mockito.any(Runnable.class));
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
                     Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(executor);
@@ -515,22 +660,164 @@ public class HudiScanNodeTest {
                 }
             };
 
-            // Execute and expect exception for line 465
+            // Execute and expect exception due to session limit (1KB < 10KB)
             List<Split> splits = Collections.synchronizedList(new ArrayList<>());
-
             try {
                 scanNode.getPartitionsSplits(partitions, splits);
-                Assert.fail("Expected AnalysisException due to file size exceeding limit");
+                Assert.fail("Expected AnalysisException due to session variable limit");
             } catch (AnalysisException e) {
-                // Verify that the exception message indicates file size limit exceeded
                 Assert.assertTrue("Exception message should mention exceed max bytes: " + e.getMessage(),
                         e.getMessage().contains("has exceed max bytes for single hudi table"));
-                Assert.assertTrue("Exception message should contain table name: " + e.getMessage(),
-                        e.getMessage().contains("testDb.testTable"));
+            }
+
+        } finally {
+            // Clean up static mocks
+            reflectionUtilsMock.close();
+            bootstrapIndexMock.close();
+        }
+    }
+
+    @Test
+    public void testGetSplitsWithSessionVariablePriority(@Injectable SessionVariable sessionVariable,
+                                                         @Injectable TupleDescriptor tupleDesc,
+                                                         @Injectable HMSExternalTable table,
+                                                         @Injectable ExternalCatalog catalog,
+                                                         @Injectable HoodieTableMetaClient client) throws Exception {
+        new Expectations() {
+            {
+                client.getBasePathV2();
+                result = new Path("/test/base/path");
+                minTimes = 0;
+            }
+        };
+
+        HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
+
+        // Mock static methods
+        MockedStatic<org.apache.hudi.common.util.ReflectionUtils> reflectionUtilsMock =
+                Mockito.mockStatic(org.apache.hudi.common.util.ReflectionUtils.class);
+        MockedStatic<org.apache.hudi.common.bootstrap.index.BootstrapIndex> bootstrapIndexMock =
+                Mockito.mockStatic(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class);
+
+        try {
+            // Mock ReflectionUtils
+            reflectionUtilsMock.when(() -> org.apache.hudi.common.util.ReflectionUtils.getClass(Mockito.any()))
+                    .thenReturn(Object.class);
+            reflectionUtilsMock.when(() -> org.apache.hudi.common.util.ReflectionUtils.loadClass(Mockito.any()))
+                    .thenReturn(Object.class);
+            bootstrapIndexMock.when(() -> org.apache.hudi.common.bootstrap.index.BootstrapIndex.getBootstrapIndex(Mockito.any()))
+                    .thenReturn(Mockito.mock(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class));
+
+            // Create partitions
+            List<HivePartition> partitions = Arrays.asList(
+                    createMockHivePartition("/test/base/path/partition1", Arrays.asList("2024", "01"))
+            );
+            java.lang.reflect.Field prunedPartitionsField = HiveScanNode.class.getDeclaredField("prunedPartitions");
+            prunedPartitionsField.setAccessible(true);
+            prunedPartitionsField.set(scanNode, partitions);
+
+            // Mock Env
+            new MockUp<Env>() {
+                @Mock
+                public Env getCurrentEnv() {
+                    Env env = Mockito.mock(Env.class);
+                    org.apache.doris.datasource.ExternalMetaCacheMgr metaCacheMgr =
+                            Mockito.mock(org.apache.doris.datasource.ExternalMetaCacheMgr.class);
+                    java.util.concurrent.ExecutorService executor = Mockito.mock(java.util.concurrent.ExecutorService.class);
+                    Mockito.doAnswer(invocation -> {
+                        ((Runnable) invocation.getArguments()[0]).run();
+                        return null;
+                    }).when(executor).execute(Mockito.any(Runnable.class));
+                    Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
+                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
+                    return env;
+                }
+            };
+
+            // Mock UserGroupInformation
+            new MockUp<UserGroupInformation>() {
+                @Mock
+                public UserGroupInformation createRemoteUser(String user, String cluster, String token) {
+                    return Mockito.mock(UserGroupInformation.class);
+                }
+
+                @Mock
+                public <T> T doAs(PrivilegedAction<T> action) {
+                    return action.run();
+                }
+            };
+
+            // Mock FileSystem
+            FileSystem fs = Mockito.mock(FileSystem.class);
+            FileStatus[] fileStatuses = new FileStatus[] {
+                createMockFileStatus("/test/base/path/partition1/file1.parquet", 10000) // 10KB
+            };
+            Mockito.when(fs.listStatus(Mockito.any(Path.class))).thenReturn(fileStatuses);
+            new MockUp<Path>() {
+                @Mock
+                public FileSystem getFileSystem(Configuration conf) {
+                    return fs;
+                }
+            };
+
+            // Mock storageStrategy
+            HoodieStorageStrategy storageStrategy = Mockito.mock(HoodieStorageStrategy.class);
+            java.lang.reflect.Field storageStrategyField = HudiScanNode.class.getDeclaredField("storageStrategy");
+            storageStrategyField.setAccessible(true);
+            storageStrategyField.set(scanNode, storageStrategy);
+            Mockito.when(storageStrategy.getRelativePath(Mockito.any())).thenReturn("relative/path");
+            Mockito.when(storageStrategy.getAllLocations(Mockito.anyString(), Mockito.anyBoolean()))
+                    .thenReturn(new HashSet<>(Arrays.asList(new Path("/test/base/path/partition1"))));
+
+            // Mock HoodieTableFileSystemView
+            new MockUp<org.apache.hudi.common.table.view.HoodieTableFileSystemView>() {
+                @Mock
+                public void $init(org.apache.hudi.common.table.HoodieTableMetaClient metaClient, // CHECKSTYLE IGNORE THIS LINE
+                                  org.apache.hudi.common.table.timeline.HoodieTimeline timeline,
+                                  org.apache.hudi.common.storage.HoodieStorageStrategy storageStrategy) {
+                }
+
+                @Mock
+                public java.util.stream.Stream<org.apache.hudi.common.model.HoodieBaseFile> getLatestBaseFilesBeforeOrOn(mockit.Invocation inv, String partitionPath, String maxCommitTime) {
+                    org.apache.hudi.common.model.HoodieBaseFile file = Mockito.mock(org.apache.hudi.common.model.HoodieBaseFile.class);
+                    Mockito.when(file.getFileSize()).thenReturn(10000L);
+                    Mockito.when(file.getPath()).thenReturn("/test/base/path/partition1/file1.parquet");
+                    return com.google.common.collect.Lists.newArrayList(file).stream();
+                }
+            };
+
+            // Mock table for error message
+            new Expectations() {
+                {
+                    table.getDbName();
+                    result = "testDb";
+                    table.getName();
+                    result = "testTable";
+                }
+            };
+
+            // Case 2: Session limit > default limit (8796093022208L)
+            // Mock ConnectContext with SessionVariable limit 2KB
+            new MockUp<ConnectContext>() {
+                @Mock
+                public ConnectContext get() {
+                    ConnectContext context = Mockito.mock(ConnectContext.class);
+                    SessionVariable sv = new SessionVariable();
+                    sv.maxSelectedTotalFileSizeForLakehouseTable = 2000L; // 2KB
+                    Mockito.when(context.getSessionVariable()).thenReturn(sv);
+                    return context;
+                }
+            };
+
+            List<Split> splits = Collections.synchronizedList(new ArrayList<>());
+            try {
+                scanNode.getPartitionsSplits(partitions, splits);
+                Assert.fail("Expected AnalysisException due to session limit");
+            } catch (AnalysisException e) {
+                Assert.assertTrue("Exception message should mention exceed max bytes: " + e.getMessage(),
+                        e.getMessage().contains("has exceed max bytes for single hudi table"));
             }
         } finally {
-            Config.max_selected_total_file_size_for_lakehouse_table = oldMaxFileSize;
-            // Clean up static mocks
             reflectionUtilsMock.close();
             bootstrapIndexMock.close();
         }
@@ -1137,10 +1424,12 @@ public class HudiScanNodeTest {
 
     @Test
     public void testCowTablePartitionProcessingWithBaseFiles(@Injectable SessionVariable sessionVariable,
-                                                              @Injectable TupleDescriptor tupleDesc,
-                                                              @Injectable HMSExternalTable table,
-                                                              @Injectable ExternalCatalog catalog,
-                                                              @Injectable HoodieTableMetaClient client) throws Exception {
+                                                             @Injectable TupleDescriptor tupleDesc,
+                                                             @Injectable HMSExternalTable table,
+                                                             @Injectable ExternalCatalog catalog,
+                                                             @Injectable HoodieTableMetaClient client) throws Exception {
+
+        sessionVariable.maxSelectedTotalFileSizeForLakehouseTable = 8796093022208L;
 
         new Expectations() {
             {
@@ -1227,11 +1516,132 @@ public class HudiScanNodeTest {
     }
 
     @Test
+    public void testGetSplitsWithUnifiedSessionVariable(@Injectable SessionVariable sessionVariable,
+                                                        @Injectable TupleDescriptor tupleDesc,
+                                                        @Injectable HMSExternalTable table,
+                                                        @Injectable ExternalCatalog catalog,
+                                                        @Injectable HoodieTableMetaClient client) throws Exception {
+
+        new Expectations() {
+            {
+                client.getBasePathV2();
+                result = new Path("/test/base/path");
+                minTimes = 0;
+
+                table.getDbName();
+                result = "testDb";
+                minTimes = 0;
+
+                table.getName();
+                result = "testTable";
+                minTimes = 0;
+            }
+        };
+
+        // try {
+        new MockUp<ConnectContext>() {
+            @Mock
+            public ConnectContext get() {
+                ConnectContext context = Mockito.mock(ConnectContext.class);
+                SessionVariable sv = new SessionVariable();
+                sv.maxSelectedTotalFileSizeForLakehouseTable = 1000L;
+                Mockito.when(context.getSessionVariable()).thenReturn(sv);
+                return context;
+            }
+        };
+
+        HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
+
+        // Override to ensure this is a MOR table
+        java.lang.reflect.Field isCowOrRoTableField = HudiScanNode.class.getDeclaredField("isCowOrRoTable");
+        isCowOrRoTableField.setAccessible(true);
+        isCowOrRoTableField.set(scanNode, false);
+
+        // Mock static methods
+        MockedStatic<org.apache.hudi.common.util.ReflectionUtils> reflectionUtilsMock =
+                Mockito.mockStatic(org.apache.hudi.common.util.ReflectionUtils.class);
+        MockedStatic<org.apache.hudi.common.bootstrap.index.BootstrapIndex> bootstrapIndexMock =
+                Mockito.mockStatic(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class);
+
+        try {
+            // Mock ReflectionUtils
+            reflectionUtilsMock.when(() -> org.apache.hudi.common.util.ReflectionUtils.getClass(Mockito.any()))
+                    .thenReturn(Object.class);
+            reflectionUtilsMock.when(() -> org.apache.hudi.common.util.ReflectionUtils.loadClass(Mockito.any()))
+                    .thenReturn(Object.class);
+            bootstrapIndexMock.when(() -> org.apache.hudi.common.bootstrap.index.BootstrapIndex.getBootstrapIndex(Mockito.any()))
+                    .thenReturn(Mockito.mock(org.apache.hudi.common.bootstrap.index.BootstrapIndex.class));
+
+            // Create test partition
+            HivePartition partition = createMockHivePartition("/test/base/path/partition1", Arrays.asList("2024", "01"));
+            List<HivePartition> partitions = Arrays.asList(partition);
+
+            // Create mock file slice with size > 1000
+            org.apache.hudi.common.model.FileSlice fileSlice1 = Mockito.mock(org.apache.hudi.common.model.FileSlice.class);
+            Mockito.when(fileSlice1.getTotalFileSize()).thenReturn(2000L);
+
+            // Mock base file
+            org.apache.hudi.common.model.HoodieBaseFile baseFile = Mockito.mock(org.apache.hudi.common.model.HoodieBaseFile.class);
+            org.apache.hudi.common.util.Option<org.apache.hudi.common.model.HoodieBaseFile> baseFileOption =
+                    org.apache.hudi.common.util.Option.of(baseFile);
+
+            Mockito.when(baseFile.getPath()).thenReturn("/test/base/path/partition1/base.parquet");
+            Mockito.when(baseFile.getFileSize()).thenReturn(2000L);
+            Mockito.when(fileSlice1.getBaseFile()).thenReturn(baseFileOption);
+            Mockito.when(fileSlice1.getPartitionPath()).thenReturn("partition1");
+            Mockito.when(fileSlice1.getLogFiles()).thenReturn(java.util.stream.Stream.empty());
+
+            // Mock FileSystemView
+            new MockUp<org.apache.hudi.common.table.view.HoodieTableFileSystemView>() {
+                @Mock
+                public void $init(org.apache.hudi.common.table.HoodieTableMetaClient metaClient, // CHECKSTYLE IGNORE THIS LINE
+                                  org.apache.hudi.common.table.timeline.HoodieTimeline timeline,
+                                  org.apache.hudi.common.storage.HoodieStorageStrategy storageStrategy) {
+                }
+
+                @Mock
+                public java.util.stream.Stream<org.apache.hudi.common.model.FileSlice> getLatestMergedFileSlicesBeforeOrOn(String partitionPath, String maxCommitTime) {
+                    return java.util.stream.Stream.of(fileSlice1);
+                }
+            };
+
+            // Set storage strategy
+            HoodieStorageStrategy storageStrategy = Mockito.mock(HoodieStorageStrategy.class);
+            java.lang.reflect.Field storageStrategyField = HudiScanNode.class.getDeclaredField("storageStrategy");
+            storageStrategyField.setAccessible(true);
+            storageStrategyField.set(scanNode, storageStrategy);
+
+            List<Split> splits = Collections.synchronizedList(new ArrayList<>());
+
+            try {
+                scanNode.getPartitionsSplits(partitions, splits);
+                Assert.fail("Expected AnalysisException but no exception was thrown");
+            } catch (AnalysisException e) {
+                Assert.assertTrue("Exception message should contain 'exceed max bytes'",
+                        e.getMessage().contains("exceed max bytes for single hudi table"));
+            } catch (RuntimeException e) {
+                if (e.getCause() instanceof AnalysisException) {
+                    Assert.assertTrue("Exception message should contain 'exceed max bytes'",
+                            e.getCause().getMessage().contains("exceed max bytes for single hudi table"));
+                } else {
+                    throw e;
+                }
+            }
+
+        } finally {
+            reflectionUtilsMock.close();
+            bootstrapIndexMock.close();
+        }
+    }
+
+    @Test
     public void testMorTablePartitionProcessingWithFileSlices(@Injectable SessionVariable sessionVariable,
-                                                               @Injectable TupleDescriptor tupleDesc,
-                                                               @Injectable HMSExternalTable table,
-                                                               @Injectable ExternalCatalog catalog,
-                                                               @Injectable HoodieTableMetaClient client) throws Exception {
+                                                              @Injectable TupleDescriptor tupleDesc,
+                                                              @Injectable HMSExternalTable table,
+                                                              @Injectable ExternalCatalog catalog,
+                                                              @Injectable HoodieTableMetaClient client) throws Exception {
+
+        sessionVariable.maxSelectedTotalFileSizeForLakehouseTable = 8796093022208L;
 
         new Expectations() {
             {

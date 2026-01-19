@@ -31,6 +31,7 @@ import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
 import org.apache.doris.datasource.iceberg.IcebergExternalTable;
 import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.planner.PlanNodeId;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.SessionVariable;
 import org.apache.doris.spi.Split;
 import org.apache.doris.system.SystemInfoService;
@@ -53,6 +54,7 @@ import org.apache.iceberg.io.CloseableIterator;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.TableScanUtil;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -75,16 +77,14 @@ public class IcebergScanNodeTest {
         FeConstants.runningUnitTest = true;
         MetricRepo.init();
 
-        Config.max_selected_total_file_size_for_lakehouse_table = 10737418240L; // 10GB default
-        Config.max_selected_partition_num_for_lakehouse_table = 1024; // Default value
-
         new MockUp<org.apache.doris.qe.ConnectContext>() {
             @Mock
             public org.apache.doris.qe.ConnectContext get() {
                 org.apache.doris.qe.ConnectContext context = Mockito.mock(org.apache.doris.qe.ConnectContext.class);
-                SessionVariable sv = Mockito.mock(SessionVariable.class);
-                Mockito.when(context.getSessionVariable()).thenReturn(sv);
-                Mockito.when(sv.getNumPartitionsInBatchMode()).thenReturn(1024);
+                SessionVariable sv = new SessionVariable();
+                SessionVariable spySv = Mockito.spy(sv);
+                Mockito.when(context.getSessionVariable()).thenReturn(spySv);
+                Mockito.doReturn(1024).when(spySv).getNumPartitionsInBatchMode();
                 return context;
             }
         };
@@ -147,15 +147,28 @@ public class IcebergScanNodeTest {
     /**
      * Test actual getSplits() method when file size exceeds limit
      */
+    @Before
+    public void setUp() throws Exception {
+    }
+
+    @Test
+    public void testGetSplitsWithUnifiedSessionVariable() throws Exception {
+    }
+
     @Test
     public void testGetSplitsExceedsMaxFileSize() throws Exception {
+        IcebergScanNode scanNode = createRealScanNode();
+
+        // Access sessionVariable via reflection (it's in FileQueryScanNode)
+        java.lang.reflect.Field svField = org.apache.doris.datasource.FileQueryScanNode.class.getDeclaredField("sessionVariable");
+        svField.setAccessible(true);
+        SessionVariable sv = (SessionVariable) svField.get(scanNode);
+
         // Set a very low max file size limit for testing
-        long oldMaxFileSize = Config.max_selected_total_file_size_for_lakehouse_table;
-        Config.max_selected_total_file_size_for_lakehouse_table = 1000L; // 1KB for testing
+        long oldMaxFileSize = sv.maxSelectedTotalFileSizeForLakehouseTable;
+        sv.maxSelectedTotalFileSizeForLakehouseTable = 1000L; // 1KB for testing
 
         try {
-            IcebergScanNode scanNode = createRealScanNode();
-
             // Create file scan tasks that exceed the limit
             List<FileScanTask> mockTasks = Arrays.asList(
                     createMockFileScanTask(10000L), // 10KB - exceeds limit
@@ -173,7 +186,7 @@ public class IcebergScanNodeTest {
                         e.getMessage().contains("exceed max bytes for single iceberg table"));
             }
         } finally {
-            Config.max_selected_total_file_size_for_lakehouse_table = oldMaxFileSize;
+            sv.maxSelectedTotalFileSizeForLakehouseTable = oldMaxFileSize;
         }
     }
 
@@ -182,13 +195,13 @@ public class IcebergScanNodeTest {
      */
     @Test
     public void testGetSplitsExceedsMaxPartitionCount() throws Exception {
+        IcebergScanNode scanNode = createRealScanNode();
+
         // Set a very low max partition count for testing
         int oldMaxPartitionCount = Config.max_selected_partition_num_for_lakehouse_table;
         Config.max_selected_partition_num_for_lakehouse_table = 2;
 
         try {
-            IcebergScanNode scanNode = createRealScanNode();
-
             // Create file scan tasks with different partitions
             List<FileScanTask> mockTasks = Arrays.asList(
                     createMockFileScanTaskWithPartition(100L, "partition1"),
@@ -317,11 +330,52 @@ public class IcebergScanNodeTest {
         // Empty splits expected since we mocked empty combined tasks
     }
 
+    /**
+     * Test getSplits() with session variable priority
+     */
+    @Test
+    public void testGetSplitsWithSessionVariable() throws Exception {
+        IcebergScanNode scanNode = createRealScanNode();
+
+        // Case 1: Session variable is set and smaller than config (Priority: Session)
+        // Session = 1KB
+        java.lang.reflect.Field sessionVariableField = org.apache.doris.datasource.FileQueryScanNode.class.getDeclaredField("sessionVariable");
+        sessionVariableField.setAccessible(true);
+        SessionVariable sv = (SessionVariable) sessionVariableField.get(scanNode);
+        sv.maxSelectedTotalFileSizeForLakehouseTable = 1000L; // 1KB
+        sv.numPartitionsInBatchMode = 1024;
+
+        // Create file scan tasks that exceed the session limit (10KB)
+        List<FileScanTask> mockTasks = Arrays.asList(
+                createMockFileScanTask(10000L)
+        );
+        setupTableScanMocks(scanNode, mockTasks, false);
+
+        try {
+            scanNode.getSplits(3);
+            Assert.fail("Should throw exception when session variable limit is exceeded");
+        } catch (AnalysisException e) {
+            Assert.assertTrue("Exception message should contain 'exceed max bytes'",
+                    e.getMessage().contains("exceed max bytes for single iceberg table"));
+        }
+    }
+
     // Helper methods
 
     private IcebergScanNode createRealScanNode() throws Exception {
         // Create minimal mocks needed for the test
-        SessionVariable sessionVariable = Mockito.mock(SessionVariable.class);
+        SessionVariable sessionVariable = Mockito.spy(new SessionVariable());
+
+        // Override ConnectContext to use our spy SessionVariable
+        new MockUp<ConnectContext>() {
+            @Mock
+            public ConnectContext get() {
+                ConnectContext context = Mockito.mock(ConnectContext.class);
+                Mockito.when(context.getSessionVariable()).thenReturn(sessionVariable);
+                return context;
+            }
+        };
+
         TupleDescriptor tupleDesc = Mockito.mock(TupleDescriptor.class);
         IcebergExternalTable table = Mockito.mock(IcebergExternalTable.class);
         IcebergExternalCatalog catalog = Mockito.mock(IcebergExternalCatalog.class);
@@ -337,7 +391,7 @@ public class IcebergScanNodeTest {
 
         // Setup basic mocks
         TupleId tupleId = new TupleId(1);
-        Mockito.when(sessionVariable.getFileSplitSize()).thenReturn(0L);
+        Mockito.doReturn(0L).when(sessionVariable).getFileSplitSize();
         Mockito.when(tupleDesc.getId()).thenReturn(tupleId);
         Mockito.when(tupleDesc.getTable()).thenReturn(table);
         Mockito.when(tupleDesc.getRef()).thenReturn(tableRef);
@@ -474,6 +528,47 @@ public class IcebergScanNodeTest {
         java.lang.reflect.Field field = IcebergScanNode.class.getDeclaredField("icebergTable");
         field.setAccessible(true);
         return (BaseTable) field.get(scanNode);
+    }
+
+    /**
+     * Test actual getSplits() method with default max file size limit
+     */
+    @Test
+    public void testDefaultMaxSelectedTotalFileSize() throws Exception {
+        IcebergScanNode scanNode = createRealScanNode();
+
+        // Access sessionVariable via reflection
+        java.lang.reflect.Field svField = org.apache.doris.datasource.FileQueryScanNode.class.getDeclaredField("sessionVariable");
+        svField.setAccessible(true);
+        SessionVariable sv = (SessionVariable) svField.get(scanNode);
+
+        // Verify default value is 8796093022208L
+        Assert.assertEquals(8796093022208L, sv.maxSelectedTotalFileSizeForLakehouseTable);
+
+        // Case 1: Session variable is default, should use default limit (8TB)
+        // Mock tasks exceeding 8TB
+        long exceedSize = 8796093022208L + 1;
+        List<FileScanTask> mockTasks = Arrays.asList(
+                createMockFileScanTask(exceedSize)
+        );
+        setupTableScanMocks(scanNode, mockTasks, false);
+
+        try {
+            scanNode.getSplits(3);
+            Assert.fail("Should throw exception when default limit is exceeded");
+        } catch (AnalysisException e) {
+            Assert.assertTrue("Exception message should contain 'exceed max bytes'",
+                    e.getMessage().contains("exceed max bytes for single iceberg table"));
+        }
+
+        // Case 2: Session variable is set by user, should use user value
+        sv.maxSelectedTotalFileSizeForLakehouseTable = exceedSize + 100;
+        try {
+            scanNode.getSplits(3);
+            // Should pass because limit is increased
+        } catch (AnalysisException e) {
+            Assert.fail("Should not throw exception when user limit is respected");
+        }
     }
 
     /**

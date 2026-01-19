@@ -73,12 +73,87 @@ public class HiveScanNodeTest {
     }
 
     @Test
-    public void testGetFileSplitSize(@Injectable SessionVariable sessionVariable,
+    public void testDefaultMaxSelectedTotalFileSize(
             @Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog) {
-        Config.max_selected_file_size_for_unrecommended_hive_table = 5000000000000L;
-        Config.max_selected_total_file_size_for_hive_table = 60000000000000L;
+        SessionVariable sessionVariable = new SessionVariable();
+        // Default is 8796093022208L now
+        Assertions.assertEquals(8796093022208L, sessionVariable.maxSelectedTotalFileSizeForHiveTable);
+
+        new Expectations() {
+            {
+                tupleDesc.getTable();
+                result = table;
+                tupleDesc.getId();
+                result = new TupleId(1);
+                table.getCatalog();
+                result = catalog;
+                catalog.bindBrokerName();
+                result = "test";
+                table.isOrcOrParquetFileFormat();
+                result = true;
+                table.getDbName();
+                result = "test";
+                table.getName();
+                result = "test";
+            }
+        };
+
+        HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
+
+        List<FileCacheValue> fileCaches = new ArrayList<>();
+        FileCacheValue fileCache1 = new FileCacheValue();
+        // 8TB + 1 byte
+        RemoteFile file1 = new RemoteFile("file1", true, 8796093022208L + 1, 1024);
+        file1.setPath(new Path("file1.text"));
+        fileCache1.addFile(file1, new LocationPath("file1.text"));
+        fileCaches.add(fileCache1);
+
+        // Should fail because default logic uses 8TB limit when variable is -1
+        try {
+            scanNode.getSelectedFileSize(fileCaches);
+            Assertions.fail("Should throw exception when session variable limit is exceeded");
+        } catch (AnalysisException e) {
+            Assertions.assertTrue(e.getMessage().contains("exceed max bytes for single hive table"));
+        } catch (Exception e) {
+            Assertions.fail(e);
+        }
+
+        // Set to larger value, should pass
+        sessionVariable.maxSelectedTotalFileSizeForHiveTable = 8796093022208L + 100;
+        try {
+            scanNode.getSelectedFileSize(fileCaches);
+        } catch (Exception e) {
+            Assertions.fail(e);
+        }
+
+        // Reset and test unrecommended
+        sessionVariable.maxSelectedTotalFileSizeForHiveTable = -1;
+        new Expectations() {
+            {
+                table.isOrcOrParquetFileFormat();
+                result = false;
+            }
+        };
+        try {
+            scanNode.getSelectedFileSize(fileCaches);
+            Assertions.fail("Should throw exception for unrecommended file size");
+        } catch (AnalysisException e) {
+            Assertions.assertTrue(e.getMessage().contains("exceed max bytes for single hive table with unrecommended"));
+        } catch (Exception e) {
+            Assertions.fail(e);
+        }
+    }
+
+    @Test
+    public void testGetFileSplitSize(
+            @Injectable TupleDescriptor tupleDesc,
+            @Injectable HMSExternalTable table,
+            @Injectable ExternalCatalog catalog) {
+        SessionVariable sessionVariable = new SessionVariable();
+        sessionVariable.maxSelectedFileSizeForUnrecommendedHiveTable = 5000000000000L;
+        sessionVariable.maxSelectedTotalFileSizeForHiveTable = 60000000000000L;
         List<FileCacheValue> fileCaches = new ArrayList<>();
         FileCacheValue fileCache1 = new FileCacheValue();
         fileCache1.setSplittable(true);
@@ -99,9 +174,6 @@ public class HiveScanNodeTest {
 
                 catalog.bindBrokerName();
                 result = "test";
-
-                sessionVariable.getFileSplitSize();
-                result = -1;
             }
         };
         Config.file_size_range_to_decide_split_size = new long[] {20 * 1024 * 1024 * 1024L, 40 * 1024 * 1024 * 1024L,
@@ -195,13 +267,27 @@ public class HiveScanNodeTest {
         } catch (Exception e) {
             Assertions.fail(e);
         }
+
+        try {
+            // Test session variable for file size limit
+            sessionVariable.maxSelectedTotalFileSizeForHiveTable = 500;
+            try {
+                scanNode.getSelectedFileSize(fileCaches);
+                Assertions.fail("Should throw exception when session variable limit is exceeded");
+            } catch (AnalysisException e) {
+                Assertions.assertTrue(e.getMessage().contains("exceed max bytes for single hive table"));
+            }
+        } catch (Exception e) {
+            Assertions.fail(e);
+        }
     }
 
     @Test
-    public void testNormalGenerateFileSplits(@Injectable SessionVariable sessionVariable,
+    public void testNormalGenerateFileSplits(
             @Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog) throws IOException, AnalysisException {
+        SessionVariable sessionVariable = new SessionVariable();
         new Expectations() {
             {
                 tupleDesc.getTable();
@@ -255,10 +341,11 @@ public class HiveScanNodeTest {
     }
 
     @Test
-    public void testGetSelectedFileSize(@Injectable SessionVariable sessionVariable,
+    public void testGetSelectedFileSize(
             @Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog) {
+        SessionVariable sessionVariable = new SessionVariable();
         new Expectations() {
             {
                 tupleDesc.getTable();
@@ -309,8 +396,8 @@ public class HiveScanNodeTest {
         } catch (Exception e) {
             Assertions.fail(e);
         }
-        Config.max_selected_file_size_for_unrecommended_hive_table = 5000;
-        Config.max_selected_total_file_size_for_hive_table = 6000;
+        sessionVariable.maxSelectedFileSizeForUnrecommendedHiveTable = 5000;
+        sessionVariable.maxSelectedTotalFileSizeForHiveTable = 6000;
         try {
             scanNode.getSelectedFileSize(fileCaches);
             Assertions.fail();
@@ -335,11 +422,14 @@ public class HiveScanNodeTest {
 
     }
 
+
+
     @Test
-    public void testGenerateFileSplitsWithSortByFileSize(@Injectable SessionVariable sessionVariable,
+    public void testGenerateFileSplitsWithSortByFileSize(
             @Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog) throws IOException, AnalysisException {
+        SessionVariable sessionVariable = new SessionVariable();
         new Expectations() {
             {
                 tupleDesc.getTable();
@@ -399,10 +489,11 @@ public class HiveScanNodeTest {
     }
 
     @Test
-    public void testCheckSelectedPartitionNumLimit(@Injectable SessionVariable sessionVariable,
+    public void testCheckSelectedPartitionNumLimit(
             @Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog) {
+        SessionVariable sessionVariable = new SessionVariable();
         new Expectations() {
             {
                 tupleDesc.getTable();
@@ -429,6 +520,7 @@ public class HiveScanNodeTest {
         };
         HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
         scanNode.setSelectedPartitionNum(100);
+        int oldMax = Config.max_selected_partition_num_for_lakehouse_table;
         Config.max_selected_partition_num_for_lakehouse_table = 10;
         try {
             scanNode.checkSelectedPartitionNumLimit();
@@ -438,6 +530,7 @@ public class HiveScanNodeTest {
                     + " 100 for test.test has exceed max selected partition num for single Hudi table: 10",
                     e.getMessage());
         }
+        Config.max_selected_partition_num_for_lakehouse_table = oldMax;
 
         new Expectations() {
             {
@@ -446,6 +539,7 @@ public class HiveScanNodeTest {
             }
         };
 
+        oldMax = Config.max_selected_partition_num_for_hive_table;
         Config.max_selected_partition_num_for_hive_table = 50;
         try {
             scanNode.checkSelectedPartitionNumLimit();
@@ -455,6 +549,7 @@ public class HiveScanNodeTest {
                             + " 100 for test.test has exceed max selected partition num for single Hive table: 50",
                     e.getMessage());
         }
+        Config.max_selected_partition_num_for_hive_table = oldMax;
     }
 
     // ========== Tests for logIfGetNoFileFromEmptyPartitions ==========

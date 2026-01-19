@@ -223,6 +223,10 @@ public class IcebergScanNode extends FileQueryScanNode {
 
         try {
             long totalFileSize = 0L;
+            long maxFileSizeForLakehouse = -1L;
+            if (sessionVariable != null) {
+                maxFileSizeForLakehouse = sessionVariable.maxSelectedTotalFileSizeForLakehouseTable;
+            }
             HashSet<String> partitionCheckSet = new HashSet<>();
             ExecutorService executor = Env.getCurrentEnv().getExtMetaCacheMgr().getLakehouseGetPartitionSplitExecutor();
             CloseableIterable<FileScanTask> plannedFiles = scan.planWith(executor).planFiles();
@@ -234,13 +238,13 @@ public class IcebergScanNode extends FileQueryScanNode {
                     partitionCheckSet.add(partition.toString());
                 }
 
-                if (totalFileSize > Config.max_selected_total_file_size_for_lakehouse_table) {
+                if (maxFileSizeForLakehouse > -1 && totalFileSize > maxFileSizeForLakehouse) {
                     TableIf table = getTargetTable();
                     plannedFiles.close();
                     throw new AnalysisException("the total scan bytes: " + totalFileSize
                             + " for " + table.getDatabase().getFullName() + "." + table.getName() + " has "
                             + "exceed max bytes for single iceberg table: "
-                            + Config.max_selected_total_file_size_for_lakehouse_table);
+                            + maxFileSizeForLakehouse);
                 }
             }
             if (ConnectContext.get() != null) {

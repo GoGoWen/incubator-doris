@@ -476,11 +476,16 @@ public class HudiScanNode extends HiveScanNode {
             totalFileSize += metadata.totalSize;
         }
 
-        if (totalFileSize > Config.max_selected_total_file_size_for_lakehouse_table) {
+        long maxFileSizeForLakehouse = -1L;
+        if (sessionVariable != null) {
+            maxFileSizeForLakehouse = sessionVariable.maxSelectedTotalFileSizeForLakehouseTable;
+        }
+
+        if (maxFileSizeForLakehouse > -1 && totalFileSize > maxFileSizeForLakehouse) {
             throw new AnalysisException("the total scan bytes: " + totalFileSize
                 + " for " + hmsTable.getDbName() + "." + hmsTable.getName()
                 + " has exceed max bytes for single hudi table: "
-                + Config.max_selected_total_file_size_for_lakehouse_table);
+                + maxFileSizeForLakehouse);
         }
         if (ConnectContext.get() != null) {
             ConnectContext.get().addToTotalScanBytes(totalFileSize);
