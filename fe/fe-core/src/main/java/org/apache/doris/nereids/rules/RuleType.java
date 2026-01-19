@@ -334,8 +334,6 @@ public enum RuleType {
     LEADING_JOIN(RuleTypeClass.REWRITE),
     REWRITE_SENTINEL(RuleTypeClass.REWRITE),
 
-    OPERATIVE_COLUMN_DERIVE(RuleTypeClass.REWRITE),
-
     // topn opts
     DEFER_MATERIALIZE_TOP_N_RESULT(RuleTypeClass.REWRITE),
     // pre agg for random distributed table

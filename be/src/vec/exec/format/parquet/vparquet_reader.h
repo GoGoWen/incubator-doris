@@ -53,10 +53,6 @@ class TFileRangeDesc;
 class TFileScanRangeParams;
 class TupleDescriptor;
 
-namespace segment_v2 {
-class RowIdColumnIteratorV2;
-}
-
 namespace io {
 class FileSystem;
 struct IOContext;
@@ -155,12 +151,6 @@ public:
     std::vector<tparquet::KeyValue> get_metadata_key_values();
     void set_table_to_file_col_map(std::unordered_map<std::string, std::string>& map) {
         _table_col_to_file_col = map;
-    }
-
-    void set_row_id_column_iterator(
-            const std::pair<std::shared_ptr<segment_v2::RowIdColumnIteratorV2>, int>&
-                    iterator_pair) {
-        _row_id_column_iterator_pair = iterator_pair;
     }
 
 protected:
@@ -320,7 +310,5 @@ private:
     const std::unordered_map<int, VExprContextSPtrs>* _slot_id_to_filter_conjuncts = nullptr;
     bool _hive_use_column_names = false;
     std::unordered_map<tparquet::Type::type, bool> _ignored_stats;
-    std::pair<std::shared_ptr<segment_v2::RowIdColumnIteratorV2>, int>
-            _row_id_column_iterator_pair = {nullptr, -1};
 };
 } // namespace doris::vectorized

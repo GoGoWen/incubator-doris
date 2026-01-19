@@ -27,8 +27,6 @@
 #include <utility>
 
 #include "common/logging.h"
-#include "gen_cpp/internal_service.pb.h"
-#include "gutil/integral_types.h"
 #include "concurrentqueue.h"
 #include "gutil/integral_types.h"
 #include "pipeline/exec/data_queue.h"
@@ -190,12 +188,12 @@ public:
     CountedFinishDependency(int id, int node_id, std::string name)
             : Dependency(id, node_id, name, true) {}
 
-    void add(uint32_t count = 1) {
+    void add() {
         std::unique_lock<std::mutex> l(_mtx);
         if (!_counter) {
             block();
         }
-        _counter += count;
+        _counter++;
     }
 
     void sub() {
@@ -591,12 +589,6 @@ public:
     std::mutex sink_eos_lock;
 };
 
-struct DataQueueSharedState : public BasicSharedState {
-    ENABLE_FACTORY_CREATOR(DataQueueSharedState)
-public:
-    DataQueue data_queue;
-};
-
 class AsyncWriterDependency final : public Dependency {
 public:
     using SharedState = BasicSharedState;
@@ -760,7 +752,6 @@ public:
             source_deps[i]->set_shared_state(this);
         }
     };
-    
     void sub_running_sink_operators();
     void sub_running_source_operators();
     void _set_always_ready() {
@@ -807,40 +798,6 @@ public:
             sink_deps.front()->set_ready();
         }
     }
-};
-
-struct FetchRpcStruct {
-    std::shared_ptr<PBackendService_Stub> stub;
-    PMultiGetRequestV2 request;
-    std::shared_ptr<doris::DummyBrpcCallback<PMultiGetResponseV2>> callback;
-    MonotonicStopWatch rpc_timer;
-};
-
-struct MaterializationSharedState : public BasicSharedState {
-    ENABLE_FACTORY_CREATOR(MaterializationSharedState)
-public:
-    MaterializationSharedState() = default;
-
-    Status init_multi_requests(const TMaterializationNode& tnode, RuntimeState* state);
-    Status create_muiltget_result(const vectorized::Columns& columns, bool eos, bool gc_id_map);
-    Status merge_multi_response(vectorized::Block* block);
-
-    Dependency* create_source_dependency(int operator_id, int node_id,
-                                         const std::string& name);
-
-    bool rpc_struct_inited = false;
-    Status rpc_status = Status::OK();
-    bool last_block = false;
-    // empty materialization sink block not need to merge block
-    bool need_merge_block = true;
-    vectorized::Block origin_block;
-    // The rowid column of the origin block. should be replaced by the column of the result block.
-    std::vector<int> rowid_locs;
-    std::vector<vectorized::MutableBlock> response_blocks;
-    std::map<int64_t, FetchRpcStruct> rpc_struct_map;
-    // Register each line in which block to ensure the order of the result.
-    // Zero means NULL value.
-    std::vector<std::vector<int64_t>> block_order_results;
 };
 
 } // namespace doris::pipeline

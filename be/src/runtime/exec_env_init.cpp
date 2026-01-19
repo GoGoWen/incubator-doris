@@ -37,7 +37,6 @@
 #include "io/cache/block/block_file_cache_factory.h"
 #include "io/fs/file_meta_cache.h"
 #include "io/fs/local_file_reader.h"
-#include "olap/id_manager.h"
 #include "olap/memtable_memory_limiter.h"
 #include "olap/olap_define.h"
 #include "olap/options.h"
@@ -399,7 +398,6 @@ Status ExecEnv::_init_mem_env() {
 
     _dummy_lru_cache = std::make_shared<DummyLRUCache>();
 
-    _id_manager = new IdManager();
     _cache_manager = CacheManager::create_global_instance();
 
     int64_t storage_cache_limit =
@@ -615,9 +613,6 @@ void ExecEnv::destroy() {
     SAFE_DELETE(_schema_cache);
     SAFE_DELETE(_segment_loader);
     SAFE_DELETE(_row_cache);
-
-    // _id_manager must be destoried before tablet schema cache
-    SAFE_DELETE(_id_manager);
 
     // StorageEngine must be destoried before _page_no_cache_mem_tracker.reset
     // StorageEngine must be destoried before _cache_manager destory

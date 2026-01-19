@@ -43,8 +43,6 @@
 #include "pipeline/exec/iceberg_table_sink_operator.h"
 #include "pipeline/exec/jdbc_scan_operator.h"
 #include "pipeline/exec/jdbc_table_sink_operator.h"
-#include "pipeline/exec/materialization_sink_operator.h"
-#include "pipeline/exec/materialization_source_operator.h"
 #include "pipeline/exec/meta_scan_operator.h"
 #include "pipeline/exec/multi_cast_data_stream_sink.h"
 #include "pipeline/exec/multi_cast_data_stream_source.h"
@@ -664,7 +662,6 @@ DECLARE_OPERATOR_X(SetProbeSinkLocalState<false>)
 DECLARE_OPERATOR_X(SetSinkLocalState<true>)
 DECLARE_OPERATOR_X(SetSinkLocalState<false>)
 DECLARE_OPERATOR_X(PartitionedHashJoinSinkLocalState)
-DECLARE_OPERATOR_X(MaterializationSinkLocalState)
 
 #undef DECLARE_OPERATOR_X
 
@@ -695,7 +692,6 @@ DECLARE_OPERATOR_X(SchemaScanLocalState)
 DECLARE_OPERATOR_X(MetaScanLocalState)
 DECLARE_OPERATOR_X(LocalExchangeSourceLocalState)
 DECLARE_OPERATOR_X(PartitionedHashJoinProbeLocalState)
-DECLARE_OPERATOR_X(MaterializationSourceLocalState)
 
 #undef DECLARE_OPERATOR_X
 
@@ -725,7 +721,6 @@ template class PipelineXSinkLocalState<MultiCastSharedState>;
 template class PipelineXSinkLocalState<SetSharedState>;
 template class PipelineXSinkLocalState<LocalExchangeSharedState>;
 template class PipelineXSinkLocalState<BasicSharedState>;
-template class PipelineXSinkLocalState<DataQueueSharedState>;
 
 template class PipelineXLocalState<HashJoinSharedState>;
 template class PipelineXLocalState<PartitionedHashJoinSharedState>;
@@ -742,7 +737,6 @@ template class PipelineXLocalState<PartitionSortNodeSharedState>;
 template class PipelineXLocalState<SetSharedState>;
 template class PipelineXLocalState<LocalExchangeSharedState>;
 template class PipelineXLocalState<BasicSharedState>;
-template class PipelineXLocalState<DataQueueSharedState>;
 
 template class AsyncWriterSink<doris::vectorized::VFileResultWriter, ResultFileSinkOperatorX>;
 template class AsyncWriterSink<doris::vectorized::VJdbcTableWriter, JdbcTableSinkOperatorX>;

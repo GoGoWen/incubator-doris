@@ -43,14 +43,12 @@ import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.Utils;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -75,33 +73,20 @@ public class LogicalHudiScan extends LogicalFileScan {
             Optional<GroupExpression> groupExpression, Optional<LogicalProperties> logicalProperties,
             Set<Expression> conjuncts, SelectedPartitions selectedPartitions, Optional<TableSample> tableSample,
             Optional<TableSnapshot> tableSnapshot,
-            Optional<TableScanParams> scanParams, Optional<IncrementalRelation> incrementalRelation,
-            Collection<Slot> operativeSlots) {
+            Optional<TableScanParams> scanParams, Optional<IncrementalRelation> incrementalRelation) {
         super(id, table, qualifier, groupExpression, logicalProperties, conjuncts,
-                selectedPartitions, tableSample, tableSnapshot, operativeSlots);
+                selectedPartitions, tableSample, tableSnapshot);
         Objects.requireNonNull(scanParams, "scanParams should not null");
         Objects.requireNonNull(incrementalRelation, "incrementalRelation should not null");
         this.scanParams = scanParams;
         this.incrementalRelation = incrementalRelation;
     }
 
-    /**
-     * Constructor for LogicalHudiScan (backward compatible).
-     */
-    protected LogicalHudiScan(RelationId id, ExternalTable table, List<String> qualifier,
-            Optional<GroupExpression> groupExpression, Optional<LogicalProperties> logicalProperties,
-            Set<Expression> conjuncts, SelectedPartitions selectedPartitions, Optional<TableSample> tableSample,
-            Optional<TableSnapshot> tableSnapshot,
-            Optional<TableScanParams> scanParams, Optional<IncrementalRelation> incrementalRelation) {
-        this(id, table, qualifier, groupExpression, logicalProperties, conjuncts,
-                selectedPartitions, tableSample, tableSnapshot, scanParams, incrementalRelation, ImmutableList.of());
-    }
-
     public LogicalHudiScan(RelationId id, ExternalTable table, List<String> qualifier,
             Optional<TableSample> tableSample, Optional<TableSnapshot> tableSnapshot) {
         this(id, table, qualifier, Optional.empty(), Optional.empty(),
                 Sets.newHashSet(), SelectedPartitions.NOT_PRUNED, tableSample, tableSnapshot,
-                Optional.empty(), Optional.empty(), ImmutableList.of());
+                Optional.empty(), Optional.empty());
     }
 
     public Optional<TableScanParams> getScanParams() {
@@ -149,17 +134,10 @@ public class LogicalHudiScan extends LogicalFileScan {
     }
 
     @Override
-    public LogicalHudiScan withOperativeSlots(Collection<Slot> operativeSlots) {
-        return new LogicalHudiScan(relationId, (ExternalTable) table, qualifier, groupExpression,
-                Optional.of(getLogicalProperties()), conjuncts, selectedPartitions, tableSample, tableSnapshot,
-                scanParams, incrementalRelation, operativeSlots);
-    }
-
-    @Override
     public LogicalHudiScan withGroupExpression(Optional<GroupExpression> groupExpression) {
         return new LogicalHudiScan(relationId, (ExternalTable) table, qualifier, groupExpression,
                 Optional.of(getLogicalProperties()), conjuncts, selectedPartitions, tableSample, tableSnapshot,
-                scanParams, incrementalRelation, getOperativeSlots());
+                scanParams, incrementalRelation);
     }
 
     @Override
@@ -167,27 +145,27 @@ public class LogicalHudiScan extends LogicalFileScan {
             Optional<LogicalProperties> logicalProperties, List<Plan> children) {
         return new LogicalHudiScan(relationId, (ExternalTable) table, qualifier,
                 groupExpression, logicalProperties, conjuncts, selectedPartitions, tableSample, tableSnapshot,
-                scanParams, incrementalRelation, getOperativeSlots());
+                scanParams, incrementalRelation);
     }
 
     @Override
     public LogicalHudiScan withConjuncts(Set<Expression> conjuncts) {
         return new LogicalHudiScan(relationId, (ExternalTable) table, qualifier, Optional.empty(),
                 Optional.of(getLogicalProperties()), conjuncts, selectedPartitions, tableSample, tableSnapshot,
-                scanParams, incrementalRelation, getOperativeSlots());
+                scanParams, incrementalRelation);
     }
 
     public LogicalHudiScan withSelectedPartitions(SelectedPartitions selectedPartitions) {
         return new LogicalHudiScan(relationId, (ExternalTable) table, qualifier, Optional.empty(),
                 Optional.of(getLogicalProperties()), conjuncts, selectedPartitions, tableSample, tableSnapshot,
-                scanParams, incrementalRelation, getOperativeSlots());
+                scanParams, incrementalRelation);
     }
 
     @Override
     public LogicalHudiScan withRelationId(RelationId relationId) {
         return new LogicalHudiScan(relationId, (ExternalTable) table, qualifier, Optional.empty(),
                 Optional.empty(), conjuncts, selectedPartitions, tableSample, tableSnapshot,
-                scanParams, incrementalRelation, getOperativeSlots());
+                scanParams, incrementalRelation);
     }
 
     @Override
@@ -255,6 +233,6 @@ public class LogicalHudiScan extends LogicalFileScan {
         newScanParams = Optional.ofNullable(scanParams);
         return new LogicalHudiScan(relationId, table, qualifier, Optional.empty(),
                 Optional.empty(), conjuncts, selectedPartitions, tableSample, tableSnapshot,
-                newScanParams, newIncrementalRelation, getOperativeSlots());
+                newScanParams, newIncrementalRelation);
     }
 }

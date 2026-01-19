@@ -32,12 +32,10 @@
 #include "common/logging.h"
 #include "common/object_pool.h"
 #include "common/status.h"
-#include "olap/id_manager.h"
 #include "pipeline/exec/operator.h"
 #include "pipeline/pipeline_x/operator.h"
 #include "pipeline/pipeline_x/pipeline_x_task.h"
 #include "runtime/exec_env.h"
-#include "runtime/fragment_mgr.h"
 #include "runtime/load_path_mgr.h"
 #include "runtime/memory/mem_tracker_limiter.h"
 #include "runtime/memory/thread_mem_tracker_mgr.h"
@@ -331,10 +329,6 @@ Status RuntimeState::init(const TUniqueId& fragment_instance_id, const TQueryOpt
     return Status::OK();
 }
 
-std::weak_ptr<QueryContext> RuntimeState::get_query_ctx_weak() {
-    return _exec_env->fragment_mgr()->get_query_context(_query_ctx->query_id());
-}
-
 void RuntimeState::init_mem_trackers(const std::string& name, const TUniqueId& id) {
     _query_mem_tracker = MemTrackerLimiter::create_shared(
             MemTrackerLimiter::Type::OTHER, fmt::format("{}#Id={}", name, print_id(id)));
@@ -560,10 +554,6 @@ Status RuntimeState::register_consumer_runtime_filter(const doris::TRuntimeFilte
 
 bool RuntimeState::is_nereids() const {
     return _query_ctx->is_nereids();
-}
-
-void RuntimeState::set_id_file_map() {
-    _id_file_map = _exec_env->get_id_manager()->add_id_file_map(_query_id, execution_timeout());
 }
 
 } // end namespace doris

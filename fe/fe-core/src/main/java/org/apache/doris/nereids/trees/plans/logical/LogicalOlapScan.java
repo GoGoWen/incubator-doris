@@ -166,7 +166,7 @@ public class LogicalOlapScan extends LogicalCatalogRelation implements OlapScan 
             Optional<TableSample> tableSample, boolean directMvScan,
             Map<String, Set<List<String>>> colToSubPathsMap) {
         super(id, PlanType.LOGICAL_OLAP_SCAN, table, qualifier,
-                groupExpression, logicalProperties, ImmutableList.of());
+                groupExpression, logicalProperties);
         Preconditions.checkArgument(selectedPartitionIds != null,
                 "selectedPartitionIds can not be null");
         this.selectedTabletIds = ImmutableList.copyOf(selectedTabletIds);

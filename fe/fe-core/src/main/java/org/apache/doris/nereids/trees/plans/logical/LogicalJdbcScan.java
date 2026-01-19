@@ -30,7 +30,6 @@ import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.Utils;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import java.util.List;
@@ -49,8 +48,7 @@ public class LogicalJdbcScan extends LogicalExternalRelation {
                            Optional<GroupExpression> groupExpression,
                            Optional<LogicalProperties> logicalProperties,
                            Set<Expression> conjuncts) {
-        super(id, PlanType.LOGICAL_JDBC_SCAN, table, qualifier, conjuncts, groupExpression, logicalProperties,
-                ImmutableList.of());
+        super(id, PlanType.LOGICAL_JDBC_SCAN, table, qualifier, conjuncts, groupExpression, logicalProperties);
     }
 
     public LogicalJdbcScan(RelationId id, TableIf table, List<String> qualifier) {

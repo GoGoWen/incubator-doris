@@ -54,7 +54,6 @@ import org.apache.doris.qe.StmtExecutor;
 import org.apache.doris.statistics.ResultRow;
 import org.apache.doris.utframe.TestWithFeService;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -257,7 +256,7 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
         final SelectedPartitions selectedPartitions = new SelectedPartitions(0, ImmutableMap.of(), true);
         Set<Expression> conjuncts = Sets.newHashSet(expression1, expression2, expression3);
         LogicalFileScan logicalFileScan = new LogicalFileScan(new RelationId(1), table,
-                Lists.newArrayList("test", "test"), Optional.empty(), Optional.empty(), ImmutableList.of());
+                Lists.newArrayList("test", "test"), Optional.empty(), Optional.empty());
         new Expectations() {
             {
                 table.getName();
@@ -304,7 +303,7 @@ class PruneFileScanPartitionTest extends TestWithFeService implements MemoPatter
         final SelectedPartitions selectedPartitions = new SelectedPartitions(0, ImmutableMap.of(), true);
         Set<Expression> conjuncts = Sets.newHashSet(expression1, expression2, expression3);
         LogicalFileScan logicalFileScan = new LogicalFileScan(new RelationId(1), table,
-                Lists.newArrayList("test", "test"), Optional.empty(), Optional.empty(), ImmutableList.of());
+                Lists.newArrayList("test", "test"), Optional.empty(), Optional.empty());
         new Expectations() {
             {
                 table.getName();

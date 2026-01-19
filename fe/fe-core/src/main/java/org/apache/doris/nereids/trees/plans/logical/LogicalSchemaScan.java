@@ -26,8 +26,6 @@ import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.Utils;
 
-import com.google.common.collect.ImmutableList;
-
 import java.util.List;
 import java.util.Optional;
 
@@ -42,8 +40,7 @@ public class LogicalSchemaScan extends LogicalCatalogRelation {
 
     public LogicalSchemaScan(RelationId id, TableIf table, List<String> qualifier,
             Optional<GroupExpression> groupExpression, Optional<LogicalProperties> logicalProperties) {
-        super(id, PlanType.LOGICAL_SCHEMA_SCAN, table, qualifier, groupExpression, logicalProperties,
-                ImmutableList.of());
+        super(id, PlanType.LOGICAL_SCHEMA_SCAN, table, qualifier, groupExpression, logicalProperties);
     }
 
     @Override
