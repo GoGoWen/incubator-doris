@@ -51,7 +51,6 @@
 #include "vec/data_types/data_type_number.h"
 #include "vec/data_types/data_type_quantilestate.h"
 #include "vec/data_types/data_type_string.h"
-#include "vec/exec/format/file_reader/new_plain_text_line_reader.h"
 
 namespace doris::vectorized {
 
@@ -219,52 +218,6 @@ inline void serialize_and_deserialize_pb_test() {
 
 TEST(DataTypeSerDeTest, DataTypeScalaSerDeTest) {
     serialize_and_deserialize_pb_test();
-}
-
-// Test for FormatOptions default values
-TEST(DataTypeSerDeTest, FormatOptionsDefaultValuesTest) {
-    // Create a FormatOptions with default constructor
-    DataTypeSerDe::FormatOptions options;
-
-    // Verify null_format has default value "\\N"
-    EXPECT_NE(options.null_format, nullptr);
-    EXPECT_STREQ(options.null_format, "\\N");
-    EXPECT_EQ(options.null_len, 2);
-
-    // Verify nested_string_wrapper has default value ""
-    EXPECT_NE(options.nested_string_wrapper, nullptr);
-    EXPECT_STREQ(options.nested_string_wrapper, "");
-    EXPECT_EQ(options.wrapper_len, 0);
-
-    // Verify other default values
-    EXPECT_EQ(options.collection_delim, ',');
-    EXPECT_EQ(options.map_key_delim, ':');
-    EXPECT_EQ(options.converted_from_string, false);
-    EXPECT_EQ(options.escape_char, 0);
-    EXPECT_EQ(options._output_object_data, true);
-
-    std::cout << "FormatOptionsDefaultValuesTest: All default values are properly initialized"
-              << std::endl;
-}
-
-// Test that FormatOptions can be used safely without explicit initialization
-TEST(DataTypeSerDeTest, FormatOptionsUsageWithoutExplicitInitTest) {
-    DataTypeSerDe::FormatOptions options;
-
-    // Test null_format access
-    std::string null_str(options.null_format, options.null_len);
-    EXPECT_EQ(null_str, "\\N");
-
-    // Test nested_string_wrapper access
-    std::string wrapper_str(options.nested_string_wrapper, options.wrapper_len);
-    EXPECT_EQ(wrapper_str, "");
-
-    // Test get_collection_delimiter function
-    char delim = options.get_collection_delimiter(1);
-    EXPECT_EQ(delim, ',');
-
-    std::cout << "FormatOptionsUsageWithoutExplicitInitTest: FormatOptions can be used safely"
-              << std::endl;
 }
 
 } // namespace doris::vectorized

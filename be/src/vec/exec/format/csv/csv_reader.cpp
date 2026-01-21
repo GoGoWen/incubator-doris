@@ -266,12 +266,6 @@ void CsvReader::_init_file_description() {
 }
 
 Status CsvReader::init_reader(bool is_load) {
-    if (!is_load && _file_slot_descs.empty()) {
-        return Status::InternalError(
-                "No file slot descriptors found for file: {}. ",
-                _range.path);
-    }
-
     // set the skip lines and start offset
     int64_t start_offset = _range.start_offset;
     if (start_offset == 0) {
@@ -388,10 +382,9 @@ Status CsvReader::init_reader(bool is_load) {
         _fields_splitter = std::make_unique<PlainCsvTextFieldSplitter>(
                 _trim_tailing_spaces, false, _value_separator, _value_separator_length, -1);
     } else {
-        size_t col_sep_num = _file_slot_descs.size() > 1 ? _file_slot_descs.size() - 1 : 0;
         text_line_reader_ctx = std::make_shared<EncloseCsvLineReaderContext>(
                 _line_delimiter, _line_delimiter_length, _value_separator, _value_separator_length,
-                col_sep_num, _enclose, _escape, _keep_cr);
+                _file_slot_descs.size() - 1, _enclose, _escape, _keep_cr);
 
         _fields_splitter = std::make_unique<EncloseCsvTextFieldSplitter>(
                 _trim_tailing_spaces, !_not_trim_enclose,
@@ -904,11 +897,9 @@ Status CsvReader::_prepare_parse(size_t* read_line, bool* is_parse_name) {
                 _trim_tailing_spaces, _trim_double_quotes, _value_separator,
                 _value_separator_length);
     } else {
-        // in load task or schema mismatch case, the _file_slot_descs may be empty vector,
-        size_t col_sep_num = _file_slot_descs.size() > 1 ? _file_slot_descs.size() - 1 : 0;
         text_line_reader_ctx = std::make_shared<EncloseCsvLineReaderContext>(
                 _line_delimiter, _line_delimiter_length, _value_separator, _value_separator_length,
-                col_sep_num, _enclose, _escape, _keep_cr);
+                _file_slot_descs.size() - 1, _enclose, _escape, _keep_cr);
         _fields_splitter = std::make_unique<EncloseCsvTextFieldSplitter>(
                 _trim_tailing_spaces, false,
                 std::static_pointer_cast<EncloseCsvLineReaderContext>(text_line_reader_ctx),
