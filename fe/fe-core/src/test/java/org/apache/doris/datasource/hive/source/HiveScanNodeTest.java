@@ -1091,21 +1091,18 @@ public class HiveScanNodeTest {
     // ========== Tests for getFileSplitByPartitions (lines 288, 329, 437) ==========
 
     @Test
-    public void testGetFileSplitByPartitionsWithCache(@Injectable SessionVariable sessionVariable,
-            @Injectable TupleDescriptor tupleDesc,
+    public void testGetFileSplitByPartitionsWithCache(@Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog,
             @Injectable HiveMetaStoreCache cache,
             @Injectable org.apache.hadoop.hive.metastore.api.Table remoteTable,
             @Injectable StorageDescriptor sd,
             @Injectable SerDeInfo serDeInfo) throws Exception {
-        // Test line 437: cache.getFilesByPartitions call with cache enabled
-
         Map<String, String> tableParams = new java.util.HashMap<>();
         tableParams.put("doris_x.enable_external_file_cache", "true");
 
         Map<String, String> serdeParams = new java.util.HashMap<>();
-
+        SessionVariable sessionVariable = new SessionVariable();
         new Expectations() {
             {
                 tupleDesc.getTable();
@@ -1133,6 +1130,10 @@ public class HiveScanNodeTest {
 
                 sd.getSerdeInfo();
                 result = serDeInfo;
+                minTimes = 0;
+
+                sd.getInputFormat();
+                result = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
                 minTimes = 0;
 
                 serDeInfo.getParameters();
@@ -1175,16 +1176,14 @@ public class HiveScanNodeTest {
     }
 
     @Test
-    public void testGetFileSplitByPartitionsWithoutCache(@Injectable SessionVariable sessionVariable,
-            @Injectable TupleDescriptor tupleDesc,
+    public void testGetFileSplitByPartitionsWithoutCache(@Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog,
             @Injectable HiveMetaStoreCache cache,
             @Injectable org.apache.hadoop.hive.metastore.api.Table remoteTable,
             @Injectable StorageDescriptor sd,
             @Injectable SerDeInfo serDeInfo) throws Exception {
-        // Test line 437: cache.getFilesByPartitions call with cache disabled
-
+        SessionVariable sessionVariable = new SessionVariable();
         Map<String, String> tableParams = new java.util.HashMap<>();
         tableParams.put("doris_x.enable_external_file_cache", "false");
 
@@ -1217,6 +1216,10 @@ public class HiveScanNodeTest {
 
                 sd.getSerdeInfo();
                 result = serDeInfo;
+                minTimes = 0;
+
+                sd.getInputFormat();
+                result = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
                 minTimes = 0;
 
                 serDeInfo.getParameters();
@@ -1259,8 +1262,7 @@ public class HiveScanNodeTest {
     }
 
     @Test
-    public void testGetFileSplitByPartitionsWithSerdeParams(@Injectable SessionVariable sessionVariable,
-            @Injectable TupleDescriptor tupleDesc,
+    public void testGetFileSplitByPartitionsWithSerdeParams(@Injectable TupleDescriptor tupleDesc,
             @Injectable HMSExternalTable table,
             @Injectable ExternalCatalog catalog,
             @Injectable HiveMetaStoreCache cache,
@@ -1301,11 +1303,15 @@ public class HiveScanNodeTest {
                 sd.getSerdeInfo();
                 result = serDeInfo;
 
+                sd.getInputFormat();
+                result = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
+                minTimes = 0;
+
                 serDeInfo.getParameters();
                 result = serdeParams;
             }
         };
-
+        SessionVariable sessionVariable = new SessionVariable();
         HiveScanNode scanNode = new HiveScanNode(new PlanNodeId(1), tupleDesc, true, sessionVariable);
 
         // Create file cache values

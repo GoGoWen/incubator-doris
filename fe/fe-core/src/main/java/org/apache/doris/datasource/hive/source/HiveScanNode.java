@@ -509,25 +509,19 @@ public class HiveScanNode extends FileQueryScanNode {
                 }
             }
         }
-        long maxFileSizeForUnrecommended = -1L;
-        long maxFileSizeForHive = -1L;
-        if (sessionVariable != null) {
-            maxFileSizeForUnrecommended = sessionVariable.maxSelectedFileSizeForUnrecommendedHiveTable;
-            maxFileSizeForHive = sessionVariable.maxSelectedTotalFileSizeForHiveTable;
-        }
 
-        if (!hmsTable.isOrcOrParquetFileFormat() && maxFileSizeForUnrecommended > -1
-                && selectedFileSize > maxFileSizeForUnrecommended) {
+        if (!hmsTable.isOrcOrParquetFileFormat()
+                && selectedFileSize > sessionVariable.maxSelectedFileSizeForUnrecommendedHiveTable) {
             throw new AnalysisException(
                     "the total scan bytes: " + selectedFileSize + " for " + hmsTable.getDbName() + "."
                             + hmsTable.getName() + " has " + "exceed max bytes for single hive table with unrecommended"
-                            + " file format: " + maxFileSizeForUnrecommended);
+                            + " file format: " + sessionVariable.maxSelectedFileSizeForUnrecommendedHiveTable);
         }
-        if (maxFileSizeForHive > -1 && selectedFileSize > maxFileSizeForHive) {
+        if (selectedFileSize > sessionVariable.maxSelectedTotalFileSizeForHiveTable) {
             throw new AnalysisException("the total scan bytes: " + selectedFileSize
                     + " for " + hmsTable.getDbName() + "." + hmsTable.getName() + " has "
                     + "exceed max bytes for single hive table: "
-                    + maxFileSizeForHive);
+                    + sessionVariable.maxSelectedTotalFileSizeForHiveTable);
         }
         if (ConnectContext.get() != null) {
             ConnectContext.get().addToTotalScanBytes(selectedFileSize);

@@ -372,8 +372,7 @@ public class HudiScanNodeTest {
 
 
     @Test
-    public void testGetSplitsExceedsMaxFileSize(@Injectable SessionVariable sessionVariable,
-                                                @Injectable TupleDescriptor tupleDesc,
+    public void testGetSplitsExceedsMaxFileSize(@Injectable TupleDescriptor tupleDesc,
                                                 @Injectable HMSExternalTable table,
                                                 @Injectable ExternalCatalog catalog,
                                                 @Injectable HoodieTableMetaClient client) throws Exception {
@@ -387,7 +386,7 @@ public class HudiScanNodeTest {
                 minTimes = 0;
             }
         };
-
+        SessionVariable sessionVariable = new SessionVariable();
         sessionVariable.maxSelectedTotalFileSizeForLakehouseTable = 8796093022208L;
 
         HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
@@ -437,7 +436,12 @@ public class HudiScanNodeTest {
                     }).when(executor).execute(Mockito.any(Runnable.class));
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
+                    Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(executor);
+                    Mockito.doAnswer(invocation -> {
+                        ((Runnable) invocation.getArguments()[0]).run();
+                        java.util.concurrent.Future<?> future = Mockito.mock(java.util.concurrent.Future.class);
+                        return future;
+                    }).when(executor).submit(Mockito.any(Runnable.class));
                     return env;
                 }
             };
@@ -497,8 +501,7 @@ public class HudiScanNodeTest {
 
 
     @Test
-    public void testGetSplitsWithSessionVariable(@Injectable SessionVariable sessionVariable,
-                                                @Injectable TupleDescriptor tupleDesc,
+    public void testGetSplitsWithSessionVariable(@Injectable TupleDescriptor tupleDesc,
                                                 @Injectable HMSExternalTable table,
                                                 @Injectable ExternalCatalog catalog,
                                                 @Injectable HoodieTableMetaClient client) throws Exception {
@@ -510,7 +513,8 @@ public class HudiScanNodeTest {
                 minTimes = 0;
             }
         };
-
+        SessionVariable sessionVariable = new SessionVariable();
+        sessionVariable.maxSelectedTotalFileSizeForLakehouseTable = 1024L;
         HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
 
         // Mock static methods that cause NullPointerException
@@ -554,7 +558,7 @@ public class HudiScanNodeTest {
                     }).when(executor).execute(Mockito.any(Runnable.class));
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
+                    Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(executor);
                     return env;
                 }
             };
@@ -645,6 +649,11 @@ public class HudiScanNodeTest {
 
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
                     Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(executor);
+                    Mockito.doAnswer(invocation -> {
+                        ((Runnable) invocation.getArguments()[0]).run();
+                        java.util.concurrent.Future<?> future = Mockito.mock(java.util.concurrent.Future.class);
+                        return future;
+                    }).when(executor).submit(Mockito.any(Runnable.class));
                     return env;
                 }
             };
@@ -660,7 +669,6 @@ public class HudiScanNodeTest {
                 }
             };
 
-            // Execute and expect exception due to session limit (1KB < 10KB)
             List<Split> splits = Collections.synchronizedList(new ArrayList<>());
             try {
                 scanNode.getPartitionsSplits(partitions, splits);
@@ -669,7 +677,6 @@ public class HudiScanNodeTest {
                 Assert.assertTrue("Exception message should mention exceed max bytes: " + e.getMessage(),
                         e.getMessage().contains("has exceed max bytes for single hudi table"));
             }
-
         } finally {
             // Clean up static mocks
             reflectionUtilsMock.close();
@@ -678,8 +685,7 @@ public class HudiScanNodeTest {
     }
 
     @Test
-    public void testGetSplitsWithSessionVariablePriority(@Injectable SessionVariable sessionVariable,
-                                                         @Injectable TupleDescriptor tupleDesc,
+    public void testGetSplitsWithSessionVariablePriority(@Injectable TupleDescriptor tupleDesc,
                                                          @Injectable HMSExternalTable table,
                                                          @Injectable ExternalCatalog catalog,
                                                          @Injectable HoodieTableMetaClient client) throws Exception {
@@ -690,7 +696,8 @@ public class HudiScanNodeTest {
                 minTimes = 0;
             }
         };
-
+        SessionVariable sessionVariable = new SessionVariable();
+        sessionVariable.maxSelectedTotalFileSizeForLakehouseTable = 1024L;
         HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
 
         // Mock static methods
@@ -728,8 +735,13 @@ public class HudiScanNodeTest {
                         ((Runnable) invocation.getArguments()[0]).run();
                         return null;
                     }).when(executor).execute(Mockito.any(Runnable.class));
+                    Mockito.doAnswer(invocation -> {
+                        ((Runnable) invocation.getArguments()[0]).run();
+                        java.util.concurrent.Future<?> future = Mockito.mock(java.util.concurrent.Future.class);
+                        return future;
+                    }).when(executor).submit(Mockito.any(Runnable.class));
                     Mockito.when(env.getExtMetaCacheMgr()).thenReturn(metaCacheMgr);
-                    Mockito.when(metaCacheMgr.getFileListingExecutor(Mockito.anyInt())).thenReturn(executor);
+                    Mockito.when(metaCacheMgr.getLakehouseGetPartitionSplitExecutor()).thenReturn(executor);
                     return env;
                 }
             };
@@ -1538,17 +1550,12 @@ public class HudiScanNodeTest {
             }
         };
 
-        // try {
-        new MockUp<ConnectContext>() {
-            @Mock
-            public ConnectContext get() {
-                ConnectContext context = Mockito.mock(ConnectContext.class);
-                SessionVariable sv = new SessionVariable();
-                sv.maxSelectedTotalFileSizeForLakehouseTable = 1000L;
-                Mockito.when(context.getSessionVariable()).thenReturn(sv);
-                return context;
-            }
-        };
+        // Set up ConnectContext with thread-local to avoid NPE in ExternalScanNode constructor
+        ConnectContext context = new ConnectContext();
+        SessionVariable sv = new SessionVariable();
+        sv.maxSelectedTotalFileSizeForLakehouseTable = 1000L;
+        context.setSessionVariable(sv);
+        context.setThreadLocalInfo();
 
         HudiScanNode scanNode = createMockHudiScanNode(sessionVariable, tupleDesc, table, catalog, client);
 
