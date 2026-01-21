@@ -101,7 +101,6 @@ import org.apache.doris.nereids.trees.plans.JoinType;
 import org.apache.doris.nereids.trees.plans.PartitionTopnPhase;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.PreAggStatus;
-import org.apache.doris.nereids.trees.plans.algebra.CatalogRelation;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalJoin;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalSort;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalAssertNumRows;
@@ -126,7 +125,6 @@ import org.apache.doris.nereids.trees.plans.physical.PhysicalHudiScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalIcebergTableSink;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalIntersect;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalJdbcScan;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalLazyMaterialize;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalLimit;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalNestedLoopJoin;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalOdbcScan;
@@ -173,7 +171,6 @@ import org.apache.doris.planner.HiveTableSink;
 import org.apache.doris.planner.IcebergTableSink;
 import org.apache.doris.planner.IntersectNode;
 import org.apache.doris.planner.JoinNodeBase;
-import org.apache.doris.planner.MaterializationNode;
 import org.apache.doris.planner.MultiCastDataSink;
 import org.apache.doris.planner.MultiCastPlanFragment;
 import org.apache.doris.planner.NestedLoopJoinNode;
@@ -676,7 +673,6 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
      */
     public Set<Expression> getConjunctsWithoutPartitionPredicate(PhysicalFileScan fileScan) {
         ExternalTable tbl = fileScan.getTable();
-        Set<Expression> result = Sets.newHashSet();
         if (tbl instanceof HMSExternalTable && (((HMSExternalTable) tbl).getDlaType() == DLAType.HIVE
                 || ((HMSExternalTable) tbl).getDlaType() == DLAType.HUDI)) {
             Map<String, Slot> scanOutput = fileScan.getOutput()
@@ -688,10 +684,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
                     .collect(Collectors.toSet());
             PartitionPruneExpressionExtractor.ExpressionEvaluableDetector detector =
                     new PartitionPruneExpressionExtractor.ExpressionEvaluableDetector(partitionSlots);
-
-            if (fileScan.getConjuncts() == null) {
-                return result;
-            }
+            Set<Expression> result = Sets.newHashSet();
             for (Expression expression : fileScan.getConjuncts()) {
                 if (!detector.detect(expression)) {
                     result.add(expression);
@@ -699,11 +692,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
             }
             return result;
         } else {
-            if (fileScan.getConjuncts() == null) {
-                return result;
-            } else {
-                return fileScan.getConjuncts();
-            }
+            return fileScan.getConjuncts();
         }
     }
 
@@ -1652,48 +1641,6 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
         }
         updateLegacyPlanIdToPhysicalPlan(currentFragment.getPlanRoot(), hashJoin);
         return currentFragment;
-    }
-
-    @Override
-    public PlanFragment visitPhysicalLazyMaterialize(PhysicalLazyMaterialize<? extends Plan> materialize,
-            PlanTranslatorContext context) {
-        PlanFragment inputPlanFragment = materialize.child(0).accept(this, context);
-        TupleDescriptor materializeTupleDesc = generateTupleDesc(materialize.getOutput(), null, context);
-
-        MaterializationNode materializeNode = new MaterializationNode(context.nextPlanNodeId(), materializeTupleDesc,
-                inputPlanFragment.getPlanRoot());
-
-        List<Expr> rowIds = materialize.getRowIds().stream()
-                .map(e -> ExpressionTranslator.translate(e, context))
-                .collect(Collectors.toList());
-        materializeNode.setRowIds(rowIds);
-
-        materializeNode.setLazyColumns(materialize.getLazyColumns());
-        materializeNode.setLocations(materialize.getLazySlotLocations());
-        materializeNode.setIdxs(materialize.getlazyTableIdxs());
-
-        List<Boolean> rowStoreFlags = new ArrayList<>();
-        for (CatalogRelation relation : materialize.getRelations()) {
-            rowStoreFlags.add(shouldUseRowStore(relation));
-        }
-        materializeNode.setRowStoreFlags(rowStoreFlags);
-
-        materializeNode.setTopMaterializeNode(context.isTopMaterializeNode());
-        if (context.isTopMaterializeNode()) {
-            context.setTopMaterializeNode(false);
-        }
-
-        inputPlanFragment.addPlanRoot(materializeNode);
-        return inputPlanFragment;
-    }
-
-    private boolean shouldUseRowStore(CatalogRelation rel) {
-        boolean useRowStore = false;
-        if (rel instanceof PhysicalOlapScan) {
-            OlapTable olapTable = ((PhysicalOlapScan) rel).getTable();
-            useRowStore = olapTable.storeRowColumn();
-        }
-        return useRowStore;
     }
 
     @Override

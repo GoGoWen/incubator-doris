@@ -35,8 +35,6 @@ import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.Utils;
 import org.apache.doris.statistics.Statistics;
 
-import com.google.common.collect.ImmutableList;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -61,7 +59,7 @@ public class PhysicalHudiScan extends PhysicalFileScan {
             Optional<TableSnapshot> tableSnapshot,
             Optional<TableScanParams> scanParams, Optional<IncrementalRelation> incrementalRelation) {
         super(id, PlanType.PHYSICAL_HUDI_SCAN, table, qualifier, distributionSpec, groupExpression, logicalProperties,
-                conjuncts, selectedPartitions, tableSample, tableSnapshot, ImmutableList.of());
+                conjuncts, selectedPartitions, tableSample, tableSnapshot);
         Objects.requireNonNull(scanParams, "scanParams should not null");
         Objects.requireNonNull(incrementalRelation, "incrementalRelation should not null");
         this.scanParams = scanParams;
@@ -78,8 +76,7 @@ public class PhysicalHudiScan extends PhysicalFileScan {
             Optional<TableSample> tableSample, Optional<TableSnapshot> tableSnapshot,
             Optional<TableScanParams> scanParams, Optional<IncrementalRelation> incrementalRelation) {
         super(id, PlanType.PHYSICAL_HUDI_SCAN, table, qualifier, distributionSpec, groupExpression, logicalProperties,
-                physicalProperties, statistics, conjuncts, selectedPartitions, tableSample, tableSnapshot,
-                ImmutableList.of());
+                physicalProperties, statistics, conjuncts, selectedPartitions, tableSample, tableSnapshot);
         this.scanParams = scanParams;
         this.incrementalRelation = incrementalRelation;
     }

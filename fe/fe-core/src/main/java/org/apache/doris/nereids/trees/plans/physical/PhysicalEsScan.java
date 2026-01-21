@@ -30,7 +30,6 @@ import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 import org.apache.doris.nereids.util.Utils;
 import org.apache.doris.statistics.Statistics;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import java.util.List;
@@ -52,8 +51,7 @@ public class PhysicalEsScan extends PhysicalCatalogRelation {
     public PhysicalEsScan(RelationId id, ExternalTable table, List<String> qualifier,
             DistributionSpec distributionSpec, Optional<GroupExpression> groupExpression,
             LogicalProperties logicalProperties, Set<Expression> conjuncts) {
-        super(id, PlanType.PHYSICAL_ES_SCAN, table, qualifier, groupExpression, logicalProperties,
-                ImmutableList.of());
+        super(id, PlanType.PHYSICAL_ES_SCAN, table, qualifier, groupExpression, logicalProperties);
         this.distributionSpec = distributionSpec;
         this.conjuncts = ImmutableSet.copyOf(Objects.requireNonNull(conjuncts, "conjuncts should not be null"));
     }
@@ -66,7 +64,7 @@ public class PhysicalEsScan extends PhysicalCatalogRelation {
             LogicalProperties logicalProperties, PhysicalProperties physicalProperties, Statistics statistics,
             Set<Expression> conjuncts) {
         super(id, PlanType.PHYSICAL_ES_SCAN, table, qualifier, groupExpression, logicalProperties,
-                physicalProperties, statistics, ImmutableList.of());
+                physicalProperties, statistics);
         this.distributionSpec = distributionSpec;
         this.conjuncts = ImmutableSet.copyOf(Objects.requireNonNull(conjuncts, "conjuncts should not be null"));
     }

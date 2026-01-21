@@ -893,25 +893,6 @@ public class ExpressionUtils {
         }, null);
     }
 
-    /**
-     * format a list of slots
-     */
-    public static String slotListShapeInfo(List<Slot> materializedSlots) {
-        StringBuilder shapeBuilder = new StringBuilder();
-        shapeBuilder.append("(");
-        boolean isFirst = true;
-        for (Slot slot : materializedSlots) {
-            if (isFirst) {
-                shapeBuilder.append(slot.shapeInfo());
-                isFirst = false;
-            } else {
-                shapeBuilder.append(",").append(slot.shapeInfo());
-            }
-        }
-        shapeBuilder.append(")");
-        return shapeBuilder.toString();
-    }
-
     /** distinctSlotByName */
     public static List<Slot> distinctSlotByName(List<Slot> slots) {
         Set<String> existSlotNames = new HashSet<>(slots.size() * 2);

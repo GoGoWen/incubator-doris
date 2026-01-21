@@ -126,7 +126,6 @@ public enum PlanType {
     PHYSICAL_TOP_N,
     PHYSICAL_UNION,
     PHYSICAL_WINDOW,
-    PHYSICAL_MATERIALIZE,
 
     // commands
     CREATE_POLICY_COMMAND,

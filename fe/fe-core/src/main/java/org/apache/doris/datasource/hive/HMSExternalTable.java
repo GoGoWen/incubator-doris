@@ -94,7 +94,6 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
     private static final Logger LOG = LogManager.getLogger(HMSExternalTable.class);
 
     public static final Set<String> SUPPORTED_HIVE_FILE_FORMATS;
-    public static final Set<String> SUPPORTED_HIVE_TOPN_LAZY_FILE_FORMATS;
     public static final Set<String> SUPPORTED_HIVE_TRANSACTIONAL_FILE_FORMATS;
     public static final Set<String> SUPPORTED_HUDI_FILE_FORMATS;
 
@@ -133,10 +132,6 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
 
         SUPPORTED_HIVE_TRANSACTIONAL_FILE_FORMATS = Sets.newHashSet();
         SUPPORTED_HIVE_TRANSACTIONAL_FILE_FORMATS.add("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat");
-
-        SUPPORTED_HIVE_TOPN_LAZY_FILE_FORMATS = Sets.newHashSet();
-        SUPPORTED_HIVE_TOPN_LAZY_FILE_FORMATS.add("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat");
-        SUPPORTED_HIVE_TOPN_LAZY_FILE_FORMATS.add("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat");
     }
 
     static {
@@ -310,25 +305,6 @@ public class HMSExternalTable extends ExternalTable implements MTMVRelatedTableI
             LOG.debug("hms table {} is {} with file format: {}", name, remoteTable.getTableType(), inputFileFormat);
         }
         return true;
-    }
-
-    /**
-     * Only support /orc/orc transactional/parquet table.
-     */
-    public boolean supportedHiveTopNLazyTable() {
-        if (remoteTable.getSd() == null) {
-            return false;
-        }
-
-        if (remoteTable.isSetViewExpandedText() || remoteTable.isSetViewOriginalText()) {
-            return false;
-        }
-
-        String inputFileFormat = remoteTable.getSd().getInputFormat();
-        if (inputFileFormat == null) {
-            return false;
-        }
-        return SUPPORTED_HIVE_TOPN_LAZY_FILE_FORMATS.contains(inputFileFormat);
     }
 
     /**

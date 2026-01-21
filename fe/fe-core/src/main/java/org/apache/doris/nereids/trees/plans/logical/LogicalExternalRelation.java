@@ -21,14 +21,12 @@ import org.apache.doris.catalog.TableIf;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.properties.LogicalProperties;
 import org.apache.doris.nereids.trees.expressions.Expression;
-import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.plans.PlanType;
 import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.visitor.PlanVisitor;
 
 import com.google.common.collect.ImmutableSet;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -44,9 +42,8 @@ public abstract class LogicalExternalRelation extends LogicalCatalogRelation {
 
     public LogicalExternalRelation(RelationId relationId, PlanType type, TableIf table, List<String> qualifier,
             Set<Expression> conjuncts,
-            Optional<GroupExpression> groupExpression, Optional<LogicalProperties> logicalProperties,
-            Collection<Slot> operativeSlots) {
-        super(relationId, type, table, qualifier, groupExpression, logicalProperties, operativeSlots);
+            Optional<GroupExpression> groupExpression, Optional<LogicalProperties> logicalProperties) {
+        super(relationId, type, table, qualifier, groupExpression, logicalProperties);
         this.conjuncts = ImmutableSet.copyOf(Objects.requireNonNull(conjuncts, "conjuncts should not be null"));
     }
 

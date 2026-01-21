@@ -64,7 +64,7 @@ public class LogicalDeferMaterializeOlapScan extends LogicalCatalogRelation impl
             Set<ExprId> deferMaterializeSlotIds, SlotReference columnIdSlot,
             Optional<GroupExpression> groupExpression, Optional<LogicalProperties> logicalProperties) {
         super(logicalOlapScan.getRelationId(), logicalOlapScan.getType(), logicalOlapScan.getTable(),
-                logicalOlapScan.getQualifier(), groupExpression, logicalProperties, ImmutableList.of());
+                logicalOlapScan.getQualifier(), groupExpression, logicalProperties);
         this.logicalOlapScan = Objects.requireNonNull(logicalOlapScan, "logicalOlapScan can not be null");
         this.deferMaterializeSlotIds = ImmutableSet.copyOf(Objects.requireNonNull(deferMaterializeSlotIds,
                 "deferMaterializeSlotIds can not be null"));

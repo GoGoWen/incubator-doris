@@ -111,7 +111,7 @@ public class RewriteTopDownJobTest {
         public LogicalBoundRelation(TableIf table, List<String> qualifier, Optional<GroupExpression> groupExpression,
                 Optional<LogicalProperties> logicalProperties) {
             super(StatementScopeIdGenerator.newRelationId(), PlanType.LOGICAL_BOUND_RELATION, table, qualifier,
-                    groupExpression, logicalProperties, ImmutableList.of());
+                    groupExpression, logicalProperties);
         }
 
         @Override
