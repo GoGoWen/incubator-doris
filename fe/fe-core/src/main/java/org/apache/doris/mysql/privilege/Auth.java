@@ -1072,6 +1072,15 @@ public class Auth implements Writable {
         }
     }
 
+    public boolean getEnableExternalFileCache(String qualifiedUser) {
+        readLock();
+        try {
+            return propertyMgr.getEnableExternalFileCache(qualifiedUser);
+        } finally {
+            readUnlock();
+        }
+    }
+
     public long getMaxQueryInstances(String qualifiedUser) {
         readLock();
         try {

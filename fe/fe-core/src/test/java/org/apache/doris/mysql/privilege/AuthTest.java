@@ -37,6 +37,7 @@ import org.apache.doris.catalog.Env;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.ExceptionChecker;
+import org.apache.doris.common.Pair;
 import org.apache.doris.common.UserException;
 import org.apache.doris.datasource.InternalCatalog;
 import org.apache.doris.mysql.MysqlPassword;
@@ -2480,5 +2481,63 @@ public class AuthTest {
         }
         Assert.assertTrue(findWgPriv);
 
+    }
+
+    @Test
+    public void testGetEnableExternalFileCache() throws UserException {
+        // Test 1: Default value for non-existent user (should return true)
+        String nonExistentUser = "non_existent_user";
+        Assert.assertTrue("Default value for non-existent user should be true",
+                auth.getEnableExternalFileCache(nonExistentUser));
+
+        // Test 2: Create a user and test default value (should return true)
+        UserIdentity userIdentity = new UserIdentity("testFileCacheUser", "%");
+        UserDesc userDesc = new UserDesc(userIdentity, "12345", true);
+        CreateUserStmt createUserStmt = new CreateUserStmt(false, userDesc, null);
+        try {
+            createUserStmt.analyze(analyzer);
+            auth.createUser(createUserStmt);
+        } catch (UserException e) {
+            e.printStackTrace();
+            Assert.fail("Failed to create user: " + e.getMessage());
+        }
+
+        String qualifiedUser = userIdentity.getQualifiedUser();
+        Assert.assertTrue("Default value for user without property should be true",
+                auth.getEnableExternalFileCache(qualifiedUser));
+
+        // Test 3: Set property to false
+        List<Pair<String, String>> properties = Lists.newArrayList();
+        properties.add(Pair.of("enable_external_file_cache", "false"));
+        try {
+            auth.updateUserPropertyInternal(qualifiedUser, properties, false);
+        } catch (UserException e) {
+            e.printStackTrace();
+            Assert.fail("Failed to update user property: " + e.getMessage());
+        }
+        Assert.assertFalse("Should return false after setting property to false",
+                auth.getEnableExternalFileCache(qualifiedUser));
+
+        // Test 4: Set property to true
+        properties.clear();
+        properties.add(Pair.of("enable_external_file_cache", "true"));
+        try {
+            auth.updateUserPropertyInternal(qualifiedUser, properties, false);
+        } catch (UserException e) {
+            e.printStackTrace();
+            Assert.fail("Failed to update user property: " + e.getMessage());
+        }
+        Assert.assertTrue("Should return true after setting property to true",
+                auth.getEnableExternalFileCache(qualifiedUser));
+
+        // Test 5: Clean up - drop the user
+        DropUserStmt dropUserStmt = new DropUserStmt(userIdentity);
+        try {
+            dropUserStmt.analyze(analyzer);
+            auth.dropUser(dropUserStmt);
+        } catch (UserException e) {
+            e.printStackTrace();
+            Assert.fail("Failed to drop user: " + e.getMessage());
+        }
     }
 }

@@ -49,7 +49,12 @@ public class UserPropertyTest {
 
     @Before
     public void setUp() {
-        new Expectations(env) {
+        // Use FakeEnv to mock static methods
+        fakeEnv = new FakeEnv();
+        FakeEnv.setMetaVersion(FeConstants.meta_version);
+        FakeEnv.setEnv(env);
+
+        new Expectations() {
             {
                 env.getSqlBlockRuleMgr();
                 minTimes = 0;
@@ -80,10 +85,6 @@ public class UserPropertyTest {
 
     @Test
     public void testNormal() throws IOException, DdlException {
-        // mock catalog
-        fakeEnv = new FakeEnv();
-        FakeEnv.setMetaVersion(FeConstants.meta_version);
-
         String qualifiedUser = "root";
         UserProperty property = new UserProperty(qualifiedUser);
         // To image
@@ -195,5 +196,156 @@ public class UserPropertyTest {
             Assert.assertTrue(e.getMessage().contains("is not valid"));
         }
         Assert.assertEquals(-1, userProperty.getCpuResourceLimit());
+    }
+
+    @Test
+    public void testGetEnableExternalFileCache() {
+        // Test 1: Default value should be true
+        UserProperty userProperty = new UserProperty();
+        Assert.assertTrue("Default value of enableExternalFileCache should be true",
+                userProperty.getEnableExternalFileCache());
+    }
+
+    @Test
+    public void testUpdateEnableExternalFileCache() throws UserException {
+        // Test 2: Update enable_external_file_cache to true
+        UserProperty userProperty = new UserProperty();
+        List<Pair<String, String>> properties = Lists.newArrayList();
+        properties.add(Pair.of("enable_external_file_cache", "true"));
+        userProperty.update(properties);
+        Assert.assertTrue("Should return true after setting to true",
+                userProperty.getEnableExternalFileCache());
+
+        // Test 3: Update enable_external_file_cache to false
+        properties.clear();
+        properties.add(Pair.of("enable_external_file_cache", "false"));
+        userProperty.update(properties);
+        Assert.assertFalse("Should return false after setting to false",
+                userProperty.getEnableExternalFileCache());
+
+        // Test 4: Update enable_external_file_cache back to true
+        properties.clear();
+        properties.add(Pair.of("enable_external_file_cache", "true"));
+        userProperty.update(properties);
+        Assert.assertTrue("Should return true after setting back to true",
+                userProperty.getEnableExternalFileCache());
+    }
+
+    @Test
+    public void testUpdateEnableExternalFileCacheCaseInsensitive() throws UserException {
+        // Test 5: Case insensitive property name
+        UserProperty userProperty = new UserProperty();
+        List<Pair<String, String>> properties = Lists.newArrayList();
+        properties.add(Pair.of("ENABLE_EXTERNAL_FILE_CACHE", "false"));
+        userProperty.update(properties);
+        Assert.assertFalse("Should handle case insensitive property name",
+                userProperty.getEnableExternalFileCache());
+
+        properties.clear();
+        properties.add(Pair.of("Enable_External_File_Cache", "true"));
+        userProperty.update(properties);
+        Assert.assertTrue("Should handle mixed case property name",
+                userProperty.getEnableExternalFileCache());
+    }
+
+    @Test
+    public void testUpdateEnableExternalFileCacheFormatError() {
+        // Test 6: Format error - key with dot separator
+        UserProperty userProperty = new UserProperty();
+        List<Pair<String, String>> properties = Lists.newArrayList();
+        properties.add(Pair.of("enable_external_file_cache.subkey", "true"));
+        try {
+            userProperty.update(properties);
+            Assert.fail("Should throw DdlException for format error");
+        } catch (UserException e) {
+            Assert.assertTrue("Should throw format error",
+                    e.getMessage().contains("format error"));
+        }
+    }
+
+    @Test
+    public void testUpdateEnableExternalFileCacheInvalidBoolean() throws UserException {
+        // Test 7: Invalid boolean value - Boolean.parseBoolean returns false for invalid strings
+        // Note: Boolean.parseBoolean doesn't throw exception, it just returns false for non-"true" strings
+        UserProperty userProperty = new UserProperty();
+        List<Pair<String, String>> properties = Lists.newArrayList();
+
+        // "invalid" will be parsed as false by Boolean.parseBoolean (it never throws exception)
+        properties.add(Pair.of("enable_external_file_cache", "invalid"));
+        userProperty.update(properties);
+        // Boolean.parseBoolean doesn't throw exception, so this should succeed
+        // but the value will be false (any non-"true" string is parsed as false)
+        Assert.assertFalse("Invalid string should be parsed as false",
+                userProperty.getEnableExternalFileCache());
+
+        // Test with empty string
+        properties.clear();
+        properties.add(Pair.of("enable_external_file_cache", ""));
+        userProperty.update(properties);
+        Assert.assertFalse("Empty string should be parsed as false",
+                userProperty.getEnableExternalFileCache());
+
+        // Test with "1" (not "true")
+        properties.clear();
+        properties.add(Pair.of("enable_external_file_cache", "1"));
+        userProperty.update(properties);
+        Assert.assertFalse("'1' should be parsed as false (only 'true' is true)",
+                userProperty.getEnableExternalFileCache());
+    }
+
+    @Test
+    public void testUpdateEnableExternalFileCacheInFetchProperty() throws UserException {
+        // Test 8: Verify enable_external_file_cache appears in fetchProperty
+        UserProperty userProperty = new UserProperty();
+        List<Pair<String, String>> properties = Lists.newArrayList();
+        properties.add(Pair.of("enable_external_file_cache", "false"));
+        userProperty.update(properties);
+
+        List<List<String>> rows = userProperty.fetchProperty();
+        boolean found = false;
+        for (List<String> row : rows) {
+            String key = row.get(0);
+            String value = row.get(1);
+            if (key.equalsIgnoreCase("enable_external_file_cache")) {
+                found = true;
+                Assert.assertEquals("false", value);
+                break;
+            }
+        }
+        Assert.assertTrue("enable_external_file_cache should appear in fetchProperty", found);
+    }
+
+    @Test
+    public void testUpdateEnableExternalFileCacheWithOtherProperties() throws UserException {
+        // Test 9: Update enable_external_file_cache along with other properties
+        UserProperty userProperty = new UserProperty();
+        List<Pair<String, String>> properties = Lists.newArrayList();
+        properties.add(Pair.of("max_user_connections", "200"));
+        properties.add(Pair.of("enable_external_file_cache", "false"));
+        properties.add(Pair.of("query_timeout", "300"));
+        userProperty.update(properties);
+
+        Assert.assertEquals(200, userProperty.getMaxConn());
+        Assert.assertFalse("enable_external_file_cache should be false",
+                userProperty.getEnableExternalFileCache());
+        Assert.assertEquals(300, userProperty.getQueryTimeout());
+    }
+
+    @Test
+    public void testUpdateEnableExternalFileCacheDefaultValueInFetchProperty() {
+        // Test 10: Verify default value (true) appears in fetchProperty
+        UserProperty userProperty = new UserProperty();
+        List<List<String>> rows = userProperty.fetchProperty();
+        boolean found = false;
+        for (List<String> row : rows) {
+            String key = row.get(0);
+            String value = row.get(1);
+            if (key.equalsIgnoreCase("enable_external_file_cache")) {
+                found = true;
+                Assert.assertEquals("true", value);
+                break;
+            }
+        }
+        Assert.assertTrue("enable_external_file_cache should appear in fetchProperty with default value", found);
     }
 }

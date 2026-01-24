@@ -58,7 +58,6 @@ public interface FlightSessionsManager {
                 connectContext.getEnv().getAuth().getQueryTimeout(connectContext.getQualifiedUser()));
         connectContext.setUserInsertTimeout(
                 connectContext.getEnv().getAuth().getInsertTimeout(connectContext.getQualifiedUser()));
-
         connectContext.setConnectScheduler(ExecuteEnv.getInstance().getScheduler());
         return connectContext;
     }

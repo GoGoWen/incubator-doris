@@ -431,8 +431,15 @@ public class HiveScanNode extends FileQueryScanNode {
                 withCache = Boolean.valueOf(parameters.getOrDefault(key,
                         "true")) && withCache;
             }
+            boolean enableFileCache = true;
+            enableFileCache = ConnectContext.get() == null || Env.getCurrentEnv().getAuth().getEnableExternalFileCache(
+                    ConnectContext.get().getQualifiedUser());
+
+
             withCache = withCache && Config.max_external_file_cache_num > 0 && (ConnectContext.get() == null
                     || ConnectContext.get().getSessionVariable().getEnableExternalFileCache());
+
+            withCache = withCache && enableFileCache;
             withCache = withCache && partitions.size() <= Config.num_indicate_many_partitions;
             fileCaches = cache.getFilesByPartitions(partitions, withCache, bindBrokerName);
             if (Config.enable_log_empty_partition_when_list_file) {

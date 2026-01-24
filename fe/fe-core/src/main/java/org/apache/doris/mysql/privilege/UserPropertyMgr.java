@@ -128,6 +128,15 @@ public class UserPropertyMgr implements Writable {
         return existProperty.getParallelFragmentExecInstanceNum();
     }
 
+    public boolean getEnableExternalFileCache(String qualifiedUser) {
+        UserProperty existProperty = propertyMap.get(qualifiedUser);
+        existProperty = getLdapPropertyIfNull(qualifiedUser, existProperty);
+        if (existProperty == null) {
+            return true;
+        }
+        return existProperty.getEnableExternalFileCache();
+    }
+
     public Set<Tag> getResourceTags(String qualifiedUser) {
         UserProperty existProperty = propertyMap.get(qualifiedUser);
         existProperty = getLdapPropertyIfNull(qualifiedUser, existProperty);

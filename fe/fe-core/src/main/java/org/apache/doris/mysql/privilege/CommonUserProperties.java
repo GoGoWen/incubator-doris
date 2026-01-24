@@ -67,6 +67,9 @@ public class CommonUserProperties implements Writable {
     @SerializedName("workloadGroup")
     private String workloadGroup = WorkloadGroupMgr.DEFAULT_GROUP_NAME;
 
+    @SerializedName("enableExternalFileCache")
+    private boolean enableExternalFileCache = true;
+
     private String[] sqlBlockRulesSplit = {};
 
     long getMaxConn() {
@@ -160,6 +163,14 @@ public class CommonUserProperties implements Writable {
 
     public void setWorkloadGroup(String workloadGroup) {
         this.workloadGroup = workloadGroup;
+    }
+
+    public boolean getEnableExternalFileCache() {
+        return enableExternalFileCache;
+    }
+
+    public void setEnableExternalFileCache(boolean enableExternalFileCache) {
+        this.enableExternalFileCache = enableExternalFileCache;
     }
 
     public static CommonUserProperties read(DataInput in) throws IOException {

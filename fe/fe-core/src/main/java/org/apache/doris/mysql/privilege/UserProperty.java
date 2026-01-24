@@ -79,6 +79,7 @@ public class UserProperty implements Writable {
     private static final String PROP_DEFAULT_LOAD_CLUSTER = "default_load_cluster";
 
     private static final String PROP_WORKLOAD_GROUP = "default_workload_group";
+    private static final String PROP_ENABLE_EXTERNAL_FILE_CACHE = "enable_external_file_cache";
 
     // for system user
     public static final Set<Pattern> ADVANCED_PROPERTIES = Sets.newHashSet();
@@ -128,6 +129,7 @@ public class UserProperty implements Writable {
         COMMON_PROPERTIES.add(Pattern.compile("^" + PROP_LOAD_CLUSTER + "." + DppConfig.CLUSTER_NAME_REGEX + ".",
                 Pattern.CASE_INSENSITIVE));
         COMMON_PROPERTIES.add(Pattern.compile("^" + PROP_WORKLOAD_GROUP + "$", Pattern.CASE_INSENSITIVE));
+        COMMON_PROPERTIES.add(Pattern.compile("^" + PROP_ENABLE_EXTERNAL_FILE_CACHE + "$", Pattern.CASE_INSENSITIVE));
     }
 
     public UserProperty() {
@@ -173,6 +175,10 @@ public class UserProperty implements Writable {
         return commonProperties.getWorkloadGroup();
     }
 
+    public boolean getEnableExternalFileCache() {
+        return commonProperties.getEnableExternalFileCache();
+    }
+
     @Deprecated
     public WhiteList getWhiteList() {
         return whiteList;
@@ -202,6 +208,7 @@ public class UserProperty implements Writable {
         int queryTimeout = this.commonProperties.getQueryTimeout();
         int insertTimeout = this.commonProperties.getInsertTimeout();
         String workloadGroup = this.commonProperties.getWorkloadGroup();
+        boolean enableExternalFileCache = this.commonProperties.getEnableExternalFileCache();
 
         String newDefaultLoadCluster = defaultLoadCluster;
         Map<String, DppConfig> newDppConfigs = Maps.newHashMap(clusterToDppConfig);
@@ -341,6 +348,16 @@ public class UserProperty implements Writable {
                     throw new DdlException("workload group " + value + " not exists");
                 }
                 workloadGroup = value;
+            } else if (keyArr[0].equalsIgnoreCase(PROP_ENABLE_EXTERNAL_FILE_CACHE)) {
+                if (keyArr.length != 1) {
+                    throw new DdlException(PROP_ENABLE_EXTERNAL_FILE_CACHE + " format error");
+                }
+
+                try {
+                    enableExternalFileCache = Boolean.parseBoolean(value);
+                } catch (NumberFormatException e) {
+                    throw new DdlException(PROP_ENABLE_EXTERNAL_FILE_CACHE + " is not boolean");
+                }
             } else {
                 if (isReplay) {
                     // After using SET PROPERTY to modify the user property, if FE rolls back to a version without
@@ -364,6 +381,7 @@ public class UserProperty implements Writable {
         this.commonProperties.setQueryTimeout(queryTimeout);
         this.commonProperties.setInsertTimeout(insertTimeout);
         this.commonProperties.setWorkloadGroup(workloadGroup);
+        this.commonProperties.setEnableExternalFileCache(enableExternalFileCache);
         if (newDppConfigs.containsKey(newDefaultLoadCluster)) {
             defaultLoadCluster = newDefaultLoadCluster;
         } else {
@@ -499,6 +517,9 @@ public class UserProperty implements Writable {
         result.add(Lists.newArrayList(PROP_RESOURCE_TAGS, Joiner.on(", ").join(commonProperties.getResourceTags())));
 
         result.add(Lists.newArrayList(PROP_WORKLOAD_GROUP, String.valueOf(commonProperties.getWorkloadGroup())));
+
+        result.add(Lists.newArrayList(PROP_ENABLE_EXTERNAL_FILE_CACHE,
+                String.valueOf(commonProperties.getEnableExternalFileCache())));
 
         // load cluster
         if (defaultLoadCluster != null) {
