@@ -576,6 +576,7 @@ TRY_CAST: 'TRY_CAST';
 TYPE: 'TYPE';
 TYPECAST: 'TYPE_CAST';
 TYPES: 'TYPES';
+UESCAPE: 'UESCAPE';
 UNBOUNDED: 'UNBOUNDED';
 UNCOMMITTED: 'UNCOMMITTED';
 UNINSTALL: 'UNINSTALL';
@@ -653,6 +654,10 @@ DOUBLEATSIGN: '@@';
 STRING_LITERAL
     :  '\'' ( {!isNoBackslashEscapes}? '\\'. | '\'\'' | {!isNoBackslashEscapes}? ~('\'' | '\\') | {isNoBackslashEscapes}? ~('\''))* '\''
     | '"' ( {!isNoBackslashEscapes}? '\\'. | '""' | {!isNoBackslashEscapes}? ~('"'| '\\') | {isNoBackslashEscapes}? ~('"'))* '"'
+    ;
+
+UNICODE_STRING_LITERAL
+    : 'U&\'' ( ~'\'' | '\'\'' )* '\''
     ;
 
 VARBINARY_LITERAL
