@@ -1397,6 +1397,7 @@ limitClause
     : (LIMIT limit=INTEGER_VALUE)
     | (LIMIT limit=INTEGER_VALUE OFFSET offset=INTEGER_VALUE)
     | (LIMIT offset=INTEGER_VALUE COMMA limit=INTEGER_VALUE)
+    | (OFFSET offset=INTEGER_VALUE LIMIT limit=INTEGER_VALUE)
     ;
 
 partitionClause
@@ -2169,7 +2170,6 @@ nonReserved
     | NULLS
     | OF
     | OFF
-    | OFFSET
     | ONLY
     | OPEN
     | OPTIMIZE
