@@ -106,6 +106,7 @@ public class AcceptListener implements ChannelListener<AcceptingChannel<StreamCo
 
             // authenticate check failed.
             if (!MysqlProto.negotiate(context)) {
+                MysqlProto.sendResponsePacket(context);
                 throw new AfterConnectedException("mysql negotiate failed");
             }
             int res = connectScheduler.getConnectPoolMgr().registerConnection(context);

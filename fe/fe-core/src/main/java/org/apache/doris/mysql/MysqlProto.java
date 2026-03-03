@@ -134,7 +134,6 @@ public class MysqlProto {
                 MysqlSslPacket sslPacket = new MysqlSslPacket();
                 if (!sslPacket.readFrom(sslConnectionRequest)) {
                     ErrorReport.report(ErrorCode.ERR_NOT_SUPPORTED_AUTH_MODE);
-                    sendResponsePacket(context);
                     return false;
                 }
                 // try to establish ssl connection.
@@ -144,7 +143,6 @@ public class MysqlProto {
                     // The ssl handshake phase still uses plaintext.
                     if (!mysqlSslContext.sslExchange(channel)) {
                         ErrorReport.report(ErrorCode.ERR_NOT_SUPPORTED_AUTH_MODE);
-                        sendResponsePacket(context);
                         return false;
                     }
                 } catch (Exception e) {
@@ -182,7 +180,6 @@ public class MysqlProto {
         MysqlAuthPacket authPacket = new MysqlAuthPacket();
         if (!authPacket.readFrom(handshakeResponse)) {
             ErrorReport.report(ErrorCode.ERR_NOT_SUPPORTED_AUTH_MODE);
-            sendResponsePacket(context);
             return false;
         }
 
@@ -190,7 +187,6 @@ public class MysqlProto {
         if (!MysqlCapability.isCompatible(context.getServerCapability(), authPacket.getCapability())) {
             // TODO: client return capability can not support
             ErrorReport.report(ErrorCode.ERR_NOT_SUPPORTED_AUTH_MODE);
-            sendResponsePacket(context);
             return false;
         }
 
@@ -303,7 +299,6 @@ public class MysqlProto {
             }
         } catch (DdlException e) {
             context.getState().setError(e.getMysqlErrorCode(), e.getMessage());
-            sendResponsePacket(context);
             return false;
         }
 
